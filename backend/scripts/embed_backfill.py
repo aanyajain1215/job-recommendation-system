@@ -1,15 +1,18 @@
-"""Batch embedding backfill for jobs + profiles (plan §4/§13).
+"""Batch embedding backfill for jobs + profiles + skills (plan §4/§13).
 
 Recomputes null-or-stale embedding vectors in batches using the configured
 backend (MiniLM when importable, deterministic hashing fallback otherwise).
 Vectors are invalidated on write (updated_at > embedding_updated_at) and
 this script is the bulk recompute path; the API also fills lazily.
+Skill vectors power family centroids / transfer similarity (plan §5/§11) —
+Skill rows carry no updated_at, so they recompute whenever null.
 
 Usage:
     cd backend
-    python -m scripts.embed_backfill                # jobs + profiles
+    python -m scripts.embed_backfill                # jobs + profiles + skills
     python -m scripts.embed_backfill --jobs-only
     python -m scripts.embed_backfill --profiles-only
+    python -m scripts.embed_backfill --skills-only
 """
 
 from __future__ import annotations
@@ -23,7 +26,7 @@ from sqlalchemy.orm import selectinload
 from app.core.db import SessionLocal
 from app.models.job import Job
 from app.models.profile import Profile
-from app.models.skill import JobSkill, ProfileSkill
+from app.models.skill import JobSkill, ProfileSkill, Skill
 from app.services.embeddings import build_job_text, build_profile_text, get_embedder
 
 BATCH_SIZE = 128
@@ -101,11 +104,32 @@ def backfill_profiles(db, embedder) -> tuple[int, int]:
     return len(stale), len(profiles)
 
 
+def backfill_skills(db, embedder) -> tuple[int, int]:
+    skills = db.scalars(select(Skill)).all()
+    stale = [s for s in skills if s.embedding is None or s.embedding_updated_at is None]
+    now = datetime.now(timezone.utc)
+    for start in range(0, len(stale), BATCH_SIZE):
+        chunk = stale[start : start + BATCH_SIZE]
+        texts = [
+            f"{s.name} ({s.category})" if s.category else s.name
+            for s in chunk
+        ]
+        for skill, vec in zip(chunk, embedder.encode(texts), strict=True):
+            skill.embedding = vec.tolist()
+            skill.embedding_updated_at = now
+        db.commit()
+        print(f"  skills: {min(start + BATCH_SIZE, len(stale))}/{len(stale)}")
+    return len(stale), len(skills)
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Backfill job/profile embeddings")
+    parser = argparse.ArgumentParser(
+        description="Backfill job/profile/skill embeddings"
+    )
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--jobs-only", action="store_true")
     group.add_argument("--profiles-only", action="store_true")
+    group.add_argument("--skills-only", action="store_true")
     args = parser.parse_args()
 
     embedder = get_embedder()
@@ -113,12 +137,16 @@ def main() -> None:
 
     db = SessionLocal()
     try:
-        if not args.profiles_only:
+        only = args.jobs_only or args.profiles_only or args.skills_only
+        if not only or args.jobs_only:
             done, total = backfill_jobs(db, embedder)
             print(f"jobs: {done}/{total} embedded")
-        if not args.jobs_only:
+        if not only or args.profiles_only:
             done, total = backfill_profiles(db, embedder)
             print(f"profiles: {done}/{total} embedded")
+        if not only or args.skills_only:
+            done, total = backfill_skills(db, embedder)
+            print(f"skills: {done}/{total} embedded")
         print("embed_backfill complete.")
     finally:
         db.close()

@@ -40,6 +40,26 @@ class Settings(BaseSettings):
     exploration_rate: float = 0.1667  # 1-in-6 feed slots
     transfer_similarity_threshold: float = 0.65
 
+    # ---- Skill Gap Engine (plan §8) ----
+    gap_strong_min_years: float = 2.0
+
+    # ---- Career Roadmap Generator (plan §9) ----
+    roadmap_weak_partial_importance: float = 1.4
+    roadmap_phase_max_hours: float = 25.0
+    roadmap_project_every_n_skills: int = 2
+
+    # ---- Alternative Career Discovery (plan §11) ----
+    discovery_threshold: float = 55.0          # τ — minimum affinity to suggest
+    discovery_weight_strong: float = 1.0
+    discovery_weight_partial: float = 0.6
+    discovery_weight_transfer: float = 0.7     # × transfer similarity
+    discovery_weight_semantic: float = 0.3     # blend = 0.7·overlap + 0.3·semantic
+
+    # ---- LLM layer (plan §15) ----
+    llm_cache_ttl_seconds: int = 3600
+    llm_cache_max_entries: int = 256
+    llm_max_repair_turns: int = 1
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

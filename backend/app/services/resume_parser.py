@@ -1,19 +1,24 @@
 """
-Resume parsing service.
+Resume parsing service (plan §15 P1 — routed through the provider abstraction).
 
-Two parsing paths:
-  1. GeminiResumeParser  — calls Gemini 1.5 Flash with a strict JSON schema prompt.
-                           Used when GEMINI_API_KEY is configured.
-  2. RegexResumeParser   — heuristic extraction: common-tech-skill keyword matching
-                           + date-span regex for years_of_experience estimation.
-                           Used as fallback (no external calls, always available).
+Parsing paths:
+  1. LlmResumeParser     — P1 through `services.llm.provider` with a strict
+                           JSON schema, then evidence-preserving validation
+                           (span + skill-token checks): violating rows are
+                           dropped, the call is flagged, the valid rows are
+                           kept.  Used whenever a provider is configured
+                           (OpenAI default, Gemini retained).
+  2. RegexResumeParser   — heuristic extraction: common-tech-skill keyword
+                           matching + date-span regex for years estimation.
+                           Always available fallback — no external calls.
 
-Public API:
+Public API (stable — tests and api/profiles.py import these names):
     parse_resume(file_bytes: bytes, extension: str) -> ParsedResume
+    ParsedResume, RegexResumeParser, GeminiResumeParser
+    _extract_text, _estimate_years, _infer_seniority
 """
 from __future__ import annotations
 
-import json
 import logging
 import re
 from io import BytesIO
@@ -57,7 +62,12 @@ class ParsedResume(BaseModel):
     seniority: str | None = None          # maps to ExperienceLevel enum values
     education: list[ParsedEducation] = Field(default_factory=list)
     work_experience: list[ParsedWorkExperience] = Field(default_factory=list)
-    parser_used: str = "regex"            # "gemini" | "regex"
+    parser_used: str = "regex"            # "openai" | "gemini" | "regex" | "regex_fallback"
+    # ---- P1 upgraded schema (plan §15: evidence-preserving extraction) ----
+    evidence: list[dict[str, Any]] = Field(default_factory=list)
+    projects: list[dict[str, Any]] = Field(default_factory=list)
+    certifications: list[dict[str, Any]] = Field(default_factory=list)
+    interests: list[str] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -231,107 +241,80 @@ class RegexResumeParser:
 
 
 # ---------------------------------------------------------------------------
-# Gemini LLM parser
+# LLM parser (plan §15 P1 — provider abstraction + validators)
 # ---------------------------------------------------------------------------
 
-_GEMINI_PROMPT = """You are a precise resume parsing assistant.
-Extract structured information from the resume text below and return ONLY valid JSON matching this exact schema — no markdown, no explanation, nothing else:
+class LlmResumeParser:
+    """P1 through the provider abstraction with evidence-preserving repair.
 
-{{
-  "skills": [
-    {{"name": "Python", "category": "programming", "years": 3}},
-    ...
-  ],
-  "years_of_experience": 4.5,
-  "seniority": "mid",
-  "education": [
-    {{"degree": "B.Tech Computer Science", "institution": "IIT Delhi", "year": 2020, "field_of_study": "Computer Science"}}
-  ],
-  "work_experience": [
-    {{"title": "Software Engineer", "company": "Google", "duration_years": 2.0, "description": "Built ML pipelines"}}
-  ]
-}}
+    Contract: span/skill-token violations never reach the profile.  Rows
+    failing validation are dropped (valid rows are kept — extraction is
+    evidence-preserving, not all-or-nothing), the usage is flagged in
+    `llm_usage`, and any hard failure falls back to the regex parser.
+    """
 
-Allowed seniority values: entry, mid, senior, lead, executive
-If a field is unknown, use null.
-Keep skill names clean canonical strings (e.g. "React" not "reactjs").
+    def __init__(self) -> None:
+        from app.services.llm import get_provider  # noqa: PLC0415
 
-RESUME TEXT:
-{resume_text}"""
+        self._provider = get_provider()
 
-
-class GeminiResumeParser:
-    """LLM-based parser using Gemini 1.5 Flash."""
-
-    def __init__(self, api_key: str) -> None:
-        try:
-            import google.generativeai as genai  # type: ignore[import-untyped]
-            genai.configure(api_key=api_key)
-            self._model = genai.GenerativeModel("gemini-1.5-flash")
-            self._available = True
-        except ImportError:
-            logger.warning("google-generativeai not installed; falling back to regex parser.")
-            self._available = False
+    @property
+    def available(self) -> bool:
+        return self._provider is not None
 
     def parse(self, text: str) -> ParsedResume:
-        if not self._available:
+        if self._provider is None:
             return RegexResumeParser().parse(text)
 
-        prompt = _GEMINI_PROMPT.format(resume_text=text[:12000])  # token budget
+        from app.services.llm import mark_flagged, validators  # noqa: PLC0415
+        from app.services.llm import prompts  # noqa: PLC0415
+
         try:
-            response = self._model.generate_content(prompt)
-            raw = response.text.strip()
-
-            # Strip any accidental markdown fences
-            if raw.startswith("```"):
-                raw = re.sub(r"^```(?:json)?\s*", "", raw)
-                raw = re.sub(r"\s*```$", "", raw)
-
-            data: dict[str, Any] = json.loads(raw)
-
-            skills = [
-                ParsedSkill(
-                    name=s.get("name", ""),
-                    category=s.get("category"),
-                    years=s.get("years"),
-                )
-                for s in data.get("skills", [])
-                if s.get("name")
-            ]
-            education = [
-                ParsedEducation(
-                    degree=e.get("degree"),
-                    institution=e.get("institution"),
-                    year=e.get("year"),
-                    field_of_study=e.get("field_of_study"),
-                )
-                for e in data.get("education", [])
-            ]
-            work_experience = [
-                ParsedWorkExperience(
-                    title=w.get("title"),
-                    company=w.get("company"),
-                    duration_years=w.get("duration_years"),
-                    description=w.get("description"),
-                )
-                for w in data.get("work_experience", [])
-            ]
-
-            return ParsedResume(
-                raw_text=text,
-                skills=skills,
-                years_of_experience=data.get("years_of_experience"),
-                seniority=data.get("seniority"),
-                education=education,
-                work_experience=work_experience,
-                parser_used="gemini",
+            parsed, usage = self._provider.complete_json(
+                ParsedResume,
+                prompts.p1_resume(text),
+                system=(
+                    "You extract structured resume data. You never invent "
+                    "content: every claim must be traceable to the source text."
+                ),
+                max_tokens=2500,
+                route="P1",
             )
-
-        except (json.JSONDecodeError, Exception) as exc:
-            logger.warning("Gemini parsing failed (%s); falling back to regex.", exc)
+        except Exception as exc:
+            logger.warning("P1 LLM parsing failed (%s); falling back to regex.", exc)
             result = RegexResumeParser().parse(text)
             result.parser_used = "regex_fallback"
             return result
+
+        # ---- evidence-preserving validation (plan §15) ----
+        problems: list[str] = []
+        problems += validators.validate_spans(parsed.evidence, text)
+        problems += validators.validate_skill_tokens(
+            [s.name for s in parsed.skills], text
+        )
+
+        if problems:
+            mark_flagged(usage, reason="P1: " + "; ".join(problems[:3]))
+            logger.warning("P1 output failed validators (%s); filtering rows.", problems)
+            # Drop only violating rows — keep everything that passed.
+            parsed.evidence = [
+                e for e in parsed.evidence if validators.validate_spans([e], text) == []
+            ]
+            src_lower = text.lower()
+            parsed.skills = [
+                s for s in parsed.skills
+                if s.name and s.name.lower().strip() in src_lower
+            ]
+
+        parsed.raw_text = text
+        parsed.parser_used = self._provider.name
+        if parsed.seniority is None:
+            parsed.seniority = _infer_seniority(text, parsed.years_of_experience)
+        return parsed
+
+
+# Back-compat alias (pre-provider name; nothing may break importing it)
+GeminiResumeParser = LlmResumeParser
 
 
 # ---------------------------------------------------------------------------
@@ -341,20 +324,16 @@ class GeminiResumeParser:
 def parse_resume(file_bytes: bytes, extension: str) -> ParsedResume:
     """Extract text from a resume file and return structured data.
 
-    Automatically selects GeminiResumeParser when GEMINI_API_KEY is set,
-    otherwise uses RegexResumeParser.
+    Uses the configured LLM provider (plan §15 — OpenAI default) whenever a
+    key is present; otherwise the deterministic regex parser.  Failures
+    inside the LLM path always fall back to regex, never to an error.
     """
-    from app.core.config import get_settings
-
     text = _extract_text(file_bytes, extension)
     if not text.strip():
         logger.warning("Resume text extraction yielded empty text for extension=%s", extension)
         return ParsedResume(raw_text="", parser_used="regex")
 
-    settings = get_settings()
-    if settings.gemini_api_key:
-        parser: GeminiResumeParser | RegexResumeParser = GeminiResumeParser(settings.gemini_api_key)
-    else:
-        parser = RegexResumeParser()
-
-    return parser.parse(text)
+    llm_parser = LlmResumeParser()
+    if llm_parser.available:
+        return llm_parser.parse(text)
+    return RegexResumeParser().parse(text)

@@ -16,6 +16,8 @@ pypdf>=4.3.0
 python-docx>=1.1.0
 # LLM-based structured extraction (Gemini) — optional; regex fallback used if key absent
 google-generativeai>=0.8.0
+# LLM provider abstraction (plan §15 — OpenAI default)
+openai>=1.40.0
 # Embeddings / similarity (plan §4)
 sentence-transformers>=2.6.0
 # Skill graph + roadmap ordering helpers (plan §5/§9)

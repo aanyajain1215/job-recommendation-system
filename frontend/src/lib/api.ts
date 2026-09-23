@@ -1,13 +1,20 @@
 import {
   ApplicationItem,
   ApplicationStats,
+  DiscoverResponse,
+  GapResponse,
   JobCreatePayload,
   JobDetail,
   JobListResponse,
   ProfileDetail,
   ProfileUpdatePayload,
   RecommendationFeedResponse,
+  RoadmapResponse,
+  SimulateRequest,
+  SimulateResponse,
+  SimulationListResponse,
   Skill,
+  StepCompleteResponse,
 } from "./types";
 
 export type ReadinessResponse = {
@@ -282,6 +289,73 @@ export async function getMyApplicationStats(token: string): Promise<ApplicationS
     };
   }
   return res.json();
+}
+
+// ---------------- Phase 2: Gap / Roadmap / Simulator / Careers ---------------- //
+
+async function authedJson<T>(url: string, token: string, init: RequestInit = {}): Promise<T> {
+  const res = await fetch(url, {
+    ...init,
+    headers: {
+      Accept: "application/json",
+      ...(init.body ? { "Content-Type": "application/json" } : {}),
+      Authorization: `Bearer ${token}`,
+      ...(init.headers || {}),
+    },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: `Request failed (${res.status})` }));
+    throw new Error(
+      typeof err.detail === "string" ? err.detail : `Request failed (${res.status})`,
+    );
+  }
+  return res.json() as Promise<T>;
+}
+
+export async function getJobGap(jobId: string, token: string): Promise<GapResponse> {
+  const base = getBrowserApiBaseUrl();
+  return authedJson(`${base}/api/v1/recommendations/${jobId}/gap`, token);
+}
+
+export async function getJobRoadmap(jobId: string, token: string): Promise<RoadmapResponse> {
+  const base = getBrowserApiBaseUrl();
+  return authedJson(`${base}/api/v1/recommendations/${jobId}/roadmap`, token);
+}
+
+export async function completeRoadmapStep(
+  pathId: string,
+  stepId: string,
+  token: string,
+): Promise<StepCompleteResponse> {
+  const base = getBrowserApiBaseUrl();
+  return authedJson(`${base}/api/v1/roadmaps/${pathId}/steps/${stepId}/complete`, token, {
+    method: "POST",
+  });
+}
+
+export async function runSimulation(
+  payload: SimulateRequest,
+  token: string,
+): Promise<SimulateResponse> {
+  const base = getBrowserApiBaseUrl();
+  return authedJson(`${base}/api/v1/simulate`, token, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getSimulations(
+  token: string,
+  limit: number = 10,
+): Promise<SimulationListResponse> {
+  const base = getBrowserApiBaseUrl();
+  return authedJson(`${base}/api/v1/simulations?limit=${limit}`, token);
+}
+
+export async function discoverCareers(token: string): Promise<DiscoverResponse> {
+  const base = getBrowserApiBaseUrl();
+  return authedJson(`${base}/api/v1/careers/discover`, token);
 }
 
 // ---------------- Generic API Client (Supports TanStack Query & direct use) ---------------- //

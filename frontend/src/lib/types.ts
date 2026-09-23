@@ -230,3 +230,172 @@ export interface ApplicationItem {
   updated_at: string;
   job?: JobDetail | null;
 }
+
+// ---------------- Phase 2: Gap · Roadmap · Simulator · Careers ---------------- //
+
+export type Readiness = { value: number; band: "low" | "medium" | "high" };
+
+export type GapStatus = "STRONG" | "PARTIAL" | "TRANSFERABLE" | "MISSING";
+
+export interface GapClassItem {
+  skill: string;
+  status: GapStatus;
+  evidence: {
+    reason?: string;
+    proficiency?: string | null;
+    years?: number | null;
+    transfer_similarity?: number;
+    via_skill?: string;
+    [key: string]: unknown;
+  };
+}
+
+export interface GapResponse {
+  job_id: string;
+  job_title: string;
+  match_score: number;
+  gap_score: number;
+  readiness: Readiness;
+  classes: GapClassItem[];
+  counts: { strong: number; partial: number; transferable: number; missing: number };
+  missing_required: string[];
+  weakest_link: string | null;
+  reasons: string[];
+}
+
+export interface RoadmapStep {
+  seq: number;
+  kind: "skill" | "project";
+  title: string;
+  skill: string | null;
+  category: string | null;
+  est_hours: number;
+  rationale: Record<string, unknown>;
+  /** Row UUID of the persisted CareerPathStep (null when no family anchor). */
+  id?: string | null;
+  /** Completion state persisted in the DB (never clobbered by re-reads). */
+  done?: boolean;
+}
+
+export interface RoadmapPhase {
+  label: string;
+  est_hours: number;
+  steps: RoadmapStep[];
+}
+
+export interface RoadmapResponse {
+  id: string | null;
+  job_id: string;
+  job_title: string;
+  steps: RoadmapStep[];
+  phases: RoadmapPhase[];
+  candidates: string[];
+  effort_band: "low" | "medium" | "high";
+  total_hours: number;
+  readiness_before: Readiness;
+  readiness_after: Readiness;
+  summary: string;
+}
+
+export interface StepCompleteResponse {
+  step_id: string;
+  path_id: string;
+  seq: number;
+  done_at: string;
+  path_status: string;
+  steps_done: number;
+  steps_total: number;
+}
+
+export interface SkillMutation {
+  name: string;
+  level?: ProficiencyLevel;
+  years?: number | null;
+}
+
+export interface SimulateRequest {
+  add_skills?: SkillMutation[];
+  remove_skills?: string[];
+  expected_salary?: { min?: number | null; max?: number | null; currency?: string | null } | null;
+  location?: string | null;
+  work_mode?: "remote" | "hybrid" | "onsite" | null;
+  target_family?: string | null;
+  add_project?: { name?: string; description?: string; skills?: string[] } | null;
+  add_cert?: { name?: string; issuer?: string } | null;
+  target_job_id?: string | null;
+}
+
+export interface SimulateDelta {
+  job_id: string;
+  job_title: string;
+  before: number;
+  after: number;
+  delta: number;
+  band_before: string;
+  band_after: string;
+  band_changed: boolean;
+  newly_eligible: boolean;
+  lost: boolean;
+}
+
+export interface SimulateTarget {
+  job_id: string;
+  job_title: string;
+  before: number;
+  after: number;
+  delta: number;
+  band_before: string;
+  band_after: string;
+  per_skill: { skill: string; score: number; band: string }[];
+}
+
+export interface ResultDelta {
+  before: { mean_score: number; band_counts: Record<string, number> };
+  after: { mean_score: number; band_counts: Record<string, number> };
+  deltas: SimulateDelta[];
+  target: SimulateTarget | null;
+  mutation: Record<string, unknown>;
+}
+
+export interface SimulateResponse {
+  id: string | null;
+  mutation: Record<string, unknown>;
+  result_delta: ResultDelta;
+}
+
+export interface SimulationListItem {
+  id: string;
+  mutation: Record<string, unknown>;
+  result_delta: ResultDelta;
+  created_at: string;
+}
+
+export interface SimulationListResponse {
+  items: SimulationListItem[];
+  total: number;
+}
+
+export interface FamilySuggestion {
+  family_id: string;
+  family: string;
+  affinity: number;
+  overlap: number;
+  semantic: number;
+  core_skill_count: number;
+  matched_count: number;
+  transfer_count: number;
+  explanation: {
+    top_skills: string[];
+    transfer_count: number;
+    nearest_edge: { from: string; to: string; relation: string } | null;
+    note: string;
+  };
+}
+
+export interface DiscoverResponse {
+  threshold: number;
+  target_family: string | null;
+  suggestions: FamilySuggestion[];
+  presets: FamilySuggestion[];
+  explored: number;
+}

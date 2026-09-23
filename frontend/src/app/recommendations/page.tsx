@@ -18,8 +18,10 @@ import {
   Layers,
   MapPin,
   RefreshCw,
+  Route,
   SlidersHorizontal,
   Sparkles,
+  Target,
   TrendingUp,
   UserCheck,
   Zap,
@@ -384,6 +386,23 @@ export default function RecommendationsPage() {
                         <div className="text-xs text-zinc-400">
                           Text Similarity: <strong className="text-zinc-200">{item.content_similarity_score}%</strong>
                         </div>
+                      </div>
+
+                      <div className="flex lg:flex-col gap-2">
+                        <Link
+                          href={`/gap/${item.job.id}`}
+                          className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-zinc-800 bg-zinc-900/70 px-3 py-2 text-xs font-semibold text-zinc-300 hover:border-teal-500/50 hover:text-teal-300 transition-colors"
+                        >
+                          <Target className="h-3.5 w-3.5" />
+                          Skill Gap
+                        </Link>
+                        <Link
+                          href={`/roadmap?jobId=${item.job.id}`}
+                          className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-zinc-800 bg-zinc-900/70 px-3 py-2 text-xs font-semibold text-zinc-300 hover:border-teal-500/50 hover:text-teal-300 transition-colors"
+                        >
+                          <Route className="h-3.5 w-3.5" />
+                          Roadmap
+                        </Link>
                       </div>
 
                       <Link

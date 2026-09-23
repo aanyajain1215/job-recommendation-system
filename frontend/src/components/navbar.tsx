@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { Briefcase, Building2, Compass, LogOut, PlusCircle, Sparkles, User as UserIcon } from "lucide-react";
+import { Briefcase, Building2, Compass, GitBranch, LogOut, PlusCircle, Route, Sparkles, User as UserIcon } from "lucide-react";
 
 export function Navbar() {
   const pathname = usePathname();
@@ -104,6 +104,28 @@ export function Navbar() {
                 >
                   <Sparkles className="h-4 w-4 text-teal-400" />
                   AI Matches
+                </Link>
+                <Link
+                  href="/careers"
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    pathname === "/careers"
+                      ? "text-teal-400 bg-zinc-900/60"
+                      : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/40"
+                  }`}
+                >
+                  <Route className="h-4 w-4" />
+                  Careers
+                </Link>
+                <Link
+                  href="/simulator"
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    pathname === "/simulator"
+                      ? "text-teal-400 bg-zinc-900/60"
+                      : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/40"
+                  }`}
+                >
+                  <GitBranch className="h-4 w-4" />
+                  What-If
                 </Link>
                 <Link
                   href="/profile"
