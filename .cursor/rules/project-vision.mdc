@@ -1,0 +1,35 @@
+---
+description: Product vision, phases, stack, and engineering standards for the job recommendation platform
+alwaysApply: true
+---
+
+# Job Recommendation Platform
+
+Build a real recommendation system (retrieval + ranking + feedback loop), not a keyword job board.
+
+## Roles
+
+- Job seekers: profile, matches, apply, track status
+- Employers/recruiters: post jobs, AI-ranked candidates, pipeline
+- Admins: moderate content, platform health, skills taxonomy
+
+## Phases (do not skip ahead)
+
+1. MVP: auth (JWT + OAuth, hand-rolled), resume parse/confirm, job CRUD, keyword+filter search, content-based feed, apply pipeline, employer dashboard, admin moderation
+2. Smart matching: NLP parsing, collaborative filtering, notifications, messaging, alerts, employer analytics, skill-gap suggestions
+3. Novelties: hybrid recommender + skill/role knowledge graph, explainability, embedding search, career-trajectory, conversational search, fraud detector, fairness audit, A/B tests, inferred-features control panel
+
+## Stack
+
+Next.js + TypeScript + Tailwind + shadcn/ui + TanStack Query. FastAPI. PostgreSQL + pgvector. Redis. Meilisearch later. Redpanda later. sentence-transformers, LightGBM, MLflow. Docker Compose now; K8s is a later stretch.
+
+## Architecture
+
+Modular monolith. Event-driven interactions (view/save/apply/ignore) feeding a near-real-time feature store. Recommender: cold start from profile/JD embeddings → pgvector ANN (~200) → LightGBM/XGBoost re-rank → explanations. No mock data, no fake recommenders, no temporary hacks.
+
+## Engineering
+
+- Production-grade only: real DB, real migrations, real env config, typed APIs
+- Never invent job/user data as a substitute for the product; seed data only when explicitly added as a seeder
+- Prefer Alembic, RBAC, Argon2, rate limits, OpenAPI as features land — do not stub them away
+- Keep frontend, API, and recommender seams so services can split later

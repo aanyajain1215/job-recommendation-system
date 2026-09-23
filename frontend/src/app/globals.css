@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+:root {
+  --background: #09090b;
+  --foreground: #f4f4f5;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+mark {
+  background-color: rgba(20, 184, 166, 0.25);
+  color: #5eead4;
+  font-weight: 600;
+  padding: 0.05rem 0.25rem;
+  border-radius: 0.25rem;
+}

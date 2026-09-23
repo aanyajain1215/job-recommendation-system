@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+.coverage
+htmlcov/
+
+# Node
+node_modules/
+frontend/.next/
+frontend/out/
+frontend/coverage/
+
+# Env & secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Uploaded user files (PII — resumes etc.)
+backend/uploads/
+
+# Docker / OS / IDE
+.docker/
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# ML artifacts (later)
+mlruns/
+*.pt
+*.lgb
+*.onnx

@@ -1,0 +1,47 @@
+# Canonical job families (plan §5/§7/§11) — seeded into `job_families` by
+# scripts/seed_canonical.py, which also auto-assigns `jobs.family_id` for
+# existing postings using the keyword lists below (first match wins,
+# longest-keyword-first so "machine learning" beats "learning").
+#
+# core_skills: seed Skill rows if missing; used as family affinity axes.
+# parent: builds the family graph for alt-career discovery + roadmap routes.
+
+- name: Software Engineering
+  parent: null
+  core_skills: [python, java, git, data structures, system design, unit testing]
+  keywords: [software engineer, software developer, sde, programmer, full stack, fullstack]
+
+- name: Frontend Engineering
+  parent: Software Engineering
+  core_skills: [javascript, typescript, react, html, css, next.js]
+  keywords: [frontend, front end, front-end, ui engineer, web developer, react developer, frontend engineer]
+
+- name: Backend Engineering
+  parent: Software Engineering
+  core_skills: [python, fastapi, node.js, postgresql, rest apis, microservices]
+  keywords: [backend, back end, back-end, server side, api engineer, spring boot]
+
+- name: DevOps Engineering
+  parent: Software Engineering
+  core_skills: [docker, kubernetes, terraform, aws, ci/cd, linux]
+  keywords: [devops, sre, site reliability, infrastructure engineer, platform engineer, cloud engineer, cloud devops, devsecops]
+
+- name: Data Science
+  parent: null
+  core_skills: [python, pandas, sql, statistics, machine learning, data visualization]
+  keywords: [data scientist, data science, data analyst, business intelligence, analytics consultant]
+
+- name: Machine Learning Engineering
+  parent: Data Science
+  core_skills: [python, pytorch, tensorflow, machine learning, deep learning, mlops]
+  keywords: [machine learning engineer, ml engineer, ai engineer, machine learning, deep learning engineer, nlp engineer, computer vision engineer, applied scientist, genai engineer, llm engineer]
+
+- name: Data Analytics
+  parent: Data Science
+  core_skills: [sql, excel, power bi, tableau, statistics, data analysis]
+  keywords: [data analyst, reporting analyst, bi analyst, analytics engineer, operations analyst]
+
+- name: Cybersecurity
+  parent: Software Engineering
+  core_skills: [linux, network security, siem, ethical hacking, incident response]
+  keywords: [security engineer, cybersecurity, information security, soc analyst, pen tester, application security]

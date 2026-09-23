@@ -1,0 +1,54 @@
+# Curated skill graph edges (plan §5/§7/§8), seeded by scripts/seed_canonical.py
+# and merged (DB wins) by services/skill_graph.py.
+#
+# Edge semantics: from: A → to: B
+#   prereq    — A is a practical prerequisite for B (roadmap ordering credit;
+#               holders of A get partial transferability toward B)
+#   transfer  — holders of A can transfer INTO B with strong credit
+#               (gap engine class; credit = 0.7 × min(1, weight))
+#   supersedes — A is the newer skill replacing B
+#
+# Deliberately NO edges targeting kubernetes / docker / terraform so the
+# required-skill gaps for DevOps roles stay visible in the gap engine demo
+# (test_recommender asserts those appear in missing_skills).
+
+# --- prerequisites (ordering + partial transfer) ---
+- { from: python,        to: fastapi,     type: prereq, weight: 0.9, source: seed }
+- { from: python,        to: django,       type: prereq, weight: 0.9, source: seed }
+- { from: python,        to: pandas,       type: prereq, weight: 0.9, source: seed }
+- { from: python,        to: pytorch,      type: prereq, weight: 0.8, source: seed }
+- { from: python,        to: tensorflow,   type: prereq, weight: 0.8, source: seed }
+- { from: pandas,        to: numpy,        type: prereq, weight: 0.7, source: seed }
+- { from: javascript,    to: react,        type: prereq, weight: 0.9, source: seed }
+- { from: javascript,    to: node.js,      type: prereq, weight: 0.9, source: seed }
+- { from: javascript,    to: typescript,   type: prereq, weight: 0.8, source: seed }
+- { from: html,          to: css,          type: prereq, weight: 0.7, source: seed }
+- { from: css,           to: tailwind css, type: prereq, weight: 0.8, source: seed }
+- { from: react,         to: next.js,      type: prereq, weight: 0.85, source: seed }
+- { from: sql,           to: data analysis, type: prereq, weight: 0.7, source: seed }
+- { from: git,           to: ci/cd,        type: prereq, weight: 0.7, source: seed }
+- { from: data structures, to: system design, type: prereq, weight: 0.7, source: seed }
+
+# --- transferability (gap engine credit) ---
+# The plan §2 golden example: TensorFlow holder → PyTorch role.
+- { from: tensorflow,    to: pytorch,      type: transfer, weight: 0.85, source: seed }
+- { from: pytorch,       to: tensorflow,   type: transfer, weight: 0.85, source: seed }
+- { from: javascript,    to: typescript,   type: transfer, weight: 0.9,  source: seed }
+- { from: sql,           to: postgresql,   type: transfer, weight: 0.9,  source: seed }
+- { from: mysql,         to: postgresql,   type: transfer, weight: 0.85, source: seed }
+- { from: vue.js,        to: react,        type: transfer, weight: 0.75, source: seed }
+- { from: angular,       to: react,        type: transfer, weight: 0.75, source: seed }
+- { from: java,          to: kotlin,       type: transfer, weight: 0.8,  source: seed }
+- { from: aws,           to: gcp,          type: transfer, weight: 0.75, source: seed }
+- { from: aws,           to: azure,        type: transfer, weight: 0.75, source: seed }
+- { from: sklearn,        to: pytorch,      type: transfer, weight: 0.7,  source: seed }
+- { from: scikit-learn,  to: pytorch,      type: transfer, weight: 0.7,  source: seed }
+- { from: pandas,        to: sql,          type: transfer, weight: 0.7,  source: seed }
+- { from: flask,         to: fastapi,      type: transfer, weight: 0.8,  source: seed }
+- { from: django,        to: fastapi,      type: transfer, weight: 0.75, source: seed }
+- { from: selenium,      to: cypress,      type: transfer, weight: 0.7,  source: seed }
+- { from: tableau,       to: power bi,     type: transfer, weight: 0.8,  source: seed }
+
+# --- supersedes (newer replaces older) ---
+- { from: typescript,    to: javascript,   type: supersedes, weight: 0.6, source: seed }
+- { from: tailwind css,  to: bootstrap,    type: supersedes, weight: 0.6, source: seed }

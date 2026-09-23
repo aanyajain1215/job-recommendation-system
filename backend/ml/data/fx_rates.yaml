@@ -1,0 +1,17 @@
+# Curated FX snapshot: currency → 1 unit in USD (plan §6/§20).
+# Static on purpose: scoring must never make network calls. Refresh
+# manually when rates move materially; unknown currencies fall back to the
+# neutral salary prior (70) rather than guessing (never fabricate).
+USD: 1.0
+EUR: 1.08
+GBP: 1.27
+INR: 0.012
+CAD: 0.74
+AUD: 0.66
+SGD: 0.74
+AED: 0.27
+CHF: 1.13
+JPY: 0.0067
+CNY: 0.14
+BRL: 0.18
+AUD: 0.66

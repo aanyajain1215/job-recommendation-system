@@ -1,0 +1,277 @@
+# Curated skill alias → canonical map (plan §20 stage 2/3).
+# Structure: canonical_name: [alias, ...]
+# Loaded by services/skill_normalizer.py (from_yaml) and seeded into
+# skill_aliases by scripts/seed_canonical.py. All keys are canonical names
+# as stored in `skills.name`; aliases are matched case-insensitively.
+
+Python:
+  - python3
+  - python2
+  - py
+  - python programming
+JavaScript:
+  - js
+  - javascript es6
+  - ecmascript
+  - vanilla js
+TypeScript:
+  - ts
+  - typescript es6
+React:
+  - reactjs
+  - react js
+  - react.js
+Next.js:
+  - nextjs
+  - next js
+  - next
+Vue.js:
+  - vuejs
+  - vue
+  - vue 3
+Angular:
+  - angularjs
+  - angular 2+
+Node.js:
+  - nodejs
+  - node
+  - node js
+  - express.js
+  - expressjs
+HTML:
+  - html5
+  - html/css
+CSS:
+  - css3
+  - sass
+  - scss
+Tailwind CSS:
+  - tailwind
+  - tailwindcss
+PostgreSQL:
+  - postgres
+  - postgresql 15
+  - psql
+MySQL:
+  - mariadb
+MongoDB:
+  - mongo
+  - mongodb atlas
+SQL:
+  - structured query language
+  - t-sql
+  - plsql
+Django:
+  - django rest framework
+  - drf
+FastAPI:
+  - fast api
+  - fastapi rest
+Flask:
+  - flask restful
+Express:
+  - express
+  - express-router
+Spring Boot:
+  - spring
+  - springboot
+Java:
+  - java 17
+  - java 8
+Kotlin:
+  - kotlin coroutines
+C#:
+  - csharp
+  - .net
+  - dotnet
+Go:
+  - golang
+Rust:
+  - rustlang
+Ruby:
+  - ruby on rails
+  - rails
+PHP:
+  - laravel
+  - php8
+React Native:
+  - react-native
+Flutter:
+  - flutter dart
+Swift:
+  - swiftui
+Kubernetes:
+  - k8s
+  - kubernetes engine
+Docker:
+  - docker compose
+  - dockerfile
+Terraform:
+  - terraform cloud
+  - infrastructure as code
+AWS:
+  - amazon web services
+  - aws cloud
+  - ec2
+  - s3
+Azure:
+  - microsoft azure
+  - azure cloud
+GCP:
+  - google cloud
+  - google cloud platform
+  - bigquery
+CI/CD:
+  - cicd
+  - continuous integration
+  - continuous delivery
+Git:
+  - github
+  - gitlab
+  - version control
+Linux:
+  - ubuntu
+  - debian
+  - bash
+Nginx:
+  - nginx ingress
+Redis:
+  - redis cache
+  - elast icache
+Kafka:
+  - apache kafka
+  - kafka streams
+RabbitMQ:
+  - rabbit mq
+Airflow:
+  - apache airflow
+  - dagster
+Spark:
+  - pyspark
+  - apache spark
+Hadoop:
+  - apache hadoop
+dbt:
+  - dbt core
+Tableau:
+  - tableau public
+Power BI:
+  - powerbi
+Excel:
+  - microsoft excel
+  - advanced excel
+Pandas:
+  - pandas dataframe
+NumPy:
+  - numpy array
+Matplotlib:
+  - matplotlib seaborn
+Seaborn:
+  - seaborn plots
+Scikit-learn:
+  - sklearn
+  - scikit learn
+  - scikit-learn
+TensorFlow:
+  - tf
+  - tensorflow 2
+PyTorch:
+  - pytorch lightning
+  - torch
+Keras:
+  - tf.keras
+Hugging Face:
+  - huggingface
+  - transformers library
+LangChain:
+  - langchain llm
+OpenAI API:
+  - openai
+  - gpt api
+LLM:
+  - large language models
+  - generative ai
+  - genai
+Machine Learning:
+  - ml
+  - machine-learning
+Deep Learning:
+  - dl
+  - neural networks
+Natural Language Processing:
+  - nlp
+  - text analytics
+Computer Vision:
+  - cv
+  - opencv
+Prompt Engineering:
+  - prompt engineering llm
+MLOps:
+  - ml ops
+  - mlflow
+  - experiment tracking
+Data Analysis:
+  - data analytics
+  - analytics
+Data Visualization:
+  - dataviz
+  - visualization
+Statistics:
+  - statistical analysis
+  - inferential statistics
+A/B Testing:
+  - ab testing
+  - experimentation
+Product Management:
+  - pm
+  - product manager
+Agile:
+  - scrum
+  - kanban
+Jira:
+  - atlassian jira
+Figma:
+  - figma design
+REST APIs:
+  - rest
+  - restful
+  - rest api
+GraphQL:
+  - graphql apollo
+Microservices:
+  - micro services
+  - service mesh
+System Design:
+  - system design interview
+  - distributed systems
+Data Structures:
+  - ds
+  - algorithms
+  - dsa
+Unit Testing:
+  - pytest
+  - jest
+  - junit
+  - tdd
+Selenium:
+  - selenium webdriver
+Cypress:
+  - cypress io
+Postman:
+  - postman api
+Elasticsearch:
+  - elastic search
+  - opensearch
+Prometheus:
+  - prometheus monitoring
+Grafana:
+  - grafana dashboards
+Ansible:
+  - ansible playbooks
+CircleCI:
+  - circle ci
+GitHub Actions:
+  - gh actions
+  - github action
+Pytest:
+  - pytest framework
