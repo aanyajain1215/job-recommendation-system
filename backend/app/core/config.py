@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     # degrades to its deterministic/template fallback (never a 500).
     llm_enabled: bool = True
     llm_timeout_seconds: int = 30
+    # P6 (§15): EXPLAIN_LLM=true → LLM rewrites explanation prose (never
+    # numbers — digit-multiset validator discards any drift). Default off.
+    explain_llm: bool = False
 
     # ---- Embeddings (plan §4/§13) ----
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"

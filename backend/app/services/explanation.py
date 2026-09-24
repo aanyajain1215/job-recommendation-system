@@ -5,16 +5,28 @@ verbatim from the deterministic scorer — components feed the contract, the
 contract feeds the UI.  A validator asserts internal consistency (contributions
 sum to the final score) so no layer can drift.
 
-Text templates are deterministic here; optional LLM polish (Phase 2, §15) may
-rewrite `summary` only, never the numbers.
+Text templates are deterministic here; the flag-gated P6 LLM polish
+(`EXPLAIN_LLM=true`, §15) may rewrite `summary`/`recommended_action` wording
+only — a digit-multiset validator discards the polish on any numeric drift.
 """
 
 from __future__ import annotations
 
+import re
+from collections import Counter
 from dataclasses import dataclass, field
+
+from pydantic import BaseModel
 
 from app.core.config import get_settings
 from app.services.scoring import ScoreResult
+
+
+class _PolishPayload(BaseModel):
+    """P6 response shape — provider.complete_json schema-validates this."""
+
+    sentences: list[str] = []
+    recommended_action: str = ""
 
 
 @dataclass
@@ -127,15 +139,72 @@ def build_explanation(
         + "."
     )
 
-    return ExplanationContract(
-        summary=summary,
-        components=dict(comp),
-        contributions=dict(result.contributions),
-        strengths=strengths,
-        concerns=concerns,
-        recommended_action=recommended_action,
-        delta_note=None,
+    return polish_explanation(
+        ExplanationContract(
+            summary=summary,
+            components=dict(comp),
+            contributions=dict(result.contributions),
+            strengths=strengths,
+            concerns=concerns,
+            recommended_action=recommended_action,
+            delta_note=None,
+        )
     )
+
+
+def _digit_tokens(text: str) -> list[str]:
+    return re.findall(r"\d+(?:\.\d+)?", text)
+
+
+def polish_explanation(contract: ExplanationContract) -> ExplanationContract:
+    """P6 (plan §15) — flag-gated LLM rewrite of `summary`/action wording.
+
+    The deterministic template always ships; polish only ever replaces prose,
+    and only when the digit-multiset validator proves every number survived
+    verbatim (no rounding, nothing invented). Any failure — flag off, no
+    provider, schema miss, validation mismatch — returns the contract
+    untouched. The LLM never touches components/contributions (§7).
+    """
+    if not get_settings().explain_llm:
+        return contract
+    try:
+        from app.services.llm.prompts import p6_explanation_polish  # noqa: PLC0415
+        from app.services.llm.provider import (  # noqa: PLC0415
+            get_provider,
+            llm_available,
+        )
+
+        provider = get_provider() if llm_available() else None
+    except Exception:  # pragma: no cover - provider import/config issues
+        return contract
+    if provider is None:
+        return contract
+
+    source_action = contract.recommended_action
+    source_numbers = _digit_tokens(f"{contract.summary} {source_action}")
+    try:
+        result, _usage = provider.complete_json(
+            _PolishPayload,
+            p6_explanation_polish(contract.summary, source_numbers),
+            route="explain_polish",
+        )
+    except Exception:  # pragma: no cover - any LLM failure → template
+        return contract
+
+    polished_summary = " ".join(s for s in result.sentences if s).strip()
+    polished_action = (result.recommended_action or "").strip()
+    if not polished_summary or not polished_action:
+        return contract
+
+    # Digit-multiset validator: identical numbers verbatim, or discard.
+    if Counter(_digit_tokens(f"{polished_summary} {polished_action}")) != Counter(
+        source_numbers
+    ):
+        return contract
+
+    contract.summary = polished_summary
+    contract.recommended_action = polished_action
+    return contract
 
 
 def readiness_from_score(score: float) -> dict:
