@@ -1,0 +1,72 @@
+{
+  "feature_order": [
+    "semantic",
+    "skill",
+    "experience",
+    "education",
+    "project",
+    "location",
+    "salary",
+    "interest",
+    "required_coverage",
+    "preferred_coverage",
+    "missing_required_count",
+    "semantic_cosine_raw",
+    "experience_gap_years",
+    "education_rank_delta",
+    "salary_iou",
+    "location_class",
+    "family_match",
+    "job_age_days",
+    "applicant_count",
+    "profile_completeness",
+    "historical_apply_rate",
+    "exploration_flag",
+    "seeker_skill_count",
+    "job_skill_count",
+    "transfer_credit_count",
+    "partial_credit_count",
+    "salary_disclosed",
+    "is_remote",
+    "experience_level_ordinal",
+    "project_overlap_count"
+  ],
+  "params": {
+    "objective": "lambdarank",
+    "metric": "ndcg",
+    "ndcg_at": [
+      5,
+      10
+    ],
+    "learning_rate": 0.05,
+    "num_leaves": 31,
+    "min_data_in_leaf": 5,
+    "feature_fraction": 0.9,
+    "seed": 42,
+    "deterministic": true,
+    "num_threads": 1,
+    "verbosity": -1
+  },
+  "num_boost_round": 100,
+  "metrics": {
+    "ranklet": {
+      "ndcg_at_10": 0.9455,
+      "precision_at_5": 0.85,
+      "mrr_at_10": 0.9583
+    },
+    "deterministic": {
+      "ndcg_at_10": 0.8989,
+      "precision_at_5": 0.845,
+      "mrr_at_10": 0.9583
+    },
+    "popularity": {
+      "ndcg_at_10": 0.852,
+      "precision_at_5": 0.85,
+      "mrr_at_10": 0.925
+    }
+  },
+  "gate_ndcg_vs_deterministic": true,
+  "trained_at": "2026-09-24T08:31:36.222330+00:00",
+  "train_rows": 960,
+  "test_rows": 240
+}
