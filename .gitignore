@@ -38,3 +38,6 @@ mlruns/
 *.pt
 *.lgb
 *.onnx
+
+# Ingestion run snapshots / reports (regenerated per run)
+backend/ml/data/raw/
