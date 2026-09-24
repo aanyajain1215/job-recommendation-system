@@ -353,6 +353,10 @@ def get_provider() -> JsonProvider | None:
     """Configured provider, or None when no key is present (callers then
     use their deterministic fallback — never a hard failure)."""
     settings = get_settings()
+    if not settings.llm_enabled:
+        # §22 kill switch — LLM_ENABLED=false degrades every route.
+        log.info("LLM disabled via settings.llm_enabled; deterministic fallbacks in use")
+        return None
     provider = (settings.llm_provider or "openai").lower().strip()
 
     if provider == "gemini":

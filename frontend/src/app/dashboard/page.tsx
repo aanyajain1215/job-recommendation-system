@@ -557,6 +557,14 @@ export default function DashboardPage() {
                   Post a New Opportunity
                 </Link>
               )}
+              {user.role === "admin" && (
+                <Link
+                  href="/admin"
+                  className="block rounded-lg border border-rose-500/30 bg-rose-500/5 p-3 text-xs text-rose-300 hover:border-rose-500/50 hover:text-rose-200 transition-colors"
+                >
+                  Admin Console
+                </Link>
+              )}
             </div>
           </div>
         </div>

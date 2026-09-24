@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     openai_base_url: str = ""  # optional OpenAI-compatible proxy
     llm_provider: str = "openai"  # "openai" | "gemini"
     llm_model: str = "gpt-4o-mini"
+    # §22 kill switch: false → get_provider() returns None, every LLM route
+    # degrades to its deterministic/template fallback (never a 500).
+    llm_enabled: bool = True
     llm_timeout_seconds: int = 30
 
     # ---- Embeddings (plan §4/§13) ----

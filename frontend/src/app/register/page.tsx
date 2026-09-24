@@ -52,7 +52,7 @@ export default function RegisterPage() {
         last_name: lastName.trim() || undefined,
         company_name: role === "employer" ? companyName.trim() : undefined,
       });
-      router.push("/dashboard");
+      router.push(role === "job_seeker" ? "/onboarding" : "/dashboard");
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message);

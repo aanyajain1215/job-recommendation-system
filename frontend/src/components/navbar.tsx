@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { Briefcase, Bookmark, Building2, Compass, GitBranch, ListChecks, LogOut, PlusCircle, Route, Settings as SettingsIcon, Sparkles, User as UserIcon } from "lucide-react";
+import { Briefcase, Bookmark, Building2, Compass, GitBranch, ListChecks, LogOut, PlusCircle, Route, Settings as SettingsIcon, ShieldCheck, Sparkles, User as UserIcon } from "lucide-react";
 
 export function Navbar() {
   const pathname = usePathname();
@@ -90,6 +90,20 @@ export function Navbar() {
                   Employer Hub
                 </Link>
               </>
+            )}
+
+            {user?.role === "admin" && (
+              <Link
+                href="/admin"
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  pathname === "/admin"
+                    ? "text-rose-400 bg-zinc-900/60"
+                    : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/40"
+                }`}
+              >
+                <ShieldCheck className="h-4 w-4 text-rose-400" />
+                Admin
+              </Link>
             )}
 
             {user?.role === "job_seeker" && (

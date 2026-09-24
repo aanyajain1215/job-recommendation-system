@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from app.api.admin import router as admin_router
 from app.api.applications import router as applications_router
 from app.api.auth import router as auth_router
 from app.api.careers import router as careers_router
@@ -8,6 +9,7 @@ from app.api.gap import router as gap_router
 from app.api.health import router as health_router
 from app.api.interactions import router as interactions_router
 from app.api.jobs import router as jobs_router
+from app.api.onboarding import router as onboarding_router
 from app.api.preferences import router as preferences_router
 from app.api.profiles import router as profiles_router
 from app.api.project_mapping import router as project_mapping_router
@@ -40,3 +42,6 @@ api_router.include_router(preferences_router)
 api_router.include_router(search_router)
 api_router.include_router(resume_optimize_router)
 api_router.include_router(project_mapping_router)
+# ---- Phase 5 (plan §18/§22): admin surface + M5 onboarding elicitation ----
+api_router.include_router(admin_router)
+api_router.include_router(onboarding_router)
