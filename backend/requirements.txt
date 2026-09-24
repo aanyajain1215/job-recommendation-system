@@ -19,6 +19,11 @@ google-generativeai>=0.8.0
 # LLM provider abstraction (plan §15 — OpenAI default)
 openai>=1.40.0
 # Embeddings / similarity (plan §4)
+# CPU-only torch: the server has no GPU, and the default PyPI wheel drags in
+# ~4 GB of NVIDIA/CUDA packages that triple the Docker build time. Resolved
+# across PyPI + the PyTorch CPU wheel index (torch resolves to the +cpu build).
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.14.0
 sentence-transformers>=2.6.0
 # Skill graph + roadmap ordering helpers (plan §5/§9)
 gensim>=4.3.0
