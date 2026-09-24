@@ -2,8 +2,8 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { getJobs } from "@/lib/api";
-import { JobDetail } from "@/lib/types";
+import { getJobs, searchJobsNL } from "@/lib/api";
+import { JobDetail, JobNlResponse } from "@/lib/types";
 import {
   ArrowUpDown,
   Briefcase,
@@ -33,7 +33,14 @@ export default function JobsPage() {
   const [skillFilter, setSkillFilter] = useState<string>("");
   const [sortBy, setSortBy] = useState<"relevance" | "date" | "salary">("relevance");
 
+  // Phase 4 §17: natural-language search (LLM-parsed → whitelisted filters, FTS fallback)
+  const [nlQ, setNlQ] = useState("");
+  const [nlResult, setNlResult] = useState<JobNlResponse | null>(null);
+  const [nlLoading, setNlLoading] = useState(false);
+  const [nlError, setNlError] = useState<string | null>(null);
+
   const loadJobs = useCallback(async () => {
+    setNlResult(null); // editing standard filters exits NL mode (§17)
     setIsLoading(true);
     try {
       const data = await getJobs({
@@ -67,6 +74,11 @@ export default function JobsPage() {
   };
 
   const clearAllFilters = () => {
+    const hadFilters = Boolean(
+      q || location || isRemote !== undefined || employmentType || experienceLevel || skillFilter,
+    );
+    const hadNl = nlResult !== null;
+    setNlResult(null);
     setQ("");
     setLocation("");
     setIsRemote(undefined);
@@ -75,6 +87,79 @@ export default function JobsPage() {
     setSkillFilter("");
     setSortBy("relevance");
     setPage(1);
+    // No dep change above → nothing triggers a reload, but NL may have
+    // overwritten the standard result list — restore it explicitly.
+    if (hadNl && !hadFilters) loadJobs();
+  };
+
+  /** §17: run the NL query; parsed filters + items replace the standard list. */
+  const handleNlSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const query = nlQ.trim();
+    if (!query) return;
+    setNlLoading(true);
+    setNlError(null);
+    try {
+      const resp = await searchJobsNL(query);
+      setNlResult(resp);
+      setJobs(resp.items);
+      setTotal(resp.total);
+    } catch (err) {
+      setNlError(err instanceof Error ? err.message : "AI search failed");
+    } finally {
+      setNlLoading(false);
+    }
+  };
+
+  /** Clicking a parsed chip moves it into the standard filter form. */
+  const applyNlFilter = (key: string, value: unknown) => {
+    setNlResult(null);
+    if (value === null || value === undefined) return;
+    let depChanged = false;
+    switch (key) {
+      case "keywords": {
+        const next = String(value);
+        if (next !== q) depChanged = true;
+        setQ(next);
+        break;
+      }
+      case "location": {
+        const next = String(value);
+        if (next !== location) depChanged = true;
+        setLocation(next);
+        break;
+      }
+      case "remote_only": {
+        const next = value === true || value === "true" ? true : undefined;
+        if (next !== isRemote) depChanged = true;
+        setIsRemote(next);
+        break;
+      }
+      case "employment_type": {
+        const next = String(value);
+        if (next !== employmentType) depChanged = true;
+        setEmploymentType(next);
+        break;
+      }
+      case "experience_level": {
+        const next = String(value);
+        if (next !== experienceLevel) depChanged = true;
+        setExperienceLevel(next);
+        break;
+      }
+      case "skills": {
+        const next = String(value);
+        if (next !== skillFilter) depChanged = true;
+        setSkillFilter(next);
+        break;
+      }
+      default:
+        break; // e.g. min_salary has no dedicated standard control yet
+    }
+    if (page !== 1) depChanged = true;
+    setPage(1);
+    // If no dep changed, the effect won't refire — reload explicitly.
+    if (!depChanged) loadJobs();
   };
 
   const hasActiveFilters = Boolean(
@@ -94,6 +179,40 @@ export default function JobsPage() {
         </h1>
         <p className="mt-1 text-sm text-zinc-400">
           Instant keyword, title, skill, and multi-parameter search backed by PostgreSQL GIN indexing.
+        </p>
+      </div>
+
+      {/* Phase 4 §17: Natural-language AI search */}
+      <div className="mt-6 rounded-2xl border border-teal-500/20 bg-gradient-to-br from-teal-950/40 via-zinc-900/40 to-zinc-900/40 p-5 shadow-xl">
+        <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wider text-teal-400">
+          <Sparkles className="h-3.5 w-3.5" />
+          AI Search
+          <span className="rounded-full border border-teal-500/30 bg-teal-500/10 px-2 py-0.5 text-[10px] normal-case text-teal-300">
+            plan §17 · NL → whitelisted filters
+          </span>
+        </div>
+        <form onSubmit={handleNlSubmit} className="mt-3 flex flex-col gap-3 sm:flex-row">
+          <input
+            type="text"
+            value={nlQ}
+            onChange={(e) => setNlQ(e.target.value)}
+            placeholder='Describe what you want: "remote python jobs under 100000"'
+            className="flex-1 rounded-lg border border-zinc-800 bg-zinc-950/70 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:border-teal-500 focus:outline-none"
+            aria-label="Natural language job search"
+          />
+          <button
+            type="submit"
+            disabled={nlLoading || !nlQ.trim()}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-teal-500 px-5 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-teal-400 disabled:opacity-50"
+          >
+            <Sparkles className={`h-4 w-4 ${nlLoading ? "animate-pulse" : ""}`} />
+            {nlLoading ? "Parsing…" : "AI Search"}
+          </button>
+        </form>
+        {nlError && <p className="mt-2 text-xs text-rose-400">{nlError}</p>}
+        <p className="mt-2 text-[11px] text-zinc-500">
+          The LLM only parses your sentence into strict whitelisted filters — it never scores jobs
+          or touches the database. No key configured? Keyword full-text fallback keeps this working.
         </p>
       </div>
 
@@ -288,6 +407,51 @@ export default function JobsPage() {
           </div>
         )}
       </form>
+
+      {/* Phase 4 §17: NL mode banner + editable parsed-filter chips */}
+      {nlResult && (
+        <div className="mt-6 rounded-xl border border-teal-500/30 bg-teal-500/5 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-teal-200">
+              <Sparkles className="h-3.5 w-3.5 text-teal-400" />
+              <span>
+                AI search &quot;{nlResult.q}&quot; → <strong>{nlResult.total}</strong> result(s)
+              </span>
+              <span className="rounded-full bg-zinc-800/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-300">
+                mode: {nlResult.mode === "llm" ? "llm-parsed" : "fts-fallback"}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setNlResult(null);
+                loadJobs();
+              }}
+              className="text-xs text-teal-400 hover:text-teal-300 underline-offset-4 hover:underline"
+            >
+              Back to filter results
+            </button>
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+            <span className="text-zinc-500">Parsed filters (click to edit in the form):</span>
+            {Object.entries(nlResult.parsed_filters).flatMap(([key, value]) =>
+              (Array.isArray(value) ? value : [value]).map((v) => (
+                <button
+                  key={`${key}:${String(v)}`}
+                  type="button"
+                  onClick={() => applyNlFilter(key, v)}
+                  title="Move this parsed filter into the standard search form"
+                  className="inline-flex items-center gap-1 rounded-full bg-zinc-800 px-2.5 py-0.5 text-zinc-300 hover:bg-teal-500/20 hover:text-teal-200 transition-colors"
+                >
+                  <span className="capitalize text-zinc-500">{key.replace(/_/g, " ")}:</span>
+                  {v === true ? "yes" : v === false ? "no" : String(v)}
+                  <X className="h-3 w-3" />
+                </button>
+              )),
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Meta Bar */}
       <div className="mt-6 flex items-center justify-between text-xs text-zinc-400">

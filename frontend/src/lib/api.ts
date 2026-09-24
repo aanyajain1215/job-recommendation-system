@@ -1,14 +1,33 @@
 import {
+  AdminConfigResponse,
+  AdminSkillsResponse,
   ApplicationItem,
   ApplicationStats,
+  ApplicationStatus,
+  ConfigSaveResponse,
   DiscoverResponse,
+  DuplicatesResponse,
+  FeedbackPayload,
+  FeedbackResponse,
   GapResponse,
   JobCreatePayload,
   JobDetail,
   JobListResponse,
+  JobNlResponse,
+  LlmUsageResponse,
+  MergeReport,
+  ModelRegistryItem,
+  OnboardingCompletePayload,
+  OnboardingCompleteResponse,
+  OnboardingPairsResponse,
+  ParseFailuresResponse,
+  PreferenceState,
   ProfileDetail,
   ProfileUpdatePayload,
+  ProjectBenefitsResponse,
+  ProjectMapResponse,
   RecommendationFeedResponse,
+  ResumeOptimizeResponse,
   RoadmapResponse,
   SimulateRequest,
   SimulateResponse,
@@ -286,6 +305,9 @@ export async function getMyApplicationStats(token: string): Promise<ApplicationS
       interview: 0,
       rejected: 0,
       offer: 0,
+      saved: 0,
+      successful_skills: [],
+      observation_note: "",
     };
   }
   return res.json();
@@ -356,6 +378,184 @@ export async function getSimulations(
 export async function discoverCareers(token: string): Promise<DiscoverResponse> {
   const base = getBrowserApiBaseUrl();
   return authedJson(`${base}/api/v1/careers/discover`, token);
+}
+
+// ---------------- Phase 4: Feedback · Preferences · NL · Resume · Projects · Tracker ---------------- //
+
+export async function submitFeedback(
+  payload: FeedbackPayload,
+  token: string,
+): Promise<FeedbackResponse> {
+  const base = getBrowserApiBaseUrl();
+  return authedJson(`${base}/api/v1/feedback`, token, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getPreferences(token: string): Promise<PreferenceState> {
+  const base = getBrowserApiBaseUrl();
+  return authedJson(`${base}/api/v1/preferences`, token);
+}
+
+export async function resetPreferences(token: string): Promise<PreferenceState> {
+  const base = getBrowserApiBaseUrl();
+  return authedJson(`${base}/api/v1/preferences`, token, {
+    method: "PATCH",
+    body: JSON.stringify({ reset: true }),
+  });
+}
+
+export async function searchJobsNL(q: string): Promise<JobNlResponse> {
+  const base = getBrowserApiBaseUrl();
+  const res = await fetch(`${base}/api/v1/jobs/nl?q=${encodeURIComponent(q)}`, {
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    throw new Error("Natural-language search failed");
+  }
+  return res.json();
+}
+
+export async function optimizeResume(
+  jobId: string,
+  token: string,
+): Promise<ResumeOptimizeResponse> {
+  const base = getBrowserApiBaseUrl();
+  return authedJson(`${base}/api/v1/jobs/${jobId}/resume-optimize`, token, {
+    method: "POST",
+  });
+}
+
+export async function getProjectMap(
+  jobId: string,
+  token: string,
+): Promise<ProjectMapResponse> {
+  const base = getBrowserApiBaseUrl();
+  return authedJson(`${base}/api/v1/jobs/${jobId}/project-map`, token);
+}
+
+export async function getProjectBenefits(
+  token: string,
+): Promise<ProjectBenefitsResponse> {
+  const base = getBrowserApiBaseUrl();
+  return authedJson(`${base}/api/v1/profiles/me/project-benefits`, token);
+}
+
+export async function saveJob(jobId: string, token: string): Promise<ApplicationItem> {
+  const base = getBrowserApiBaseUrl();
+  return authedJson(`${base}/api/v1/jobs/${jobId}/save`, token, {
+    method: "POST",
+  });
+}
+
+export async function updateApplication(
+  applicationId: string,
+  status: ApplicationStatus,
+  token: string,
+): Promise<ApplicationItem> {
+  const base = getBrowserApiBaseUrl();
+  return authedJson(`${base}/api/v1/applications/${applicationId}`, token, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
+}
+
+export async function removeSavedJob(
+  applicationId: string,
+  token: string,
+): Promise<{ status: string; id: string }> {
+  const base = getBrowserApiBaseUrl();
+  return authedJson(`${base}/api/v1/applications/${applicationId}`, token, {
+    method: "DELETE",
+  });
+}
+
+// ---------------- Phase 5: Admin · M5 Onboarding ---------------- //
+
+export async function getAdminSkills(token: string, q?: string): Promise<AdminSkillsResponse> {
+  const base = getBrowserApiBaseUrl();
+  const suffix = q ? `?q=${encodeURIComponent(q)}` : "";
+  return authedJson(`${base}/api/v1/admin/skills${suffix}`, token);
+}
+
+export async function mergeSkills(
+  sourceId: string,
+  targetId: string,
+  token: string,
+): Promise<MergeReport> {
+  const base = getBrowserApiBaseUrl();
+  return authedJson(`${base}/api/v1/admin/skills/merge`, token, {
+    method: "POST",
+    body: JSON.stringify({ source_id: sourceId, target_id: targetId }),
+  });
+}
+
+export async function getJobDuplicates(token: string): Promise<DuplicatesResponse> {
+  const base = getBrowserApiBaseUrl();
+  return authedJson(`${base}/api/v1/admin/jobs/duplicates`, token);
+}
+
+export async function getLlmUsage(token: string): Promise<LlmUsageResponse> {
+  const base = getBrowserApiBaseUrl();
+  return authedJson(`${base}/api/v1/admin/llm-usage`, token);
+}
+
+export async function getParseFailures(token: string): Promise<ParseFailuresResponse> {
+  const base = getBrowserApiBaseUrl();
+  return authedJson(`${base}/api/v1/admin/parse-failures`, token);
+}
+
+export async function retryParse(
+  resumeId: string,
+  token: string,
+): Promise<{ status: string; resume_id: string }> {
+  const base = getBrowserApiBaseUrl();
+  return authedJson(`${base}/api/v1/admin/parse-failures/${resumeId}/retry`, token, {
+    method: "POST",
+  });
+}
+
+export async function getAdminConfig(token: string): Promise<AdminConfigResponse> {
+  const base = getBrowserApiBaseUrl();
+  return authedJson(`${base}/api/v1/admin/config`, token);
+}
+
+export async function putAdminConfig(
+  weights: Record<string, number>,
+  token: string,
+): Promise<ConfigSaveResponse> {
+  const base = getBrowserApiBaseUrl();
+  return authedJson(`${base}/api/v1/admin/config`, token, {
+    method: "PUT",
+    body: JSON.stringify({ weights }),
+  });
+}
+
+export async function getAdminModels(token: string): Promise<{
+  items: ModelRegistryItem[];
+  total: number;
+}> {
+  const base = getBrowserApiBaseUrl();
+  return authedJson(`${base}/api/v1/admin/models`, token);
+}
+
+export async function getOnboardingPairs(): Promise<OnboardingPairsResponse> {
+  const base = getBrowserApiBaseUrl();
+  const res = await fetch(`${base}/api/v1/onboarding/pairs`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Failed to load onboarding questions");
+  return res.json();
+}
+
+export async function completeOnboarding(
+  payload: OnboardingCompletePayload,
+  token: string,
+): Promise<OnboardingCompleteResponse> {
+  const base = getBrowserApiBaseUrl();
+  return authedJson(`${base}/api/v1/onboarding/complete`, token, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 // ---------------- Generic API Client (Supports TanStack Query & direct use) ---------------- //

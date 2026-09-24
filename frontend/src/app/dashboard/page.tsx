@@ -517,12 +517,38 @@ export default function DashboardPage() {
                 Browse All Jobs
               </Link>
               {user.role === "job_seeker" ? (
-                <Link
-                  href="/profile"
-                  className="block rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-3 text-xs text-zinc-300 hover:border-zinc-700 hover:text-white transition-colors"
-                >
-                  Manage Profile & Skills
-                </Link>
+                <>
+                  <Link
+                    href="/profile"
+                    className="block rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-3 text-xs text-zinc-300 hover:border-zinc-700 hover:text-white transition-colors"
+                  >
+                    Manage Profile & Skills
+                  </Link>
+                  <Link
+                    href="/tracker"
+                    className="block rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-3 text-xs text-zinc-300 hover:border-zinc-700 hover:text-white transition-colors"
+                  >
+                    Application Tracker
+                  </Link>
+                  <Link
+                    href="/saved"
+                    className="block rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-3 text-xs text-zinc-300 hover:border-zinc-700 hover:text-white transition-colors"
+                  >
+                    Saved Jobs
+                  </Link>
+                  <Link
+                    href="/resume-optimize"
+                    className="block rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-3 text-xs text-zinc-300 hover:border-zinc-700 hover:text-white transition-colors"
+                  >
+                    Resume Optimizer
+                  </Link>
+                  <Link
+                    href="/settings"
+                    className="block rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-3 text-xs text-zinc-300 hover:border-zinc-700 hover:text-white transition-colors"
+                  >
+                    Personalization Settings
+                  </Link>
+                </>
               ) : (
                 <Link
                   href="/jobs/new"

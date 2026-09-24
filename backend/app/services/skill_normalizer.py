@@ -138,8 +138,8 @@ class SkillNormalizer:
 
 def build_db_normalizer(db) -> SkillNormalizer:
     """Construct from live DB rows: all canonical skills + DB alias rows."""
-    names = [n for n in (db.query(Skill.name).all())] or []
-    canonical = [n[0] if isinstance(n, tuple) else n for n in names]
+    # Legacy Query rows support indexing ([0]) but are not tuple instances.
+    canonical = [n[0] for n in db.query(Skill.name).all() if n[0]]
     rows = db.query(SkillAlias.alias, Skill.name).join(
         Skill, SkillAlias.skill_id == Skill.id
     ).all()

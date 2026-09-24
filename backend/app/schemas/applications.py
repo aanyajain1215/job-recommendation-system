@@ -54,6 +54,10 @@ class ApplicationStatsOut(BaseModel):
     interview: int
     rejected: int
     offer: int
+    # ---- additive Phase 4 (plan §18/§19) ----
+    saved: int = 0
+    successful_skills: list[str] = []
+    observation_note: str = ""
 
 
 class ApplicantProfileSummary(BaseModel):

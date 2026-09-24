@@ -4,8 +4,12 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { getRecommendations } from "@/lib/api";
-import { RecommendationFeedResponse, RecommendationItem } from "@/lib/types";
+import { getRecommendations, submitFeedback } from "@/lib/api";
+import {
+  FeedbackReason,
+  RecommendationFeedResponse,
+  RecommendationItem,
+} from "@/lib/types";
 import {
   AlertCircle,
   ArrowRight,
@@ -22,10 +26,24 @@ import {
   SlidersHorizontal,
   Sparkles,
   Target,
+  ThumbsDown,
   TrendingUp,
   UserCheck,
+  Wrench,
   Zap,
 } from "lucide-react";
+
+/** §16 feedback menu — every reason trains M4 (weights + skill affinities). */
+const FEEDBACK_REASONS: { value: FeedbackReason; label: string }[] = [
+  { value: "relevant", label: "Relevant" },
+  { value: "not_relevant", label: "Not relevant" },
+  { value: "already_applied", label: "Already applied" },
+  { value: "not_interested", label: "Not interested" },
+  { value: "too_difficult", label: "Too difficult" },
+  { value: "location_issue", label: "Location issue" },
+  { value: "salary_issue", label: "Salary issue" },
+  { value: "other", label: "Other" },
+];
 
 export default function RecommendationsPage() {
   const router = useRouter();
@@ -35,6 +53,9 @@ export default function RecommendationsPage() {
   const [error, setError] = useState<string | null>(null);
   const [minMatchThreshold, setMinMatchThreshold] = useState<number>(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [feedbackMenu, setFeedbackMenu] = useState<string | null>(null);
+  const [sendingFeedbackId, setSendingFeedbackId] = useState<string | null>(null);
+  const [feedbackNotes, setFeedbackNotes] = useState<Record<string, string>>({});
 
   const fetchFeed = async () => {
     if (!token) return;
@@ -63,6 +84,28 @@ export default function RecommendationsPage() {
   const handleRefresh = () => {
     setRefreshing(true);
     fetchFeed();
+  };
+
+  const handleFeedback = async (jobId: string, reason: FeedbackReason) => {
+    if (!token) return;
+    setSendingFeedbackId(jobId);
+    try {
+      const resp = await submitFeedback({ job_id: jobId, reason }, token);
+      setFeedbackNotes((prev) => ({
+        ...prev,
+        [jobId]:
+          resp.personalization_note ||
+          `Recorded: ${reason.replace(/_/g, " ")} — tune it anytime in Settings.`,
+      }));
+      setFeedbackMenu(null);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to record feedback",
+      );
+      setFeedbackMenu(null);
+    } finally {
+      setSendingFeedbackId(null);
+    }
   };
 
   if (authLoading || (loading && !feed)) {
@@ -325,6 +368,17 @@ export default function RecommendationsPage() {
                             Remote
                           </span>
                         )}
+
+                        {/* Phase 4 §14: "Powered by: <project> — <band>" */}
+                        {item.job.project_relevance && (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-full border border-violet-500/30 bg-violet-500/10 px-2.5 py-0.5 text-xs font-semibold text-violet-300"
+                            title="One of your projects powers this job's career family (plan §14)"
+                          >
+                            <Wrench className="h-3 w-3" />
+                            {item.job.project_relevance}
+                          </span>
+                        )}
                       </div>
 
                       {/* Title */}
@@ -446,7 +500,54 @@ export default function RecommendationsPage() {
                           <Route className="h-3.5 w-3.5" />
                           Roadmap
                         </Link>
+
+                        {/* Phase 4 §16: feedback → M4 weight + affinity update */}
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setFeedbackMenu(
+                                feedbackMenu === item.job.id ? null : item.job.id,
+                              )
+                            }
+                            disabled={sendingFeedbackId === item.job.id}
+                            aria-expanded={feedbackMenu === item.job.id}
+                            className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-zinc-800 bg-zinc-900/70 px-3 py-2 text-xs font-semibold text-zinc-300 hover:border-teal-500/50 hover:text-teal-300 transition-colors disabled:opacity-50"
+                          >
+                            <ThumbsDown className="h-3.5 w-3.5" />
+                            {sendingFeedbackId === item.job.id
+                              ? "Saving…"
+                              : feedbackMenu === item.job.id
+                                ? "Close"
+                                : "Feedback"}
+                          </button>
+                          {feedbackMenu === item.job.id && (
+                            <div className="absolute right-0 bottom-full z-30 mb-1 w-48 rounded-xl border border-zinc-700 bg-zinc-900 p-1 shadow-2xl shadow-black/50">
+                              <p className="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+                                Why? (trains your model)
+                              </p>
+                              {FEEDBACK_REASONS.map((reason) => (
+                                <button
+                                  key={reason.value}
+                                  type="button"
+                                  onClick={() =>
+                                    handleFeedback(item.job.id, reason.value)
+                                  }
+                                  className="block w-full rounded-lg px-2.5 py-1.5 text-left text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                                >
+                                  {reason.label}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
+
+                      {feedbackNotes[item.job.id] && (
+                        <p className="max-w-[200px] text-[11px] leading-snug text-teal-400 lg:text-right">
+                          {feedbackNotes[item.job.id]}
+                        </p>
+                      )}
 
                       <Link
                         href={`/jobs/${item.job.id}`}

@@ -172,6 +172,10 @@ export interface JobDetail {
   applicant_count: number;
   relevance_score?: number | null;
   snippet?: string | null;
+  /** Canonical job-family name (plan §5). */
+  family?: string | null;
+  /** §14 "Powered by: <project> — <band>" (only surfaced at Moderate+). */
+  project_relevance?: string | null;
 }
 
 export interface JobListResponse {
@@ -232,7 +236,8 @@ export type ApplicationStatus =
   | "shortlisted"
   | "interview"
   | "rejected"
-  | "offer";
+  | "offer"
+  | "saved";
 
 export interface ApplicationStats {
   total_applied: number;
@@ -242,6 +247,12 @@ export interface ApplicationStats {
   interview: number;
   rejected: number;
   offer: number;
+  /** Phase 4: saved-later count (plan §19 /saved). */
+  saved?: number;
+  /** Phase 4: required skills across successful applications (§18). */
+  successful_skills?: string[];
+  /** Phase 4: "… a historical observation, not a causal claim." (§18). */
+  observation_note?: string;
 }
 
 export interface ApplicationItem {
@@ -424,4 +435,321 @@ export interface DiscoverResponse {
   suggestions: FamilySuggestion[];
   presets: FamilySuggestion[];
   explored: number;
+}
+
+// ---------------- Phase 4: Feedback · Preferences · NL · Resume · Projects ---------------- //
+
+export type FeedbackReason =
+  | "relevant"
+  | "not_relevant"
+  | "already_applied"
+  | "not_interested"
+  | "too_difficult"
+  | "location_issue"
+  | "salary_issue"
+  | "other";
+
+export interface FeedbackPayload {
+  job_id: string;
+  reason: FeedbackReason;
+  note?: string;
+}
+
+export interface FeedbackResponse {
+  id: string;
+  job_id: string;
+  reason: FeedbackReason;
+  note?: string | null;
+  created_at?: string | null;
+  /** What the M4 update did to your weights (never a score itself). */
+  personalization_note?: string | null;
+}
+
+/** One bar in Settings → "Your preferences" (§16). */
+export interface WeightBar {
+  component: string;
+  label: string;
+  weight: number;
+  global_weight: number;
+}
+
+export interface WeightHistoryEntry {
+  component: string;
+  delta: number;
+  weight: number;
+  reason: string;
+  at: string;
+}
+
+export interface AffinityEntry {
+  skill: string;
+  score: number;
+}
+
+export interface PreferenceState {
+  weights: WeightBar[];
+  n_events: number;
+  shrinkage: number;
+  updated_at?: string | null;
+  history: WeightHistoryEntry[];
+  affinities: AffinityEntry[];
+  personalization_note?: string | null;
+}
+
+/** §17 NL search response — parsed filters are echoed as editable chips. */
+export interface JobNlResponse {
+  items: JobDetail[];
+  total: number;
+  mode: "llm" | "fts";
+  parsed_filters: Record<string, unknown>;
+  q: string;
+}
+
+export interface AtsCheck {
+  name: string;
+  status: "PASS" | "WARN" | "FAIL";
+  detail: string;
+}
+
+export interface ResumeOptimizeResponse {
+  job_id: string;
+  job_title: string;
+  ats: {
+    checks: AtsCheck[];
+    ats_score: number;
+    missing_keywords: string[];
+    weak_evidence: string[];
+    keyword_coverage: number;
+    quantified_bullet_pct: number;
+    bullet_count: number;
+  };
+  suggestions: {
+    bullet: string;
+    issues: string[];
+    rewrite: string;
+    status: string;
+  }[];
+  violations_dropped: number;
+  llm_used: boolean;
+  disclaimer: string;
+}
+
+export type ProjectBand = "Very high" | "High" | "Moderate" | "Low";
+
+export interface ProjectMapItem {
+  project_id: string | null;
+  title: string;
+  score: number;
+  band: ProjectBand;
+  matched_skills: string[];
+}
+
+export interface ProjectMapResponse {
+  job_id: string;
+  job_title: string;
+  items: ProjectMapItem[];
+  best?: ProjectMapItem | null;
+  powered_by?: string | null;
+}
+
+export interface FamilyBenefit {
+  family: string;
+  score: number;
+  band: ProjectBand;
+}
+
+export interface ProjectBenefitItem {
+  project_id: string;
+  title: string;
+  benefits: FamilyBenefit[];
+}
+
+export interface ProjectBenefitsResponse {
+  items: ProjectBenefitItem[];
+}
+
+// ---------------- Phase 5: Admin · M5 Onboarding ---------------- //
+
+export interface AdminSkillItem {
+  id: string;
+  name: string;
+  category?: string | null;
+  profiles: number;
+  jobs: number;
+  aliases: number;
+  has_embedding: boolean;
+}
+
+export interface AdminSkillsResponse {
+  total_skills: number;
+  items: AdminSkillItem[];
+}
+
+export interface MergeCount {
+  moved: number;
+  deduped?: number;
+  dropped?: number;
+  skipped?: number;
+}
+
+export interface MergeReport {
+  status: string;
+  source: { id: string; name: string };
+  target: { id: string; name: string };
+  profile_skills: MergeCount;
+  job_skills: MergeCount;
+  skill_aliases: MergeCount;
+  skill_edges: MergeCount;
+  skill_affinities: MergeCount;
+  embedding_refreshed: boolean;
+}
+
+export interface DuplicateJobRef {
+  id: string;
+  title: string;
+  location?: string | null;
+  skills: number;
+}
+
+export interface DuplicatePair {
+  cosine: number;
+  title_similarity: number;
+  job_a: DuplicateJobRef;
+  job_b: DuplicateJobRef;
+  suggested_survivor_id: string;
+  suggested_retire_id: string;
+}
+
+export interface DuplicatesResponse {
+  threshold: number;
+  title_similarity_min: number;
+  jobs_examined: number;
+  pairs: DuplicatePair[];
+}
+
+export interface LlmUsageTotals {
+  calls: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  cache_hits: number;
+  flagged: number;
+  avg_latency_ms: number;
+  estimated_cost_usd: number | null;
+}
+
+export interface LlmUsageResponse {
+  totals: LlmUsageTotals;
+  by_route: {
+    route: string;
+    calls: number;
+    prompt_tokens: number;
+    completion_tokens: number;
+    avg_latency_ms: number;
+    flagged: number;
+  }[];
+  by_model: {
+    provider: string;
+    model: string;
+    calls: number;
+    prompt_tokens: number;
+    completion_tokens: number;
+    estimated_cost_usd: number | null;
+  }[];
+  recent: {
+    id: string;
+    route: string;
+    provider: string;
+    model: string;
+    prompt_tokens: number;
+    completion_tokens: number;
+    latency_ms: number;
+    cached: boolean;
+    flagged: boolean;
+    created_at: string | null;
+  }[];
+  llm_enabled: boolean;
+}
+
+export interface ParseFailureItem {
+  id: string;
+  profile_id: string;
+  original_filename?: string | null;
+  parse_status: string;
+  parser_used?: string | null;
+  stuck: boolean;
+  created_at: string | null;
+}
+
+export interface ParseFailuresResponse {
+  items: ParseFailureItem[];
+  stuck_after_minutes: number;
+}
+
+export interface AdminWeightBar {
+  component: string;
+  label: string;
+  weight: number;
+  default: number;
+}
+
+export interface AdminConfigResponse {
+  weights: AdminWeightBar[];
+  source: "system_config" | "defaults";
+  sum: number;
+  llm: {
+    enabled: boolean;
+    provider: string;
+    model: string;
+    has_api_key: boolean;
+    kill_switch: string;
+  };
+  m4: { learning_rate: number; bounds: number[]; shrinkage_k: number };
+}
+
+export interface ConfigSaveResponse {
+  status: string;
+  source: string;
+  weights: Record<string, number>;
+  sum: number;
+}
+
+export interface ModelRegistryItem {
+  id: string;
+  name: string;
+  version: string;
+  artifact_path: string;
+  artifact_exists: boolean;
+  metrics: Record<string, unknown>;
+  active: boolean;
+  trained_at: string | null;
+}
+
+export interface OnboardingPairOption {
+  label: string;
+  blurb: string;
+  shape: Record<string, number>;
+}
+
+export interface OnboardingPair {
+  index: number;
+  question: string;
+  a: OnboardingPairOption;
+  b: OnboardingPairOption;
+}
+
+export interface OnboardingPairsResponse {
+  pairs: OnboardingPair[];
+  components: { component: string; label: string }[];
+  note: string;
+}
+
+export interface OnboardingCompletePayload {
+  choices: { pair_index: number; chosen: "a" | "b" }[];
+  target_family?: string;
+}
+
+export interface OnboardingCompleteResponse {
+  weights: { component: string; label: string; weight: number }[];
+  target_family: string | null;
+  message: string;
 }

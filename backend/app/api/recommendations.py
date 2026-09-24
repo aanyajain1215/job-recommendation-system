@@ -11,6 +11,7 @@ from app.models.recommendation import Recommendation
 from app.models.skill import ProfileSkill
 from app.models.user import User
 from app.schemas.recommendation import RecommendationFeedResponse
+from app.services import personalization
 from app.services.recommender import ContentRecommender, generate_candidates
 
 router = APIRouter(prefix="/recommendations", tags=["recommendations"])
@@ -56,11 +57,18 @@ def get_recommendation_feed(
     # 2. Hybrid candidate generation (KNN ∪ FTS ∪ skill → RRF), fully eager-loaded
     candidates = generate_candidates(db, profile, limit)
 
-    # 3. Score → rerank → diversify → explain
+    # 3. Score → rerank → diversify → explain (M4 weights/affinities, §16)
+    weights, m4_note, _shrink = personalization.effective_weights(
+        db, profile.user_id
+    )
+    affinities = personalization.load_affinities(db, profile.id)
     feed = ContentRecommender.recommend_jobs(
         profile=profile,
         jobs=candidates,
         limit=limit,
+        weights=weights,
+        affinities=affinities,
+        personalization_note=m4_note,
     )
 
     # 4. Persist what was served — snapshot carries component breakdown +

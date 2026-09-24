@@ -397,6 +397,10 @@ class ContentRecommender:
         profile: Profile,
         jobs: Sequence[Job],
         limit: int = 20,
+        *,
+        weights: dict[str, float] | None = None,
+        affinities: dict[str, float] | None = None,
+        personalization_note: str | None = None,
     ) -> RecommendationFeedResponse:
         completeness = cls.compute_profile_completeness(profile)
 
@@ -422,9 +426,15 @@ class ContentRecommender:
 
         scored: list[tuple[Job, ScoreResult, RankOutcome]] = []
         now = datetime.now(timezone.utc)
+        try:
+            projects = list(profile.project_rows or [])
+        except Exception:  # detached profile in tests — project cards optional
+            projects = []
         for job in jobs:
             inputs = ctx.inputs_for(job)
-            result = score_pair(inputs)
+            if affinities:
+                inputs.seeker_skill_affinities = dict(affinities)
+            result = score_pair(inputs, weights=weights)
             features = build_features(
                 inputs,
                 result,
@@ -496,9 +506,20 @@ class ContentRecommender:
                 reasons = [contract.summary]
 
             is_explorer = index == explorer_slot
+            detail = cls._job_detail(job, outcome.final)
+            if projects:
+                # §14 job-card direction: "Powered by: <project> — <band>"
+                try:
+                    from app.services.project_mapping import powered_by_label
+
+                    detail.project_relevance = powered_by_label(
+                        projects, _build_job_requirements(job)
+                    )
+                except Exception:  # pragma: no cover - defensive
+                    detail.project_relevance = None
             items.append(
                 RecommendationItem(
-                    job=cls._job_detail(job, outcome.final),
+                    job=detail,
                     match_score=outcome.final,
                     skill_match_score=result.components.get("skill", 0.0),
                     content_similarity_score=result.components.get("semantic", 0.0),
@@ -519,6 +540,16 @@ class ContentRecommender:
             )
 
         first_outcome = scored[0][2]
+        exploration_note = (
+            "Includes 1 exploratory suggestion (1-in-6 feed slots, "
+            f"propensity {exploration_propensity(settings.exploration_rate)}) "
+            "to surface adjacent career directions."
+            if explorer_slot is not None
+            else None
+        )
+        merged_note = " ".join(
+            note for note in (personalization_note, exploration_note) if note
+        ) or None
         return RecommendationFeedResponse(
             items=items,
             total=len(scored),
@@ -527,13 +558,7 @@ class ContentRecommender:
             recommendation_strategy=STRATEGY_LABEL,
             strategy=first_outcome.strategy,
             model_version=first_outcome.model_version,
-            personalization_note=(
-                "Includes 1 exploratory suggestion (1-in-6 feed slots, "
-                f"propensity {exploration_propensity(settings.exploration_rate)}) "
-                "to surface adjacent career directions."
-                if explorer_slot is not None
-                else None
-            ),
+            personalization_note=merged_note,
         )
 
     @classmethod

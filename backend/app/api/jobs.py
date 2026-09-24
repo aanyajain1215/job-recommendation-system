@@ -10,7 +10,7 @@ from app.api.deps import get_current_user, require_roles
 from app.core.db import get_db
 from app.models.application import Application
 from app.models.company import Company
-from app.models.enums import EmploymentType, ExperienceLevel, JobStatus, UserRole
+from app.models.enums import EmploymentType, ExperienceLevel, JobStatus, UserRole, WorkMode
 from app.models.job import Job
 from app.models.job_family import JobFamily
 from app.models.skill import JobSkill, Skill
@@ -19,10 +19,12 @@ from app.schemas.job import (
     JobCreateRequest,
     JobDetailResponse,
     JobListResponse,
+    JobNlResponse,
     JobSkillRequirement,
     JobUpdateRequest,
 )
 from app.schemas.user import CompanySummary
+from app.services import nl_search
 from app.services.skill_normalizer import build_db_normalizer, resolve_skill
 
 router = APIRouter(tags=["jobs"])
@@ -178,10 +180,12 @@ def list_jobs(
     sort_by: str = Query(default="relevance", pattern="^(relevance|date|salary)$"),
     location: str | None = None,
     is_remote: bool | None = None,
+    work_mode: WorkMode | None = None,
     employment_type: EmploymentType | None = None,
     experience_level: ExperienceLevel | None = None,
     skill: str | None = None,
     company_id: UUID | None = None,
+    company: str | None = None,
     industry: str | None = None,
     family: str | None = None,
     skills: Annotated[list[str] | None, Query()] = None,
@@ -260,6 +264,19 @@ def list_jobs(
             Job.company.has(Company.industry.ilike(f"%{industry.strip()}%"))
         )
 
+    if company:
+        query = query.where(
+            Job.company.has(Company.name.ilike(f"%{company.strip()}%"))
+        )
+
+    if work_mode is not None:
+        # Jobs carry only is_remote (no work_mode column): remote → is_remote;
+        # hybrid/onsite → employer-location presence (documented §17 mapping).
+        if work_mode == WorkMode.REMOTE:
+            query = query.where(Job.is_remote.is_(True))
+        else:
+            query = query.where(Job.is_remote.is_(False))
+
     if family:
         raw_family = family.strip()
         family_row = db.scalar(
@@ -331,6 +348,49 @@ def list_jobs(
         page=page,
         page_size=page_size,
         total_pages=total_pages,
+    )
+
+
+@router.get("/jobs/nl", response_model=JobNlResponse)
+def nl_search_jobs(
+    db: Annotated[Session, Depends(get_db)],
+    q: Annotated[str, Query(min_length=1, max_length=300)],
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+) -> JobNlResponse:
+    """NL job search (plan §15/§17): P7 → whitelist → same query builder.
+
+    Filters are coerced/validated by Pydantic, unknown fields dropped, skills
+    canonicalized through the normalizer.  Results fuse via RRF(k=60) over
+    FTS order, embedding KNN order and skill-set match count (deterministic
+    tie-break: recency, then id).  `parsed_filters` is echoed so the UI shows
+    editable chips — the user, not the LLM, is the final authority.  Any LLM
+    failure degrades to full-text search (`mode: "fts"`).
+    """
+    filters, mode = nl_search.parse_query(q)
+    filters = nl_search.canonicalize_skills(db, filters)
+    query, rank_column = nl_search.build_filtered_query(db, filters)
+
+    if rank_column is not None:
+        query = query.order_by(
+            rank_column.desc(), Job.created_at.desc(), Job.id.asc()
+        )
+    else:
+        query = query.order_by(Job.created_at.desc(), Job.id.asc())
+
+    candidates = list(db.scalars(query.limit(nl_search.CANDIDATE_CAP)).all())
+    ranked = nl_search.hybrid_rank(db, candidates, filters)
+
+    offset = (page - 1) * page_size
+    page_items = ranked[offset : offset + page_size]
+    items = [_format_job_response(job) for job in page_items]
+
+    return JobNlResponse(
+        items=items,
+        total=len(ranked),
+        mode=mode,
+        parsed_filters=nl_search.parsed_filters_dict(filters),
+        q=q,
     )
 
 

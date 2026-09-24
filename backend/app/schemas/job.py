@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -91,3 +92,13 @@ class JobListResponse(BaseModel):
     page: int
     page_size: int
     total_pages: int
+
+
+class JobNlResponse(BaseModel):
+    """NL search response (plan §17): results + the filters we parsed (§17)."""
+
+    items: list[JobDetailResponse]
+    total: int
+    mode: str  # "llm" | "fts" (deterministic degrade)
+    parsed_filters: dict[str, Any] = {}
+    q: str

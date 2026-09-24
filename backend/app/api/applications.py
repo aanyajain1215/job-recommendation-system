@@ -23,6 +23,7 @@ from app.models.enums import ApplicationStatus, InteractionType, JobStatus, User
 from app.models.interaction import Interaction
 from app.models.job import Job
 from app.models.profile import Profile
+from app.models.skill import JobSkill, Skill
 from app.models.user import User
 from app.schemas.applications import (
     ApplicantProfileSummary,
@@ -195,6 +196,11 @@ def apply_to_job(
 
 
 @router.get(
+    "/applications",
+    response_model=list[ApplicationOut],
+    summary="List current candidate's applications (incl. saved)",
+)
+@router.get(
     "/applications/me",
     response_model=list[ApplicationOut],
     summary="List current candidate's applications",
@@ -223,6 +229,41 @@ def get_my_applications(
     return [_format_application_out(r) for r in rows]
 
 
+def _successful_skill_observation(db: Session, user_id) -> tuple[list[str], str]:
+    """§18: 'skills in your successful applications …' — observation only."""
+    success = (
+        ApplicationStatus.SHORTLISTED,
+        ApplicationStatus.INTERVIEW,
+        ApplicationStatus.OFFER,
+    )
+    rows = db.execute(
+        select(Skill.name, func.count(Skill.id))
+        .join(JobSkill, JobSkill.skill_id == Skill.id)
+        .join(Job, Job.id == JobSkill.job_id)
+        .join(Application, Application.job_id == Job.id)
+        .where(
+            Application.user_id == user_id,
+            Application.status.in_(success),
+            JobSkill.is_required.is_(True),
+        )
+        .group_by(Skill.name)
+        .order_by(func.count(Skill.id).desc(), Skill.name.asc())
+        .limit(8)
+    ).all()
+    names = [r[0] for r in rows]
+    note = (
+        "Skills in your successful applications: "
+        + (", ".join(names) if names else "not enough data yet")
+        + " — a historical observation, not a causal claim."
+    )
+    return names, note
+
+
+@router.get(
+    "/applications/stats",
+    response_model=ApplicationStatsOut,
+    summary="Application pipeline analytics incl. skill observation (§18)",
+)
 @router.get(
     "/applications/me/stats",
     response_model=ApplicationStatsOut,
@@ -241,6 +282,7 @@ def get_my_application_stats(
 
     counts = {r[0]: r[1] for r in rows}
     total = sum(counts.values())
+    successful, note = _successful_skill_observation(db, current_user.id)
 
     return ApplicationStatsOut(
         total_applied=total,
@@ -250,7 +292,151 @@ def get_my_application_stats(
         interview=counts.get(ApplicationStatus.INTERVIEW, 0),
         rejected=counts.get(ApplicationStatus.REJECTED, 0),
         offer=counts.get(ApplicationStatus.OFFER, 0),
+        saved=counts.get(ApplicationStatus.SAVED, 0),
+        successful_skills=successful,
+        observation_note=note,
     )
+
+
+@router.post(
+    "/jobs/{job_id}/save",
+    response_model=ApplicationOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Save a job for later (status=saved)",
+)
+def save_job_for_later(
+    job_id: UUID,
+    current_user: Annotated[User, Depends(require_roles(UserRole.JOB_SEEKER))],
+    db: Annotated[Session, Depends(get_db)],
+) -> ApplicationOut:
+    """Idempotent save → Application(status=SAVED) + a 'save' interaction."""
+    job = db.scalar(
+        select(Job).options(selectinload(Job.company)).where(Job.id == job_id)
+    )
+    if job is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Job posting not found."
+        )
+
+    existing = db.scalar(
+        select(Application).where(
+            Application.job_id == job_id,
+            Application.user_id == current_user.id,
+        )
+    )
+    if existing is not None:
+        return _format_application_out(existing, job=job)
+
+    profile = db.scalar(select(Profile).where(Profile.user_id == current_user.id))
+    if not profile:
+        profile = Profile(
+            user_id=current_user.id,
+            first_name=current_user.email.split("@")[0].capitalize(),
+            last_name="",
+        )
+        db.add(profile)
+        db.flush()
+
+    record = Application(
+        job_id=job.id,
+        user_id=current_user.id,
+        profile_id=profile.id,
+        status=ApplicationStatus.SAVED,
+        resume_url_snapshot=profile.resume_url,
+    )
+    db.add(record)
+    db.add(
+        Interaction(
+            user_id=current_user.id,
+            job_id=job.id,
+            event_type=InteractionType.SAVE,
+            metadata_={"source": "save_api"},
+        )
+    )
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        again = db.scalar(
+            select(Application).where(
+                Application.job_id == job_id,
+                Application.user_id == current_user.id,
+            )
+        )
+        if again is None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Could not save this job.",
+            ) from None
+        return _format_application_out(again, job=job)
+
+    db.refresh(record)
+    return _format_application_out(record, job=job)
+
+
+@router.patch(
+    "/applications/{application_id}",
+    response_model=ApplicationOut,
+    summary="Update your own application pipeline status (tracker, §19)",
+)
+def update_my_application(
+    application_id: UUID,
+    payload: ApplicationStatusUpdate,
+    current_user: Annotated[User, Depends(require_roles(UserRole.JOB_SEEKER))],
+    db: Annotated[Session, Depends(get_db)],
+) -> ApplicationOut:
+    """Seeker-side status move (applied → viewed → shortlisted → …)."""
+    record = db.scalar(
+        select(Application)
+        .options(selectinload(Application.job).selectinload(Job.company))
+        .where(Application.id == application_id)
+    )
+    if record is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Application record not found.",
+        )
+    if record.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not own this application.",
+        )
+    record.status = payload.status
+    db.commit()
+    db.refresh(record)
+    return _format_application_out(record)
+
+
+@router.delete(
+    "/applications/{application_id}",
+    status_code=status.HTTP_200_OK,
+    summary="Remove a saved job (unsave)",
+)
+def unsave_job(
+    application_id: UUID,
+    current_user: Annotated[User, Depends(require_roles(UserRole.JOB_SEEKER))],
+    db: Annotated[Session, Depends(get_db)],
+) -> dict:
+    """Only saved rows are removable; pipeline moves go through PATCH."""
+    record = db.get(Application, application_id)
+    if record is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Application record not found.",
+        )
+    if record.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not own this application.",
+        )
+    if record.status != ApplicationStatus.SAVED:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Only saved jobs can be removed; use PATCH for pipeline statuses.",
+        )
+    db.delete(record)
+    db.commit()
+    return {"status": "removed", "id": str(application_id)}
 
 
 # ---------------------------------------------------------------------------

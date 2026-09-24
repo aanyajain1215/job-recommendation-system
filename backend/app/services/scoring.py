@@ -137,6 +137,10 @@ class ComponentInputs:
     # job skill name -> transfer similarity (skill2vec cosine or taxonomy) for
     # skills the seeker does NOT hold but can transfer into
     transfer_similarities: dict[str, float] = field(default_factory=dict)
+    # M4 skill lean (plan §16): canonical skill -> affinity in [-1, 1].
+    # SkillMatch credit is scaled by max(0, 1 + affinity·0.3); empty by
+    # default so pinned/golden scores are untouched when M4 has no state.
+    seeker_skill_affinities: dict[str, float] = field(default_factory=dict)
 
     # 3. Experience
     years_of_experience: float | None = None
@@ -245,6 +249,14 @@ def education_match(
     return _clamp(score)
 
 
+def _affinity_factor(inputs: ComponentInputs, key: str) -> float:
+    """M4 skill lean (plan §16): max(0, 1 + affinity·0.3) — never removal."""
+    affinity = inputs.seeker_skill_affinities.get(key, 0.0)
+    if not affinity:
+        return 1.0
+    return max(0.0, 1.0 + affinity * 0.3)
+
+
 def skill_match(inputs: ComponentInputs) -> SkillMatchDetail:
     """Weighted skill credit with strong/partial/transferable classes (plan §6/§7)."""
     if not inputs.job_skills:
@@ -283,11 +295,11 @@ def skill_match(inputs: ComponentInputs) -> SkillMatchDetail:
                 credit = CREDIT_PARTIAL
                 partial.append(req.name)
                 matched.append(req.name)
-            gained_weight += w_eff * credit
+            gained_weight += w_eff * credit * _affinity_factor(inputs, key)
         elif key in inputs.transfer_similarities:
             sim = inputs.transfer_similarities[key]
             credit = CREDIT_TRANSFER_FLOOR * min(1.0, max(0.0, sim))
-            gained_weight += w_eff * credit
+            gained_weight += w_eff * credit * _affinity_factor(inputs, key)
             transferable.append(req.name)
         else:
             if req.is_required:

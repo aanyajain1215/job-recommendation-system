@@ -51,6 +51,16 @@ def _persist_interaction(
         db.add(row)
         db.commit()
         logger.debug("Interaction logged: user=%s job=%s type=%s", user_id, job_id, event_type)
+        # M4 skill affinities (plan §16): implicit save/apply/dismiss lean.
+        # Best-effort — the interaction row above is already durable.
+        try:
+            from app.services import personalization
+
+            personalization.apply_interaction(db, user_id, job_id, event_type)
+            db.commit()
+        except Exception:
+            db.rollback()
+            logger.exception("M4 affinity update failed for job %s", job_id)
     except Exception:
         db.rollback()
         logger.exception(

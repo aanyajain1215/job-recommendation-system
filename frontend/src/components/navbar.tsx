@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { Briefcase, Building2, Compass, GitBranch, LogOut, PlusCircle, Route, Sparkles, User as UserIcon } from "lucide-react";
+import { Briefcase, Bookmark, Building2, Compass, GitBranch, ListChecks, LogOut, PlusCircle, Route, Settings as SettingsIcon, Sparkles, User as UserIcon } from "lucide-react";
 
 export function Navbar() {
   const pathname = usePathname();
@@ -139,15 +139,37 @@ export function Navbar() {
                   Profile & Resume
                 </Link>
                 <Link
-                  href="/dashboard"
+                  href="/tracker"
                   className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    pathname === "/dashboard"
+                    pathname === "/tracker"
                       ? "text-teal-400 bg-zinc-900/60"
                       : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/40"
                   }`}
                 >
-                  <Compass className="h-4 w-4" />
-                  Dashboard
+                  <ListChecks className="h-4 w-4" />
+                  Tracker
+                </Link>
+                <Link
+                  href="/saved"
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    pathname === "/saved"
+                      ? "text-teal-400 bg-zinc-900/60"
+                      : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/40"
+                  }`}
+                >
+                  <Bookmark className="h-4 w-4" />
+                  Saved
+                </Link>
+                <Link
+                  href="/settings"
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    pathname === "/settings"
+                      ? "text-teal-400 bg-zinc-900/60"
+                      : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/40"
+                  }`}
+                >
+                  <SettingsIcon className="h-4 w-4" />
+                  Settings
                 </Link>
               </>
             )}
