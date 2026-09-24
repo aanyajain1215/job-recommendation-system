@@ -59,7 +59,7 @@ def fetch_adzuna(query: str, page: int = 1) -> list[dict]:
             "app_id": settings.adzuna_app_id,
             "app_key": settings.adzuna_app_key,
             "content-type": "application/json",
-            "results-per-page": 25,
+            "results_per_page": 25,
             "what": query,
             "full_time": 1,
         },
