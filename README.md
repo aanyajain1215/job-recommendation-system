@@ -63,12 +63,14 @@ Postgres is published on host port **55432** because 5432/5433 were already in u
 
 LLM routes degrade gracefully without keys; set `OPENAI_API_KEY` (or `LLM_PROVIDER=gemini` + `GEMINI_API_KEY`) in `.env` to enable them. **Kill switch:** `LLM_ENABLED=false` forces every route to its deterministic fallback. Optional **explanation polish**: `EXPLAIN_LLM=true` lets the LLM rewrite explanation wording only — a digit-multiset validator discards the polish unless every number survives verbatim (default off).
 
+**Auto-ingestion:** the `ingest` service re-runs the live pipeline (fetch → clean → parse → structure → quality gates → upsert) on a timer — every `INGEST_INTERVAL_SECONDS` (default 6h), rotating through the query set defined in `docker-compose.yml`. Upserts are keyed by external id, so cycles are idempotent. Pause it with `docker compose stop ingest`; resume with `docker compose start ingest`.
+
 ## Layout
 
 - `frontend/` — Next.js App Router (19 pages: feed, gap, roadmap, simulator, careers, NL search, tracker, saved, settings, resume optimizer, onboarding, admin, …)
 - `backend/` — FastAPI + Alembic; `app/api` (57 paths), `app/services`, `ml/` training + evaluation
 - `backend/scripts/` — corpus ingestion (Adzuna/Arbeitnow/Remotive/Jobicy → preprocess → embed) and synthetic interaction bootstrap
-- `docker-compose.yml` — Postgres, API, frontend
+- `docker-compose.yml` — Postgres, API, frontend, ingest timer
 
 ## Testing
 

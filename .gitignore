@@ -41,3 +41,4 @@ mlruns/
 
 # Ingestion run snapshots / reports (regenerated per run)
 backend/ml/data/raw/
+backend/ml/reports/
