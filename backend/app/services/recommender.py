@@ -25,6 +25,7 @@ point of view.
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from typing import Sequence
 from uuid import UUID
 
@@ -53,7 +54,7 @@ from app.services.mmr import (
     exploration_should_apply,
     mmr_order,
 )
-from app.services.rerank import RankOutcome, rerank
+from app.services.rerank import FeatureContext, RankOutcome, build_features, rerank
 from app.services.scoring import (
     ComponentInputs,
     JobSkillReq,
@@ -357,6 +358,32 @@ class _ProfileContext:
         )
 
 
+def _job_age_days(job: Job, now: datetime) -> float:
+    """Days since posting — deterministic M2 context feature (plan §6)."""
+    try:
+        created = job.created_at
+        if created is None:
+            return 0.0
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        return max(0.0, (now - created).total_seconds() / 86400.0)
+    except Exception:
+        return 0.0
+
+
+def _applicant_count(job: Job) -> float:
+    try:
+        return float(len(job.applications)) if job.applications is not None else 0.0
+    except Exception:
+        return 0.0
+
+
+def _apply_rate(job: Job) -> float:
+    """Log-scaled historical apply pressure, bounded to [0, 1]."""
+    count = int(_applicant_count(job))
+    return round(min(1.0, count / 50.0), 4)
+
+
 # ---------------------------------------------------------------------------
 # Recommender
 # ---------------------------------------------------------------------------
@@ -394,9 +421,21 @@ class ContentRecommender:
         ensure_job_embeddings(jobs)
 
         scored: list[tuple[Job, ScoreResult, RankOutcome]] = []
+        now = datetime.now(timezone.utc)
         for job in jobs:
-            result = score_pair(ctx.inputs_for(job))
-            outcome = rerank(result)
+            inputs = ctx.inputs_for(job)
+            result = score_pair(inputs)
+            features = build_features(
+                inputs,
+                result,
+                FeatureContext(
+                    job_age_days=_job_age_days(job, now),
+                    applicant_count=_applicant_count(job),
+                    profile_completeness=completeness,
+                    historical_apply_rate=_apply_rate(job),
+                ),
+            )
+            outcome = rerank(result, features=features)
             scored.append((job, result, outcome))
 
         # 1. relevance order — deterministic tie-break on job id

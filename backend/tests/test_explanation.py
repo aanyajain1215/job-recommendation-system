@@ -107,13 +107,43 @@ def test_display_score_override_keeps_numbers_verbatim():
 
 
 def test_readiness_bands_phase1_mapping():
-    # low < 0.50 <= medium < 0.75 <= high; M3 isotonic replaces this later
-    assert readiness_from_score(49.0) == {"value": 0.49, "band": "low"}
-    assert readiness_from_score(50.0) == {"value": 0.5, "band": "medium"}
-    assert readiness_from_score(74.0) == {"value": 0.74, "band": "medium"}
-    assert readiness_from_score(75.0) == {"value": 0.75, "band": "high"}
-    assert readiness_from_score(150.0) == {"value": 1.0, "band": "high"}   # clamped
-    assert readiness_from_score(-10.0) == {"value": 0.0, "band": "low"}    # clamped
+    # Fallback contract (no calibrator artifact / flag off): exact Phase-1
+    # raw mapping — low < 0.50 <= medium < 0.75 <= high.  Patched manually
+    # (no fixtures) so the direct-run path below keeps working.
+    import app.services.calibration as calibration
+
+    original = calibration.predict_positive
+    calibration.predict_positive = lambda score: None
+    try:
+        assert readiness_from_score(49.0) == {"value": 0.49, "band": "low"}
+        assert readiness_from_score(50.0) == {"value": 0.5, "band": "medium"}
+        assert readiness_from_score(74.0) == {"value": 0.74, "band": "medium"}
+        assert readiness_from_score(75.0) == {"value": 0.75, "band": "high"}
+        assert readiness_from_score(150.0) == {"value": 1.0, "band": "high"}   # clamped
+        assert readiness_from_score(-10.0) == {"value": 0.0, "band": "low"}    # clamped
+    finally:
+        calibration.predict_positive = original
+
+
+def test_readiness_bands_calibrated_path():
+    # M3 calibrated path (plan §6): value = P(positive outcome), bands from
+    # settings (default low < 0.60 <= medium < 0.80 <= high).  Fake monotone
+    # calibrator: P = clamp((score - 30) / 80).
+    import app.services.calibration as calibration
+
+    original = calibration.predict_positive
+    calibration.predict_positive = lambda s: max(0.0, min(1.0, (s - 30.0) / 80.0))
+    try:
+        assert readiness_from_score(62.0) == {"value": 0.4, "band": "low"}     # P=0.40
+        assert readiness_from_score(78.0) == {"value": 0.6, "band": "medium"}  # P=0.60
+        assert readiness_from_score(94.0) == {"value": 0.8, "band": "high"}    # P=0.80
+        assert readiness_from_score(150.0) == {"value": 1.0, "band": "high"}
+        assert readiness_from_score(-10.0) == {"value": 0.0, "band": "low"}
+        # isotonic calibrators are monotone → roadmap/simulator orderings hold
+        values = [readiness_from_score(s)["value"] for s in range(0, 101, 5)]
+        assert all(b >= a for a, b in zip(values, values[1:]))
+    finally:
+        calibration.predict_positive = original
 
 
 # ---------------------------------------------------------------------------

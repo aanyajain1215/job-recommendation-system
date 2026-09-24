@@ -173,6 +173,32 @@ export default function RecommendationsPage() {
                     Cold-start mode active: Add skills to your profile to get high-accuracy tailored recommendations!
                   </p>
                 )}
+
+                {/* Phase 3: honest strategy/model provenance for this feed */}
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
+                  <span
+                    className="inline-flex items-center gap-1.5 rounded-full border border-zinc-700 bg-zinc-800/80 px-2.5 py-0.5 font-semibold text-zinc-300"
+                    title="Ranking strategy used to score this feed"
+                  >
+                    <Layers className="h-3 w-3 text-teal-400" />
+                    Strategy: {feed.strategy ?? feed.recommendation_strategy}
+                  </span>
+                  {feed.model_version && (
+                    <span
+                      className="inline-flex items-center gap-1.5 rounded-full border border-teal-500/30 bg-teal-500/10 px-2.5 py-0.5 font-semibold text-teal-300"
+                      title="Learned model version used for re-ranking"
+                    >
+                      <Zap className="h-3 w-3" />
+                      Model: {feed.model_version}
+                    </span>
+                  )}
+                </div>
+                {feed.personalization_note && (
+                  <p className="mt-2 text-xs text-teal-300/90 flex items-start gap-1.5">
+                    <Compass className="h-3.5 w-3.5 flex-shrink-0 mt-px" />
+                    <span>{feed.personalization_note}</span>
+                  </p>
+                )}
               </div>
 
               {feed.profile_completeness_score < 80 && (
@@ -283,6 +309,17 @@ export default function RecommendationsPage() {
                           #{index + 1} Best Match
                         </span>
 
+                        {/* Phase 3: per-item rerank strategy / model version */}
+                        {(item.model_version ||
+                          (item.strategy ?? "deterministic") !== "deterministic") && (
+                          <span
+                            className="rounded-full border border-indigo-500/30 bg-indigo-500/10 px-2.5 py-0.5 text-xs font-semibold text-indigo-300"
+                            title="Ranking strategy and model behind this item's score"
+                          >
+                            {[item.strategy, item.model_version].filter(Boolean).join(" · ")}
+                          </span>
+                        )}
+
                         {item.job.is_remote && (
                           <span className="rounded-full bg-teal-500/10 px-2.5 py-0.5 text-xs font-medium text-teal-400 border border-teal-500/20">
                             Remote
@@ -337,6 +374,12 @@ export default function RecommendationsPage() {
                               <span>{reason}</span>
                             </div>
                           ))}
+                          {item.explanation?.delta_note && (
+                            <div className="flex items-center gap-2 text-amber-300 pt-1 border-t border-zinc-800/80 mt-1">
+                              <TrendingUp className="h-3.5 w-3.5 flex-shrink-0" />
+                              <span>{item.explanation.delta_note}</span>
+                            </div>
+                          )}
                         </div>
                       )}
 

@@ -60,6 +60,25 @@ class Settings(BaseSettings):
     llm_cache_max_entries: int = 256
     llm_max_repair_turns: int = 1
 
+    # ---- Trained model suite M1–M3 (plan §6/§17/§21) ----
+    # M1: skill2vec cosine fallback inside transfer detection — opt-in so the
+    # seeded-edge behaviour stays byte-identical until the corpus is large.
+    skill2vec_enabled: bool = False
+    # M3: calibrated readiness.  Enabled, but only takes effect once an
+    # artifact exists (ml/calibrate.py); otherwise the raw mapping is used.
+    readiness_calibrator_enabled: bool = True
+    readiness_band_high: float = 0.80       # calibrated bands (plan §6 M3)
+    readiness_band_medium: float = 0.60     # raw fallback keeps 0.75/0.50
+    calibrator_positive_min: int = 4        # graded label ≥ save = positive outcome
+    synthetic_seed: int = 1729              # deterministic bootstrap seed (plan §6 M2)
+
+    # ---- Live ingestion pipeline (plan §20.1) ----
+    adzuna_app_id: str = ""                 # Adzuna is the primary job API
+    adzuna_app_key: str = ""
+    adzuna_country: str = "in"
+    ingest_http_timeout: int = 20
+    ingest_delay_seconds: float = 0.5       # polite rate limit between requests
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

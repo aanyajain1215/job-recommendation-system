@@ -1,0 +1,228 @@
+{"a": "tailwind css", "b": "flutter", "transferable": false}
+{"a": "next.js", "b": "spark", "transferable": false}
+{"a": "pandas", "b": "tableau", "transferable": true}
+{"a": "computer vision", "b": "deep learning", "transferable": true}
+{"a": "aws", "b": "deep learning", "transferable": false}
+{"a": "pytorch", "b": "tensorflow", "transferable": true}
+{"a": "tableau", "b": "power bi", "transferable": true}
+{"a": "swift", "b": "kotlin", "transferable": true}
+{"a": "nlp", "b": "computer vision", "transferable": true}
+{"a": "javascript", "b": "kotlin", "transferable": false}
+{"a": "ansible", "b": "machine learning", "transferable": false}
+{"a": "javascript", "b": "nlp", "transferable": false}
+{"a": "next.js", "b": "numpy", "transferable": false}
+{"a": "tailwind css", "b": "sql", "transferable": false}
+{"a": "typescript", "b": "html", "transferable": true}
+{"a": "numpy", "b": "swift", "transferable": false}
+{"a": "nlp", "b": "machine learning", "transferable": true}
+{"a": "javascript", "b": "hugging face", "transferable": false}
+{"a": "node.js", "b": "express", "transferable": true}
+{"a": "scikit-learn", "b": "hugging face", "transferable": true}
+{"a": "css", "b": "spark", "transferable": false}
+{"a": "ci/cd", "b": "computer vision", "transferable": false}
+{"a": "github actions", "b": "pytorch", "transferable": false}
+{"a": "kubernetes", "b": "aws", "transferable": true}
+{"a": "tensorflow", "b": "scikit-learn", "transferable": true}
+{"a": "linux", "b": "swift", "transferable": false}
+{"a": "html", "b": "tableau", "transferable": false}
+{"a": "pandas", "b": "spark", "transferable": true}
+{"a": "terraform", "b": "tableau", "transferable": false}
+{"a": "pytorch", "b": "deep learning", "transferable": true}
+{"a": "sql", "b": "pandas", "transferable": true}
+{"a": "postgresql", "b": "redis", "transferable": true}
+{"a": "pandas", "b": "numpy", "transferable": true}
+{"a": "flutter", "b": "react native", "transferable": true}
+{"a": "sql", "b": "spark", "transferable": true}
+{"a": "react", "b": "vue.js", "transferable": true}
+{"a": "linux", "b": "kafka", "transferable": false}
+{"a": "react", "b": "react native", "transferable": false}
+{"a": "javascript", "b": "tailwind css", "transferable": true}
+{"a": "terraform", "b": "ansible", "transferable": true}
+{"a": "html", "b": "machine learning", "transferable": false}
+{"a": "next.js", "b": "html", "transferable": true}
+{"a": "power bi", "b": "kafka", "transferable": true}
+{"a": "vue.js", "b": "sql", "transferable": false}
+{"a": "tailwind css", "b": "pytorch", "transferable": false}
+{"a": "aws", "b": "linux", "transferable": true}
+{"a": "react native", "b": "kotlin", "transferable": true}
+{"a": "typescript", "b": "flutter", "transferable": false}
+{"a": "css", "b": "pytorch", "transferable": false}
+{"a": "ci/cd", "b": "kotlin", "transferable": false}
+{"a": "fastapi", "b": "redis", "transferable": true}
+{"a": "ansible", "b": "deep learning", "transferable": false}
+{"a": "react", "b": "sql", "transferable": false}
+{"a": "ansible", "b": "github actions", "transferable": true}
+{"a": "sql", "b": "statistics", "transferable": true}
+{"a": "react", "b": "swift", "transferable": false}
+{"a": "nlp", "b": "hugging face", "transferable": true}
+{"a": "computer vision", "b": "react native", "transferable": false}
+{"a": "next.js", "b": "flutter", "transferable": false}
+{"a": "vue.js", "b": "css", "transferable": true}
+{"a": "django", "b": "postgresql", "transferable": true}
+{"a": "css", "b": "pandas", "transferable": false}
+{"a": "python", "b": "postgresql", "transferable": true}
+{"a": "vue.js", "b": "pytorch", "transferable": false}
+{"a": "typescript", "b": "kotlin", "transferable": false}
+{"a": "nlp", "b": "kotlin", "transferable": false}
+{"a": "machine learning", "b": "deep learning", "transferable": true}
+{"a": "computer vision", "b": "swift", "transferable": false}
+{"a": "github actions", "b": "spark", "transferable": false}
+{"a": "terraform", "b": "linux", "transferable": true}
+{"a": "fastapi", "b": "django", "transferable": true}
+{"a": "tensorflow", "b": "react native", "transferable": false}
+{"a": "react native", "b": "swift", "transferable": true}
+{"a": "tailwind css", "b": "deep learning", "transferable": false}
+{"a": "html", "b": "css", "transferable": true}
+{"a": "nlp", "b": "deep learning", "transferable": true}
+{"a": "fastapi", "b": "postgresql", "transferable": true}
+{"a": "pandas", "b": "airflow", "transferable": true}
+{"a": "react", "b": "power bi", "transferable": false}
+{"a": "tableau", "b": "statistics", "transferable": true}
+{"a": "html", "b": "spark", "transferable": false}
+{"a": "power bi", "b": "swift", "transferable": false}
+{"a": "spark", "b": "swift", "transferable": false}
+{"a": "ci/cd", "b": "tableau", "transferable": false}
+{"a": "ci/cd", "b": "power bi", "transferable": false}
+{"a": "machine learning", "b": "flutter", "transferable": false}
+{"a": "next.js", "b": "pytorch", "transferable": false}
+{"a": "vue.js", "b": "html", "transferable": true}
+{"a": "machine learning", "b": "react native", "transferable": false}
+{"a": "typescript", "b": "javascript", "transferable": true}
+{"a": "github actions", "b": "swift", "transferable": false}
+{"a": "aws", "b": "tensorflow", "transferable": false}
+{"a": "kubernetes", "b": "nlp", "transferable": false}
+{"a": "hugging face", "b": "flutter", "transferable": false}
+{"a": "github actions", "b": "tableau", "transferable": false}
+{"a": "scikit-learn", "b": "swift", "transferable": false}
+{"a": "numpy", "b": "power bi", "transferable": true}
+{"a": "linux", "b": "tensorflow", "transferable": false}
+{"a": "linux", "b": "react native", "transferable": false}
+{"a": "tensorflow", "b": "pytorch", "transferable": true}
+{"a": "react", "b": "javascript", "transferable": true}
+{"a": "sql", "b": "tableau", "transferable": true}
+{"a": "linux", "b": "github actions", "transferable": true}
+{"a": "scikit-learn", "b": "machine learning", "transferable": true}
+{"a": "tensorflow", "b": "deep learning", "transferable": true}
+{"a": "pandas", "b": "statistics", "transferable": true}
+{"a": "typescript", "b": "tableau", "transferable": false}
+{"a": "ci/cd", "b": "react native", "transferable": false}
+{"a": "tailwind css", "b": "react native", "transferable": false}
+{"a": "numpy", "b": "kafka", "transferable": true}
+{"a": "javascript", "b": "computer vision", "transferable": false}
+{"a": "flutter", "b": "swift", "transferable": true}
+{"a": "terraform", "b": "aws", "transferable": true}
+{"a": "css", "b": "tailwind css", "transferable": true}
+{"a": "typescript", "b": "css", "transferable": true}
+{"a": "kubernetes", "b": "linux", "transferable": true}
+{"a": "kubernetes", "b": "github actions", "transferable": true}
+{"a": "sql", "b": "power bi", "transferable": true}
+{"a": "javascript", "b": "airflow", "transferable": false}
+{"a": "typescript", "b": "statistics", "transferable": false}
+{"a": "aws", "b": "sql", "transferable": false}
+{"a": "typescript", "b": "computer vision", "transferable": false}
+{"a": "node.js", "b": "redis", "transferable": true}
+{"a": "linux", "b": "computer vision", "transferable": false}
+{"a": "next.js", "b": "nlp", "transferable": false}
+{"a": "tensorflow", "b": "machine learning", "transferable": true}
+{"a": "kubernetes", "b": "terraform", "transferable": true}
+{"a": "aws", "b": "kotlin", "transferable": false}
+{"a": "ci/cd", "b": "statistics", "transferable": false}
+{"a": "next.js", "b": "tailwind css", "transferable": true}
+{"a": "vue.js", "b": "tailwind css", "transferable": true}
+{"a": "kubernetes", "b": "computer vision", "transferable": false}
+{"a": "react", "b": "html", "transferable": true}
+{"a": "pytorch", "b": "hugging face", "transferable": true}
+{"a": "spark", "b": "power bi", "transferable": true}
+{"a": "html", "b": "airflow", "transferable": false}
+{"a": "airflow", "b": "power bi", "transferable": true}
+{"a": "vue.js", "b": "power bi", "transferable": false}
+{"a": "aws", "b": "ci/cd", "transferable": true}
+{"a": "docker", "b": "linux", "transferable": true}
+{"a": "html", "b": "kafka", "transferable": false}
+{"a": "vue.js", "b": "javascript", "transferable": true}
+{"a": "pytorch", "b": "machine learning", "transferable": true}
+{"a": "html", "b": "numpy", "transferable": false}
+{"a": "javascript", "b": "statistics", "transferable": false}
+{"a": "sql", "b": "airflow", "transferable": true}
+{"a": "ci/cd", "b": "linux", "transferable": true}
+{"a": "numpy", "b": "react native", "transferable": false}
+{"a": "typescript", "b": "numpy", "transferable": false}
+{"a": "tensorflow", "b": "nlp", "transferable": true}
+{"a": "css", "b": "deep learning", "transferable": false}
+{"a": "aws", "b": "ansible", "transferable": true}
+{"a": "aws", "b": "react native", "transferable": false}
+{"a": "kubernetes", "b": "deep learning", "transferable": false}
+{"a": "docker", "b": "kubernetes", "transferable": true}
+{"a": "vue.js", "b": "tensorflow", "transferable": false}
+{"a": "javascript", "b": "css", "transferable": true}
+{"a": "scikit-learn", "b": "computer vision", "transferable": true}
+{"a": "computer vision", "b": "hugging face", "transferable": true}
+{"a": "django", "b": "node.js", "transferable": true}
+{"a": "tailwind css", "b": "computer vision", "transferable": false}
+{"a": "css", "b": "airflow", "transferable": false}
+{"a": "python", "b": "redis", "transferable": true}
+{"a": "react", "b": "next.js", "transferable": true}
+{"a": "ansible", "b": "tensorflow", "transferable": false}
+{"a": "vue.js", "b": "kotlin", "transferable": false}
+{"a": "pytorch", "b": "computer vision", "transferable": true}
+{"a": "vue.js", "b": "scikit-learn", "transferable": false}
+{"a": "kubernetes", "b": "ansible", "transferable": true}
+{"a": "terraform", "b": "kafka", "transferable": false}
+{"a": "aws", "b": "hugging face", "transferable": false}
+{"a": "vue.js", "b": "nlp", "transferable": false}
+{"a": "express", "b": "postgresql", "transferable": true}
+{"a": "ansible", "b": "nlp", "transferable": false}
+{"a": "spark", "b": "statistics", "transferable": true}
+{"a": "ci/cd", "b": "swift", "transferable": false}
+{"a": "html", "b": "pandas", "transferable": false}
+{"a": "pandas", "b": "flutter", "transferable": false}
+{"a": "kubernetes", "b": "ci/cd", "transferable": true}
+{"a": "docker", "b": "terraform", "transferable": true}
+{"a": "scikit-learn", "b": "deep learning", "transferable": true}
+{"a": "numpy", "b": "tableau", "transferable": true}
+{"a": "terraform", "b": "github actions", "transferable": true}
+{"a": "linux", "b": "kotlin", "transferable": false}
+{"a": "spark", "b": "react native", "transferable": false}
+{"a": "javascript", "b": "scikit-learn", "transferable": false}
+{"a": "docker", "b": "github actions", "transferable": true}
+{"a": "statistics", "b": "kafka", "transferable": true}
+{"a": "kubernetes", "b": "flutter", "transferable": false}
+{"a": "docker", "b": "ci/cd", "transferable": true}
+{"a": "hugging face", "b": "deep learning", "transferable": true}
+{"a": "tailwind css", "b": "pandas", "transferable": false}
+{"a": "python", "b": "node.js", "transferable": true}
+{"a": "linux", "b": "machine learning", "transferable": false}
+{"a": "react", "b": "kafka", "transferable": false}
+{"a": "airflow", "b": "tableau", "transferable": true}
+{"a": "vue.js", "b": "airflow", "transferable": false}
+{"a": "react", "b": "kotlin", "transferable": false}
+{"a": "sql", "b": "kafka", "transferable": true}
+{"a": "typescript", "b": "deep learning", "transferable": false}
+{"a": "airflow", "b": "swift", "transferable": false}
+{"a": "flutter", "b": "kotlin", "transferable": true}
+{"a": "github actions", "b": "statistics", "transferable": false}
+{"a": "airflow", "b": "kafka", "transferable": true}
+{"a": "vue.js", "b": "typescript", "transferable": true}
+{"a": "css", "b": "flutter", "transferable": false}
+{"a": "numpy", "b": "statistics", "transferable": true}
+{"a": "numpy", "b": "flutter", "transferable": false}
+{"a": "tailwind css", "b": "swift", "transferable": false}
+{"a": "vue.js", "b": "flutter", "transferable": false}
+{"a": "hugging face", "b": "machine learning", "transferable": true}
+{"a": "react", "b": "flutter", "transferable": false}
+{"a": "ci/cd", "b": "ansible", "transferable": true}
+{"a": "html", "b": "react native", "transferable": false}
+{"a": "kafka", "b": "kotlin", "transferable": false}
+{"a": "tailwind css", "b": "tensorflow", "transferable": false}
+{"a": "sql", "b": "kotlin", "transferable": false}
+{"a": "docker", "b": "ansible", "transferable": true}
+{"a": "django", "b": "express", "transferable": true}
+{"a": "node.js", "b": "postgresql", "transferable": true}
+{"a": "python", "b": "django", "transferable": true}
+{"a": "python", "b": "fastapi", "transferable": true}
+{"a": "pytorch", "b": "scikit-learn", "transferable": true}
+{"a": "react", "b": "css", "transferable": true}
+{"a": "vue.js", "b": "hugging face", "transferable": false}
+{"a": "tensorflow", "b": "hugging face", "transferable": true}
+{"a": "tailwind css", "b": "spark", "transferable": false}
+{"a": "django", "b": "redis", "transferable": true}

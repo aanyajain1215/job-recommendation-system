@@ -182,6 +182,18 @@ export interface JobListResponse {
   total_pages: number;
 }
 
+/** §12 explanation contract — components verbatim from the deterministic scorer. */
+export interface ExplanationContract {
+  summary: string;
+  components: Record<string, number>;
+  contributions: Record<string, number>;
+  strengths?: string[];
+  concerns?: string[];
+  recommended_action?: string;
+  /** Phase 3 rerank note (e.g. ranklet delta), never a score itself. */
+  delta_note?: string | null;
+}
+
 export interface RecommendationItem {
   job: JobDetail;
   match_score: number;
@@ -190,6 +202,15 @@ export interface RecommendationItem {
   matched_skills: string[];
   missing_skills: string[];
   match_reasons: string[];
+  explanation?: ExplanationContract | null;
+  readiness?: Readiness | null;
+  family?: string | null;
+  /** Ranking strategy that produced this item (deterministic | ltr_blend | ltr_full). */
+  strategy?: string;
+  /** Learned model version when the strategy used one (e.g. "ranklet v1"). */
+  model_version?: string | null;
+  /** Exploration propensity for this slot (1.0 = always shown; logged for IPS). */
+  propensity?: number | null;
 }
 
 export interface RecommendationFeedResponse {
@@ -198,6 +219,11 @@ export interface RecommendationFeedResponse {
   profile_completeness_score: number;
   recommendation_type: "content_based" | "cold_start";
   recommendation_strategy: string;
+  /** Phase 3: actual rerank strategy + model version behind this feed. */
+  strategy?: string;
+  model_version?: string | null;
+  /** Set when the feed includes an exploratory slot (propensity logged). */
+  personalization_note?: string | null;
 }
 
 export type ApplicationStatus =
