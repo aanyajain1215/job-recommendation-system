@@ -218,7 +218,7 @@ class TestAffinities:
 
 class TestFeedbackAndPreferencesApi:
 
-    def test_feedback_endpoint_trains_and_persists(self, seeker, corpus_job):
+    def test_feedback_endpoint_trains_and_persists(self, seeker):
         # Content-based feed first: snapshots carry component values, which
         # are the deterministic input to the M4 weight update (§16).
         put = client.put(
@@ -237,11 +237,32 @@ class TestFeedbackAndPreferencesApi:
         )
         assert feed.status_code == 200, feed.text
 
+        # Feedback target: a job the feed actually SERVED (its snapshot is
+        # the M4 input) that carries REQUIRED skills (they drive the affinity
+        # lean). Derived from the live feed, never from corpus composition,
+        # so the test stays valid as the corpus grows (test hygiene).
+        from uuid import UUID
+
+        served_ids = [item["job"]["id"] for item in feed.json()["items"]]
+        assert served_ids, "feed must serve at least one job"
+        with SessionLocal() as db:
+            target_id = db.scalar(
+                select(Job.id)
+                .join(Job.skills)
+                .where(
+                    Job.id.in_([UUID(s) for s in served_ids]),
+                    JobSkill.is_required.is_(True),
+                )
+                .limit(1)
+            )
+        assert target_id is not None, "a served job must carry required skills"
+        job_id = str(target_id)
+
         resp = client.post(
             "/api/v1/feedback",
             headers=seeker["headers"],
             json={
-                "job_id": corpus_job["id"],
+                "job_id": job_id,
                 "reason": "too_difficult",
                 "note": "needs more Kubernetes",
             },
@@ -249,7 +270,7 @@ class TestFeedbackAndPreferencesApi:
         assert resp.status_code == 201, resp.text
         body = resp.json()
         assert body["reason"] == "too_difficult"
-        assert body["job_id"] == corpus_job["id"]
+        assert body["job_id"] == job_id
 
         prefs = client.get("/api/v1/preferences", headers=seeker["headers"])
         assert prefs.status_code == 200, prefs.text

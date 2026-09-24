@@ -36,6 +36,10 @@ def test_content_recommender_service():
 
         jobs = db.scalars(
             select(Job)
+            # Seeded golden corpus only: these assertions test recommender
+            # LOGIC on known inputs — never live-ingested composition
+            # (test hygiene: no corpus-size dependence).
+            .where(Job.source == "native")
             .options(
                 selectinload(Job.company),
                 selectinload(Job.skills).selectinload(JobSkill.skill),
