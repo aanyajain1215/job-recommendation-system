@@ -366,7 +366,8 @@ def upsert_jobs(rows: list[dict], report: RunReport) -> int:
             db.add(poster)
             db.flush()
 
-        companies: dict[str, Company] = {}
+        companies: dict[str, Company] = {}   # per-source feed fallback (no employer name)
+        employers: dict[str, Company] = {}    # per-employer-name cache
         skill_by_name = {
             s.name.lower(): s.id for s in db.scalars(select(Skill)).all()
         }
@@ -376,20 +377,62 @@ def upsert_jobs(rows: list[dict], report: RunReport) -> int:
 
         for row in rows:
             source = row["source"]
-            if source not in companies:
-                company = db.scalar(
-                    select(Company).where(Company.slug == f"feed-{source}")
-                )
+
+            # Company: the real employer when the provider sent one (get-or-create,
+            # slug collisions suffixed); per-source feed company otherwise.
+            # Re-resolved on every run so rows ingested before employer names
+            # existed migrate on the next upsert.
+            employer = (row.get("company") or "").strip()
+            if employer and not employer.lower().startswith("unknown"):
+                company = employers.get(employer.lower())
                 if company is None:
-                    company = Company(
-                        name=f"{source.capitalize()} Feed",
-                        slug=f"feed-{source}",
-                        description=f"Jobs ingested from the {source} provider (plan §20).",
-                        created_by_user_id=poster.id,
+                    slug = (
+                        re.sub(r"[^a-z0-9]+", "-", employer.lower()).strip("-")[:48]
+                        or "company"
                     )
-                    db.add(company)
-                    db.flush()
-                companies[source] = company
+                    base, n = slug, 2
+                    existing = db.scalar(
+                        select(Company).where(Company.slug == slug)
+                    )
+                    while (
+                        existing is not None
+                        and existing.name.lower() != employer.lower()
+                    ):
+                        slug = f"{base}-{n}"
+                        n += 1
+                        existing = db.scalar(
+                            select(Company).where(Company.slug == slug)
+                        )
+                    if existing is None:
+                        company = Company(
+                            name=employer,
+                            slug=slug,
+                            description=(
+                                f"Employer ingested from the {source} provider (plan §20)."
+                            ),
+                            created_by_user_id=poster.id,
+                        )
+                        db.add(company)
+                        db.flush()
+                    else:
+                        company = existing
+                    employers[employer.lower()] = company
+            else:
+                company = companies.get(source)
+                if company is None:
+                    company = db.scalar(
+                        select(Company).where(Company.slug == f"feed-{source}")
+                    )
+                    if company is None:
+                        company = Company(
+                            name=f"{source.capitalize()} Feed",
+                            slug=f"feed-{source}",
+                            description=f"Jobs ingested from the {source} provider (plan §20).",
+                            created_by_user_id=poster.id,
+                        )
+                        db.add(company)
+                        db.flush()
+                    companies[source] = company
 
             job = db.scalar(
                 select(Job).where(
@@ -402,11 +445,12 @@ def upsert_jobs(rows: list[dict], report: RunReport) -> int:
                     source=source,
                     external_id=row["external_id"],
                     posted_by_user_id=poster.id,
-                    company_id=companies[source].id,
+                    company_id=company.id,
                     status=JobStatus.PUBLISHED,
                 )
                 db.add(job)
 
+            job.company_id = company.id
             job.title = row["title"][:200]
             job.description = row["description"]
             job.location = row["location"] or "Remote"
