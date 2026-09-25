@@ -51,6 +51,31 @@ RAW_DIR = BACKEND / "ml" / "data" / "raw"
 FAMILIES_YAML = BACKEND / "ml" / "data" / "families.yaml"
 ALIASES_YAML = BACKEND / "ml" / "data" / "skill_aliases.yaml"
 
+# ---------------------------------------------------------------------------
+# Currency resolution (fix: INR postings were stored as USD)
+# ---------------------------------------------------------------------------
+# Geo-targeted providers (Adzuna) omit a currency field — values arrive in
+# the endpoint country's currency.  Defaulting to USD mislabeled every
+# Indian posting (₹3L stored as "USD 300000"), which skewed both the UI and
+# the salary scoring component.  Resolve from the provider's country instead.
+
+_ADZUNA_CURRENCY = {
+    "in": "INR", "gb": "GBP", "us": "USD", "ca": "CAD", "au": "AUD",
+    "at": "EUR", "be": "EUR", "ch": "CHF", "de": "EUR", "es": "EUR",
+    "fr": "EUR", "it": "EUR", "mx": "MXN", "nl": "EUR", "nz": "NZD",
+    "pl": "PLN", "pt": "EUR", "sg": "SGD",
+}
+
+
+def resolve_currency(source: str) -> str:
+    """Provider+country implied currency when the API response omits one."""
+    if source == "adzuna":
+        from app.core.config import get_settings
+
+        country = (get_settings().adzuna_country or "in").lower()
+        return _ADZUNA_CURRENCY.get(country, "INR")
+    return "USD"
+
 PREFERRED_MARKERS = (
     "nice to have",
     "good to have",
@@ -242,12 +267,14 @@ def run_pipeline(
         currency = raw.get("currency")
         if explicit_min is not None and explicit_max is not None:
             smin, smax = int(explicit_min), int(explicit_max)
-            cur = currency or "USD"
+            cur = currency or resolve_currency(source)
             if smin > smax:
                 smin, smax = smax, smin
         else:
             salary_text = raw.get("salary_text") or f"{raw.get('salary')} {title}"
-            smin, smax, cur = parse_salary(str(salary_text), default_currency=currency or "USD")
+            smin, smax, cur = parse_salary(
+                str(salary_text), default_currency=currency or resolve_currency(source)
+            )
 
         location = parse_location(raw.get("location"))
         years = parse_years(description)
@@ -457,7 +484,7 @@ def upsert_jobs(rows: list[dict], report: RunReport) -> int:
             job.is_remote = bool(row["is_remote"])
             job.salary_min = row["salary_min"]
             job.salary_max = row["salary_max"]
-            job.salary_currency = row["currency"] or "USD"
+            job.salary_currency = row["currency"] or resolve_currency(source)
             job.external_url = row["url"][:500] or None
             job.experience_level = ExperienceLevel(row["experience_level"])
             job.employment_type = EmploymentType(row["employment_type"])

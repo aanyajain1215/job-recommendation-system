@@ -362,7 +362,10 @@ def get_provider() -> JsonProvider | None:
     if provider == "gemini":
         model = settings.llm_model
         if model.startswith("gpt-"):
-            model = "gemini-1.5-flash"
+            # Config still carries an OpenAI model name — substitute a current
+            # free-tier Gemini model (gemini-1.5-flash was retired by Google;
+            # requesting it 404s and silently degrades to fallbacks).
+            model = "gemini-2.5-flash"
         if not settings.gemini_api_key:
             return None
         try:
@@ -383,7 +386,7 @@ def get_provider() -> JsonProvider | None:
         try:
             return GeminiProvider(
                 api_key=settings.gemini_api_key,
-                model="gemini-1.5-flash",
+                model="gemini-2.5-flash",
                 timeout=settings.llm_timeout_seconds,
             )
         except LlmUnavailable:  # pragma: no cover

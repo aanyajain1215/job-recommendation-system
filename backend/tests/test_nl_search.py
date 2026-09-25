@@ -184,3 +184,28 @@ class TestNlEndpoint:
         )
         data = nl_search.parsed_filters_dict(filters)
         assert data == {"keywords": "data"}
+
+
+class TestContentTokenFallback:
+    """Multi-word fallback must not require every word (verified live: the raw
+    sentence "remote python jobs in bangalore under 20 lakh" returned 0 rows —
+    websearch_to_tsquery ANDs all terms and the ILIKE branch needed the whole
+    phrase).  The OR-of-tokens branch ranks by ts_rank_cd instead."""
+
+    def test_content_tokens_drop_filler_and_bare_numbers(self):
+        assert nl_search.content_tokens(
+            "remote python jobs in bangalore under 20 lakh"
+        ) == ["remote", "python", "bangalore", "lakh"]
+
+    def test_content_tokens_dedupe_and_min_length(self):
+        assert nl_search.content_tokens("Python python a to 2x") == ["python", "2x"]
+
+    def test_multiword_fallback_returns_rows(self):
+        with SessionLocal() as db:
+            filters = nl_search.SearchFilters(
+                keywords="remote python jobs in bangalore under 20 lakh"
+            )
+            query, rank = nl_search.build_filtered_query(db, filters)
+            assert rank is not None
+            rows = list(db.scalars(query.limit(50)).all())
+            assert rows, "OR-of-tokens fallback must match the live corpus"

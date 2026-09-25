@@ -180,6 +180,45 @@ def canonicalize_skills(db: Session, filters: SearchFilters) -> SearchFilters:
 # Structured query builder shared with GET /jobs (§17: same builder)
 # ---------------------------------------------------------------------------
 
+# Query-side filler: words people use when phrasing a job search that match
+# nearly every posting.  The FTS `english` dictionary strips prepositions but
+# keeps content-noun fillers ("jobs", "hiring", "salary") — in an OR-of-tokens
+# query they would match everything and dilute the rank.
+_KEYWORD_FILLER = frozenset(
+    {
+        "job", "jobs", "hiring", "vacancy", "vacancies", "opening", "openings",
+        "role", "roles", "position", "positions", "posting", "postings",
+        "looking", "want", "wants", "need", "needs", "find", "finds", "search",
+        "best", "top", "good", "near", "under", "within", "across", "around",
+        "salary", "salaries", "pay", "paid", "stipend", "ctc", "package",
+        "candidate", "candidates", "applicant", "applicants", "apply", "applied",
+        "description", "about", "please", "show", "get", "give", "me", "my",
+        "any", "all", "some", "more", "now", "today", "freshers", "fresher",
+        "internship", "internships", "intern", "interns", "work", "working",
+        # function words (kept out so every to_tsquery operand yields a lexeme)
+        "in", "on", "at", "for", "to", "of", "the", "a", "an", "and", "or",
+        "is", "are", "be", "by", "with", "from", "as", "that", "this", "it",
+        "i", "we", "you", "who", "what", "how", "much", "many",
+    }
+)
+
+
+def content_tokens(text: str) -> list[str]:
+    """Sanitized search tokens for the OR fallback: lowercased, punctuation
+    stripped, filler dropped; must be 2+ chars and contain a letter (so bare
+    numbers like "20" never become search lexemes).  Order-preserving dedupe."""
+    tokens: list[str] = []
+    for raw in text.lower().split():
+        tok = "".join(ch for ch in raw if ch.isalnum())
+        if len(tok) < 2 or tok in _KEYWORD_FILLER:
+            continue
+        if not any(ch.isalpha() for ch in tok):
+            continue
+        if tok not in tokens:
+            tokens.append(tok)
+    return tokens
+
+
 def build_filtered_query(db: Session, filters: SearchFilters):
     """Apply SearchFilters to the canonical published-jobs query.
 
@@ -202,15 +241,33 @@ def build_filtered_query(db: Session, filters: SearchFilters):
     rank_column = None
     text = (filters.keywords or "").strip()
     if text:
-        tsquery = func.websearch_to_tsquery("english", text)
-        query = query.where(
-            or_(
-                Job.search_vector.op("@@")(tsquery),
-                Job.title.ilike(f"%{text}%"),
-                Job.description.ilike(f"%{text}%"),
+        tokens = content_tokens(text)
+        if len(tokens) > 1:
+            # Multi-word natural query: websearch_to_tsquery ANDs every word
+            # and the ILIKE branch requires the whole phrase, so a fallback
+            # sentence like "remote python jobs in bangalore" matched nothing
+            # (verified live: 0 results).  OR the content tokens instead —
+            # Postgres drops stopwords/empty operands, and ts_rank_cd rewards
+            # documents matching more tokens, so densest matches rank first.
+            tsquery = func.to_tsquery("english", " | ".join(tokens))
+            token_matches = [
+                or_(Job.title.ilike(f"%{t}%"), Job.description.ilike(f"%{t}%"))
+                for t in tokens
+            ]
+            query = query.where(
+                or_(Job.search_vector.op("@@")(tsquery), *token_matches)
             )
-        )
-        rank_column = func.ts_rank_cd(Job.search_vector, tsquery)
+            rank_column = func.ts_rank_cd(Job.search_vector, tsquery)
+        else:
+            tsquery = func.websearch_to_tsquery("english", text)
+            query = query.where(
+                or_(
+                    Job.search_vector.op("@@")(tsquery),
+                    Job.title.ilike(f"%{text}%"),
+                    Job.description.ilike(f"%{text}%"),
+                )
+            )
+            rank_column = func.ts_rank_cd(Job.search_vector, tsquery)
 
     if filters.location:
         query = query.where(Job.location.ilike(f"%{filters.location.strip()}%"))
