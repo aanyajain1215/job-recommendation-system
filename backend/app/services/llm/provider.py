@@ -28,6 +28,7 @@ from typing import Any, Protocol, TypeVar
 from pydantic import BaseModel, ValidationError
 
 from app.core.config import get_settings
+from app.services.llm.strict import strict_bail
 
 log = logging.getLogger(__name__)
 
@@ -351,11 +352,16 @@ class GeminiProvider(_BaseProvider):
 
 def get_provider() -> JsonProvider | None:
     """Configured provider, or None when no key is present (callers then
-    use their deterministic fallback — never a hard failure)."""
+    use their deterministic fallback — never a hard failure).
+
+    With ``LLM_STRICT=true`` each None-return raises LlmStrictError first,
+    so misconfiguration surfaces instead of degrading silently.
+    """
     settings = get_settings()
     if not settings.llm_enabled:
         # §22 kill switch — LLM_ENABLED=false degrades every route.
         log.info("LLM disabled via settings.llm_enabled; deterministic fallbacks in use")
+        strict_bail("provider", "LLM_ENABLED=false (kill switch)")
         return None
     provider = (settings.llm_provider or "openai").lower().strip()
 
@@ -367,6 +373,7 @@ def get_provider() -> JsonProvider | None:
             # requesting it 404s and silently degrades to fallbacks).
             model = "gemini-2.5-flash"
         if not settings.gemini_api_key:
+            strict_bail("provider", "GEMINI_API_KEY not configured")
             return None
         try:
             return GeminiProvider(
@@ -374,12 +381,14 @@ def get_provider() -> JsonProvider | None:
                 model=model,
                 timeout=settings.llm_timeout_seconds,
             )
-        except LlmUnavailable:
+        except LlmUnavailable as exc:
+            strict_bail("provider", f"Gemini provider unavailable: {exc}")
             log.warning("Gemini provider unavailable; deterministic fallbacks in use")
             return None
 
     # default: OpenAI
     if not settings.openai_api_key and not settings.gemini_api_key:
+        strict_bail("provider", "no LLM API key configured (OPENAI_API_KEY / GEMINI_API_KEY)")
         return None
     if not settings.openai_api_key and settings.gemini_api_key:
         # key set for Gemini only — honour it over a missing OpenAI key
@@ -389,7 +398,8 @@ def get_provider() -> JsonProvider | None:
                 model="gemini-2.5-flash",
                 timeout=settings.llm_timeout_seconds,
             )
-        except LlmUnavailable:  # pragma: no cover
+        except LlmUnavailable as exc:  # pragma: no cover
+            strict_bail("provider", f"Gemini provider unavailable: {exc}")
             return None
     try:
         return OpenAiProvider(
@@ -398,7 +408,8 @@ def get_provider() -> JsonProvider | None:
             base_url=settings.openai_base_url,
             timeout=settings.llm_timeout_seconds,
         )
-    except LlmUnavailable:  # pragma: no cover
+    except LlmUnavailable as exc:  # pragma: no cover
+        strict_bail("provider", f"OpenAI provider unavailable: {exc}")
         log.warning("OpenAI provider unavailable; deterministic fallbacks in use")
         return None
 

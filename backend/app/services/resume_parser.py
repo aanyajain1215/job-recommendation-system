@@ -263,7 +263,10 @@ class LlmResumeParser:
         return self._provider is not None
 
     def parse(self, text: str) -> ParsedResume:
+        from app.services.llm.strict import LlmStrictError, strict_bail
+
         if self._provider is None:
+            strict_bail("resume_parse", "no LLM provider available")
             return RegexResumeParser().parse(text)
 
         from app.services.llm import mark_flagged, validators  # noqa: PLC0415
@@ -280,7 +283,10 @@ class LlmResumeParser:
                 max_tokens=2500,
                 route="P1",
             )
+        except LlmStrictError:
+            raise
         except Exception as exc:
+            strict_bail("resume_parse", f"LLM parse failed: {exc}")
             logger.warning("P1 LLM parsing failed (%s); falling back to regex.", exc)
             result = RegexResumeParser().parse(text)
             result.parser_used = "regex_fallback"

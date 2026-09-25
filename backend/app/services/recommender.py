@@ -495,6 +495,9 @@ class ContentRecommender:
                 result,
                 family=family,
                 display_score=outcome.final,
+                # LLM-polish only the top-N — a 20-item feed firing 20
+                # requests trips the provider per-minute rate limit (429).
+                polish=(index < settings.explain_polish_top_n),
             )
             contract.delta_note = outcome.delta_note
             problems = validate_explanation(contract, result.final)

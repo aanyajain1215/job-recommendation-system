@@ -243,6 +243,7 @@ def critique_bullets(
 
         from app.services.llm.prompts import p9_bullet_critique
         from app.services.llm.provider import get_provider, llm_available
+        from app.services.llm.strict import LlmStrictError, strict_bail
 
         class BulletCritique(BaseModel):
             bullet: str = Field(default="")
@@ -254,6 +255,7 @@ def critique_bullets(
 
         provider = get_provider() if llm_available() else None
         if provider is None:
+            strict_bail("resume_optimize", "no LLM provider available")
             return [], False
 
         result, _usage = provider.complete_json(
@@ -262,7 +264,10 @@ def critique_bullets(
             route="resume_optimize",
         )
         return [c.model_dump() for c in result.critiques], True
-    except Exception:
+    except LlmStrictError:
+        raise
+    except Exception as exc:
+        strict_bail("resume_optimize", f"LLM critique failed: {exc}")
         return [], False
 
 

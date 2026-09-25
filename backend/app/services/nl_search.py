@@ -85,20 +85,30 @@ def _coerce_int(value: Any) -> int | None:
 
 
 def parse_query(q: str) -> tuple[SearchFilters, str]:
-    """NL query -> (filters, mode). mode is "llm" or "fts" (fallback)."""
+    """NL query -> (filters, mode). mode is "llm" or "fts" (fallback).
+
+    LLM_STRICT=true (temporary trial): any provider/LLM failure raises
+    LlmStrictError (→ HTTP 502) instead of degrading to FTS silently.
+    """
     text = (q or "").strip()
     if not text:
         return SearchFilters(), "fts"
+
+    from app.services.llm.strict import LlmStrictError, strict_bail
 
     try:
         from app.services.llm.provider import get_provider, llm_available
 
         provider = get_provider() if llm_available() else None
+    except LlmStrictError:
+        raise
     except Exception:  # pragma: no cover - provider import/config issues
+        strict_bail("nl_search", "provider init failed (config/import issue)")
         provider = None
 
     if provider is None:
         # Graceful degrade (plan §15): treat as plain full-text query.
+        strict_bail("nl_search", "no LLM provider available")
         return SearchFilters(keywords=text), "fts"
 
     try:
@@ -128,9 +138,13 @@ def parse_query(q: str) -> tuple[SearchFilters, str]:
             ]
         ):
             # The model parsed nothing meaningful — fall back to FTS text.
+            strict_bail("nl_search", "LLM returned no usable filters")
             return SearchFilters(keywords=text), "fts"
         return filters, "llm"
-    except Exception:
+    except LlmStrictError:
+        raise
+    except Exception as exc:
+        strict_bail("nl_search", f"LLM parse failed: {exc}")
         log.info("P7 NL parse failed; falling back to FTS for %r", text)
         return SearchFilters(keywords=text), "fts"
 

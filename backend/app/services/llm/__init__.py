@@ -15,12 +15,15 @@ from app.services.llm.provider import (
     mark_flagged,
     strip_fences,
 )
+from app.services.llm.strict import LlmStrictError, strict_bail
 
 __all__ = [
+    "LlmStrictError",
     "LlmUnavailable",
     "LlmUsage",
     "get_provider",
     "llm_available",
     "mark_flagged",
+    "strict_bail",
     "strip_fences",
 ]

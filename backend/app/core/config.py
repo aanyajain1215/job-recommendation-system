@@ -34,6 +34,17 @@ class Settings(BaseSettings):
     # P6 (§15): EXPLAIN_LLM=true → LLM rewrites explanation prose (never
     # numbers — digit-multiset validator discards any drift). Default off.
     explain_llm: bool = False
+    # TEMPORARY trial mode: true → any AI path failure (no provider, API
+    # error, rejected output) raises LlmStrictError → HTTP 502 with the
+    # reason, instead of silently using the deterministic fallback. Lets
+    # you see exactly which features work with the LLM. Set false again
+    # to restore graceful degradation.
+    llm_strict: bool = False
+    # How many recommender-feed items get LLM explanation polish per request.
+    # A full 20-item feed would fire ~20 back-to-back requests and trip the
+    # provider's per-minute rate limit; past top-N the deterministic
+    # template ships (job detail stays polished — it is a single call).
+    explain_polish_top_n: int = 3
 
     # ---- Embeddings (plan §4/§13) ----
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"

@@ -61,7 +61,7 @@ docker compose up --build
 
 Postgres is published on host port **55432** because 5432/5433 were already in use on this machine. The API still talks to Postgres on the Docker network at `postgres:5432`.
 
-LLM routes degrade gracefully without keys; set `OPENAI_API_KEY` (or `LLM_PROVIDER=gemini` + `GEMINI_API_KEY`) in `.env` to enable them. **Kill switch:** `LLM_ENABLED=false` forces every route to its deterministic fallback. Optional **explanation polish**: `EXPLAIN_LLM=true` lets the LLM rewrite explanation wording only — a digit-multiset validator discards the polish unless every number survives verbatim (default off).
+LLM routes degrade gracefully without keys; set `OPENAI_API_KEY` (or `LLM_PROVIDER=gemini` + `GEMINI_API_KEY`) in `.env` to enable them. **Kill switch:** `LLM_ENABLED=false` forces every route to its deterministic fallback. **Trial mode:** `LLM_STRICT=true` inverts the graceful degradation — any AI failure (missing provider, API error, validator rejection) returns HTTP 502 with the reason instead of silently falling back, so you can see exactly which features work with the LLM; set it back to `false` afterwards. Optional **explanation polish**: `EXPLAIN_LLM=true` lets the LLM rewrite explanation wording only — a digit-multiset validator discards the polish unless every number survives verbatim (default off).
 
 **Auto-ingestion:** the `ingest` service re-runs the live pipeline (fetch → clean → parse → structure → quality gates → upsert) on a timer — every `INGEST_INTERVAL_SECONDS` (default 6h), rotating through the query set defined in `docker-compose.yml`. Upserts are keyed by external id, so cycles are idempotent. Pause it with `docker compose stop ingest`; resume with `docker compose start ingest`.
 

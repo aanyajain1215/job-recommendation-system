@@ -68,6 +68,7 @@ def build_explanation(
     *,
     family: str | None = None,
     display_score: float | None = None,
+    polish: bool = True,
 ) -> ExplanationContract:
     """Build the §12 contract from a ScoreResult — numbers verbatim, no recomputation.
 
@@ -139,17 +140,18 @@ def build_explanation(
         + "."
     )
 
-    return polish_explanation(
-        ExplanationContract(
-            summary=summary,
-            components=dict(comp),
-            contributions=dict(result.contributions),
-            strengths=strengths,
-            concerns=concerns,
-            recommended_action=recommended_action,
-            delta_note=None,
-        )
+    contract = ExplanationContract(
+        summary=summary,
+        components=dict(comp),
+        contributions=dict(result.contributions),
+        strengths=strengths,
+        concerns=concerns,
+        recommended_action=recommended_action,
+        delta_note=None,
     )
+    # `polish=False` keeps the deterministic template — the recommender uses
+    # it past the top-N items so a feed never bursts the LLM rate limit.
+    return polish_explanation(contract) if polish else contract
 
 
 def _digit_tokens(text: str) -> list[str]:
@@ -166,6 +168,7 @@ def polish_explanation(contract: ExplanationContract) -> ExplanationContract:
     untouched. The LLM never touches components/contributions (§7).
     """
     if not get_settings().explain_llm:
+        # Config choice (quota management), not an AI failure — no bail.
         return contract
     try:
         from app.services.llm.prompts import p6_explanation_polish  # noqa: PLC0415
@@ -173,11 +176,16 @@ def polish_explanation(contract: ExplanationContract) -> ExplanationContract:
             get_provider,
             llm_available,
         )
+        from app.services.llm.strict import LlmStrictError, strict_bail  # noqa: PLC0415
 
         provider = get_provider() if llm_available() else None
+    except LlmStrictError:
+        raise
     except Exception:  # pragma: no cover - provider import/config issues
+        strict_bail("explain_polish", "provider init failed (config/import issue)")
         return contract
     if provider is None:
+        strict_bail("explain_polish", "no LLM provider available")
         return contract
 
     source_action = contract.recommended_action
@@ -188,18 +196,26 @@ def polish_explanation(contract: ExplanationContract) -> ExplanationContract:
             p6_explanation_polish(contract.summary, source_numbers),
             route="explain_polish",
         )
-    except Exception:  # pragma: no cover - any LLM failure → template
+    except LlmStrictError:
+        raise
+    except Exception as exc:  # pragma: no cover - any LLM failure → template
+        strict_bail("explain_polish", f"LLM call failed: {exc}")
         return contract
 
     polished_summary = " ".join(s for s in result.sentences if s).strip()
     polished_action = (result.recommended_action or "").strip()
     if not polished_summary or not polished_action:
+        strict_bail("explain_polish", "LLM returned empty polish output")
         return contract
 
     # Digit-multiset validator: identical numbers verbatim, or discard.
     if Counter(_digit_tokens(f"{polished_summary} {polished_action}")) != Counter(
         source_numbers
     ):
+        strict_bail(
+            "explain_polish",
+            "polish rejected by digit validator (numbers drifted from source)",
+        )
         return contract
 
     contract.summary = polished_summary
