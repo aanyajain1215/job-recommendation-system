@@ -337,6 +337,10 @@ class GeminiProvider(_BaseProvider):
         response = self._model.generate_content(
             "\n\n".join(parts),
             generation_config={"max_output_tokens": max_tokens, "temperature": 0},
+            # Bound the call — the deprecated SDK otherwise waits forever on a
+            # stalled/throttled response, so a parse could sit in "parsing"
+            # with no failure to report (LLM_TIMEOUT_SECONDS, default 30).
+            request_options={"timeout": self._timeout},
         )
         raw = response.text or ""
         meta = getattr(response, "usage_metadata", None)
