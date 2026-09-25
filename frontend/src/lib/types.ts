@@ -23,6 +23,8 @@ export interface EducationItem {
   field_of_study?: string | null;
   start_year?: number | null;
   end_year?: number | null;
+  /** Legacy resume-parse rows store a single graduation `year` instead. */
+  year?: number | null;
 }
 
 export interface ExperienceItem {
@@ -33,6 +35,14 @@ export interface ExperienceItem {
   end_date?: string | null;
   current?: boolean;
   description?: string | null;
+}
+
+export interface ResumeParseRow {
+  id: string;
+  original_filename?: string | null;
+  parse_status: "parsing" | "parsed" | "failed" | string;
+  parser_used?: string | null;
+  created_at: string;
 }
 
 export interface ProfileDetail {
@@ -51,6 +61,7 @@ export interface ProfileDetail {
   education?: EducationItem[] | null;
   work_experience?: ExperienceItem[] | null;
   skills: ProfileSkillItem[];
+  resumes?: ResumeParseRow[];
   created_at: string;
   updated_at: string;
 }

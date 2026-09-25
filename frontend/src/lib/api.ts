@@ -145,6 +145,19 @@ export async function uploadResume(
   return res.json();
 }
 
+export async function reparseResume(token: string): Promise<{ status: string; message: string }> {
+  const base = getBrowserApiBaseUrl();
+  const res = await fetch(`${base}/api/v1/profiles/me/resume/reparse`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Failed to re-parse resume" }));
+    throw new Error(err.detail || "Failed to re-parse resume");
+  }
+  return res.json();
+}
+
 // ---------------- Skills Taxonomy API ---------------- //
 
 export async function getSkills(search?: string, category?: string): Promise<Skill[]> {

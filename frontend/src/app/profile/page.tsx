@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import {
   getMyProfile,
   getSkills,
+  reparseResume,
   updateMyProfile,
   uploadResume,
 } from "@/lib/api";
@@ -22,11 +23,38 @@ import {
   FileCheck,
   GraduationCap,
   Plus,
+  RefreshCw,
   Save,
+  Sparkles,
   Trash2,
   Upload,
   User as UserIcon,
 } from "lucide-react";
+
+/** Server-side limits from ProfileUpdateRequest, enforced client-side so an
+ *  over-long parsed value can never 422 the Save. */
+const LIMITS = { firstName: 100, lastName: 100, headline: 255, location: 150, phone: 50 } as const;
+
+/** Legacy resume-parse rows store a single graduation `year`; map it into the
+ *  form's end_year slot. Extra keys (e.g. duration_years) are preserved. */
+const normalizeEducation = (e: EducationItem): EducationItem => ({
+  ...e,
+  degree: e.degree || "",
+  institution: e.institution || "",
+  field_of_study: e.field_of_study ?? "",
+  start_year: e.start_year ?? null,
+  end_year: e.end_year ?? e.year ?? null,
+});
+
+const normalizeExperience = (w: ExperienceItem): ExperienceItem => ({
+  ...w,
+  title: w.title || "",
+  company: w.company || "",
+  location: w.location ?? "",
+  start_date: w.start_date ?? "",
+  end_date: w.end_date ?? "",
+  description: w.description ?? "",
+});
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -36,7 +64,9 @@ export default function ProfilePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isAutofilling, setIsAutofilling] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Form states
   const [firstName, setFirstName] = useState("");
@@ -144,8 +174,94 @@ export default function ProfilePage() {
     ]);
   };
 
+  /** Map a parsed profile response into the editable form. Only fields the
+   *  parser actually found are overwritten; every manual edit survives and
+   *  nothing is persisted until the user presses "Save Profile". */
+  const applyAutofill = (data: ProfileDetail) => {
+    const af = (data.parsed_resume_data?.autofill ?? {}) as Record<string, unknown>;
+    const str = (v: unknown): string | null =>
+      typeof v === "string" && v.trim() ? v.trim() : null;
+
+    const fullName = str(af.full_name);
+    if (fullName) {
+      const parts = fullName.split(/\s+/);
+      setFirstName(parts[0].slice(0, LIMITS.firstName));
+      if (parts.length > 1) setLastName(parts.slice(1).join(" ").slice(0, LIMITS.lastName));
+    }
+    const headlineFromResume = str(af.headline);
+    if (headlineFromResume) setHeadline(headlineFromResume.slice(0, LIMITS.headline));
+    const summary = str(af.summary);
+    if (summary) setBio(summary);
+    const loc = str(af.location);
+    if (loc) setLocation(loc.slice(0, LIMITS.location));
+    const ph = str(af.phone);
+    if (ph) setPhone(ph.slice(0, LIMITS.phone));
+
+    if (data.years_of_experience != null) setYearsOfExp(data.years_of_experience);
+    if (data.skills?.length) setSkills(data.skills);
+    if (data.education?.length) setEducation(data.education.map(normalizeEducation));
+    if (data.work_experience?.length) setExperience(data.work_experience.map(normalizeExperience));
+  };
+
+  /** Poll the profile until the background parse finishes, then fill the form.
+   *  Under LLM_STRICT an AI outage marks the parse "failed" and surfaces here
+   *  as an honest error instead of silently degrading. */
+  const waitAndAutofill = async () => {
+    if (!token) return;
+    setIsAutofilling(true);
+    setMessage({
+      type: "success",
+      text:
+        "Parsing your resume… the free AI tier can take a minute when it is busy —" +
+        " the form fills in as soon as it finishes.",
+    });
+    try {
+      let data = await getMyProfile(token);
+      const deadline = Date.now() + 180000;
+      for (;;) {
+        const latest = data.resumes?.[0];
+        if (!latest || latest.parse_status === "parsed") break;
+        if (latest.parse_status === "failed") {
+          setMessage({
+            type: "error",
+            text:
+              "Resume parsing failed — the AI call did not succeed. Press “Re-parse” to try again" +
+              " (or set LLM_STRICT=false in .env to fall back to offline regex parsing).",
+          });
+          return;
+        }
+        if (Date.now() > deadline) {
+          setMessage({
+            type: "error",
+            text:
+              "Resume is taking longer than usual — it keeps parsing in the background;" +
+              " press Auto-fill again in a moment to pick up the result." +
+              " If it never finishes, run `docker compose logs backend` to see why.",
+          });
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        data = await getMyProfile(token);
+      }
+      setProfile(data);
+      applyAutofill(data);
+      const parser = data.parsed_resume_data?.parser_used;
+      setMessage({
+        type: "success",
+        text:
+          `Auto-filled from your resume${typeof parser === "string" ? ` (parser: ${parser})` : ""} —` +
+          " review the fields below and press “Save Profile” to keep them.",
+      });
+    } catch (err) {
+      if (err instanceof Error) setMessage({ type: "error", text: err.message });
+    } finally {
+      setIsAutofilling(false);
+    }
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file (e.g. after a retry)
     if (!file || !token) return;
 
     setIsUploading(true);
@@ -156,14 +272,41 @@ export default function ProfilePage() {
       if (profile) {
         setProfile({ ...profile, resume_url: res.resume_url });
       }
-      setMessage({ type: "success", text: `Resume '${file.name}' uploaded successfully!` });
+      setMessage({ type: "success", text: `Resume '${file.name}' uploaded — parsing now…` });
     } catch (err: unknown) {
       if (err instanceof Error) {
         setMessage({ type: "error", text: err.message });
       }
-    } finally {
       setIsUploading(false);
+      return;
     }
+    setIsUploading(false);
+    await waitAndAutofill();
+  };
+
+  /** Auto-fill entry point: no resume on file → open the picker (the upload
+   *  flow continues straight into parse+fill); otherwise parse-wait + fill. */
+  const handleAutofill = async () => {
+    if (isAutofilling || isUploading) return;
+    if (!profile?.resume_url) {
+      fileInputRef.current?.click();
+      return;
+    }
+    await waitAndAutofill();
+  };
+
+  /** Re-run the parse against the stored file — recovery for failed parses and
+   *  for resumes parsed before identity extraction existed. */
+  const handleReparse = async () => {
+    if (!token || isAutofilling || isUploading) return;
+    setMessage({ type: "success", text: "Re-parsing your stored resume…" });
+    try {
+      await reparseResume(token);
+    } catch (err: unknown) {
+      if (err instanceof Error) setMessage({ type: "error", text: err.message });
+      return;
+    }
+    await waitAndAutofill();
   };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -199,6 +342,14 @@ export default function ProfilePage() {
       setIsSaving(false);
     }
   };
+
+  const latestResume = profile?.resumes?.[0];
+  const autofillIdentity = profile?.parsed_resume_data?.autofill ?? null;
+  const showReparse =
+    !!latestResume &&
+    (latestResume.parse_status === "failed" ||
+      (latestResume.parse_status === "parsed" && !autofillIdentity));
+  const parseBusy = isUploading || isAutofilling;
 
   if (isLoading) {
     return (
@@ -256,38 +407,76 @@ export default function ProfilePage() {
             Resume Document
           </h2>
           <p className="mt-1 text-xs text-zinc-400">
-            Upload PDF, DOCX, or TXT (up to 10MB). Stored securely and ready for Phase 2 parsing.
+            Upload PDF, DOCX, or TXT (up to 10MB). The AI parses it and auto-fills the form below —
+            review everything, edit freely, then press Save Profile.
           </p>
 
           <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl border border-dashed border-zinc-700 bg-zinc-950/40 p-5">
             <div>
               {profile?.resume_url ? (
-                <div className="flex items-center gap-2 text-sm text-teal-400 font-medium">
+                <div className="flex flex-wrap items-center gap-2 text-sm text-teal-400 font-medium">
                   <CheckCircle2 className="h-4 w-4" />
                   Resume active on profile
+                  {latestResume && (
+                    <span className="rounded-full border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-[11px] font-normal text-zinc-400">
+                      {latestResume.parse_status === "parsing" && "AI parsing…"}
+                      {latestResume.parse_status === "parsed" &&
+                        `Parsed${latestResume.parser_used ? ` · ${latestResume.parser_used}` : ""}`}
+                      {latestResume.parse_status === "failed" && "Parse failed"}
+                    </span>
+                  )}
                 </div>
               ) : (
-                <p className="text-sm text-zinc-400">No resume uploaded yet.</p>
+                <p className="text-sm text-zinc-400">
+                  No resume uploaded yet — Auto-fill will ask you to pick one.
+                </p>
               )}
               <p className="text-xs text-zinc-500 mt-1">Accepted: .pdf, .docx, .txt (max 10MB)</p>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={handleAutofill}
+                disabled={parseBusy}
+                className="inline-flex items-center gap-2 rounded-lg bg-teal-500 px-4 py-2 text-sm font-semibold text-zinc-950 shadow-md shadow-teal-500/20 hover:bg-teal-400 disabled:opacity-50 transition-all"
+              >
+                {isAutofilling ? (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-950 border-t-transparent" />
+                ) : (
+                  <Sparkles className="h-4 w-4" />
+                )}
+                {isAutofilling ? "Parsing…" : "Auto-fill from resume"}
+              </button>
+
               <label className="cursor-pointer inline-flex items-center gap-2 rounded-lg bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-200 hover:bg-zinc-700 transition-colors">
                 {isUploading ? (
                   <div className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-300 border-t-transparent" />
                 ) : (
                   <Upload className="h-4 w-4 text-zinc-400" />
                 )}
-                <span>Upload New Resume</span>
+                <span>{profile?.resume_url ? "Replace Resume" : "Upload New Resume"}</span>
                 <input
+                  ref={fileInputRef}
                   type="file"
                   accept=".pdf,.docx,.txt"
                   className="hidden"
                   onChange={handleFileUpload}
-                  disabled={isUploading}
+                  disabled={parseBusy}
                 />
               </label>
+
+              {showReparse && (
+                <button
+                  type="button"
+                  onClick={handleReparse}
+                  disabled={parseBusy}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs font-medium text-zinc-300 hover:text-white transition-colors disabled:opacity-50"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${isAutofilling ? "animate-spin" : ""}`} />
+                  Re-parse
+                </button>
+              )}
 
               {profile?.resume_url && (
                 <a

@@ -35,11 +35,16 @@ def p1_resume(text: str) -> str:
 
 Schema (use null for unknown fields):
 {{
+  "full_name": "Full name as written in the resume header",
+  "headline": "professional title stated on the resume (header or stated current role), else null",
+  "summary": "the resume's own summary/objective paragraph, lightly trimmed, else null",
+  "location": "city/location written on the resume, else null",
+  "phone": "phone number exactly as written, else null",
   "skills": [{{"name": "Python", "category": "programming", "years": 3}}],
   "years_of_experience": 4.5,
   "seniority": "entry | mid | senior | lead | executive",
   "education": [{{"degree": "...", "institution": "...", "year": 2020, "field_of_study": "..."}}],
-  "work_experience": [{{"title": "...", "company": "...", "duration_years": 2.0, "description": "..."}}],
+  "work_experience": [{{"title": "...", "company": "...", "start_date": "2021-06", "end_date": "2023-02", "location": "...", "duration_years": 2.0, "description": "..."}}],
   "evidence": [{{"skill": "Python", "start": 12, "end": 18, "quote": "Python"}}],
   "projects": [{{"name": "...", "description": "...", "skills": ["React"]}}],
   "certifications": [{{"name": "...", "issuer": "...", "year": 2023}}],
@@ -49,6 +54,8 @@ Schema (use null for unknown fields):
 Rules:
 - Every evidence.quote MUST be a verbatim substring of the resume text, and [start:end] MUST slice to exactly that quote.
 - NEVER invent skills, dates, employers, degrees or numbers that are not in the text.
+- full_name, phone, location, start_date and end_date must be copied verbatim from the text; use null when not present.
+- summary must be the resume's own summary/objective wording — never rewritten or padded; null if the resume has none.
 - Keep skill names clean canonical strings (e.g. "React", not "reactjs").
 
 RESUME TEXT:

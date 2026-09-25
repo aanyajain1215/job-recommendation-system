@@ -9,7 +9,7 @@ Full-stack job recommendation platform: **Next.js frontend, FastAPI backend, Pos
 ```
 frontend (Next.js 16, App Router, 19 routes)
    │  fetch / JWT
-backend (FastAPI, /api/v1, 57 OpenAPI paths)
+backend (FastAPI, /api/v1, 58 OpenAPI paths)
    ├─ deterministic core   scoring.py · gap engine · roadmap · simulator · project mapping
    ├─ personalization      M4 weight learner + skill affinities · M5 onboarding elicitation
    ├─ search               PostgreSQL FTS + pgvector KNN + skill overlap (RRF fusion) · NL filter parser
@@ -65,17 +65,19 @@ LLM routes degrade gracefully without keys; set `OPENAI_API_KEY` (or `LLM_PROVID
 
 **Auto-ingestion:** the `ingest` service re-runs the live pipeline (fetch → clean → parse → structure → quality gates → upsert) on a timer — every `INGEST_INTERVAL_SECONDS` (default 6h), rotating through the query set defined in `docker-compose.yml`. Upserts are keyed by external id, so cycles are idempotent. Pause it with `docker compose stop ingest`; resume with `docker compose start ingest`.
 
+**Resume auto-fill:** on the Profile page, *Auto-fill from resume* uploads (or reuses) the stored resume, waits for the AI parse, and fills the editable form — name, headline, summary, location, phone, years, skills, education, work history. Nothing lands in the profile until you review the fields and press **Save Profile**; every field stays manually editable. Identity values the parser cannot verify against the resume text are dropped rather than trusted, and failed or pre-identity parses can be re-run from the stored file with the **Re-parse** button (`POST /profiles/me/resume/reparse`).
+
 ## Layout
 
 - `frontend/` — Next.js App Router (19 pages: feed, gap, roadmap, simulator, careers, NL search, tracker, saved, settings, resume optimizer, onboarding, admin, …)
-- `backend/` — FastAPI + Alembic; `app/api` (57 paths), `app/services`, `ml/` training + evaluation
+- `backend/` — FastAPI + Alembic; `app/api` (58 paths), `app/services`, `ml/` training + evaluation
 - `backend/scripts/` — corpus ingestion (Adzuna/Arbeitnow/Remotive/Jobicy → preprocess → embed) and synthetic interaction bootstrap
 - `docker-compose.yml` — Postgres, API, frontend, ingest timer
 
 ## Testing
 
 ```bash
-# backend (~200 tests: golden pins, API contracts, eval gates, ops)
+# backend (~250 tests: golden pins, API contracts, eval gates, ops)
 cd backend
 $env:DATABASE_URL='postgresql+psycopg://jobrec:change_me_in_production@localhost:55432/jobrec'
 $env:EMBEDDING_BACKEND='minilm'

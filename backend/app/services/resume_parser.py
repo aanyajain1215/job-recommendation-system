@@ -49,6 +49,9 @@ class ParsedEducation(BaseModel):
 class ParsedWorkExperience(BaseModel):
     title: str | None = None
     company: str | None = None
+    start_date: str | None = None   # "2021-06" as written on the resume
+    end_date: str | None = None     # "2023-02"; null/absent = current role
+    location: str | None = None
     duration_years: float | None = None
     description: str | None = None
 
@@ -63,6 +66,14 @@ class ParsedResume(BaseModel):
     education: list[ParsedEducation] = Field(default_factory=list)
     work_experience: list[ParsedWorkExperience] = Field(default_factory=list)
     parser_used: str = "regex"            # "openai" | "gemini" | "regex" | "regex_fallback"
+    # ---- Identity fields (autofill, plan §15 P1): form-fill only — the
+    # background parse stores them under parsed_resume_data["autofill"] and the
+    # client persists them only when the user reviews and hits Save. ----
+    full_name: str | None = None      # name exactly as written in the header
+    headline: str | None = None       # professional title stated on the resume
+    summary: str | None = None        # verbatim summary/objective paragraph
+    location: str | None = None       # city/location stated on the resume
+    phone: str | None = None          # phone number exactly as written
     # ---- P1 upgraded schema (plan §15: evidence-preserving extraction) ----
     evidence: list[dict[str, Any]] = Field(default_factory=list)
     projects: list[dict[str, Any]] = Field(default_factory=list)
@@ -216,6 +227,71 @@ def _infer_seniority(text: str, years: float | None) -> str | None:
     return None
 
 
+# ---- Identity heuristics (autofill) — best effort, user reviews before Save ----
+
+# Section headings that must never be mistaken for a person's name.
+_NAME_STOPWORDS = {
+    "resume", "curriculum", "vitae", "experience", "employment", "work",
+    "education", "academic", "skills", "technical", "summary", "objective",
+    "profile", "contact", "details", "personal", "projects", "project",
+    "certifications", "certificates", "awards", "achievements", "interests",
+    "hobbies", "languages", "references", "declaration", "activities",
+    "background", "overview", "information", "statement", "about", "career",
+}
+# Lowercase words that are almost never part of a name (particles like
+# "van"/"de" stay allowed).
+_NAME_NON_NAME_WORDS = {"in", "of", "and", "the", "at", "on", "for", "with", "a"}
+
+# Phone numbers: optional "+CC" then digit runs joined by space/dash/dot/
+# parens (total 8–15 digits). Anchored at run boundaries so a match never
+# starts mid-number. Year ranges ("2019 - 2022") are rejected explicitly by
+# _extract_phone's run-shape guard.
+_PHONE_PATTERN = re.compile(r"(?<!\d)\+?\d[\d\s().-]{5,18}\d")
+
+
+def _extract_name(text: str) -> str | None:
+    """Best-effort: first header line that looks like a person's name."""
+    for raw_line in text.splitlines()[:8]:
+        line = raw_line.strip().strip("•|-–—*#").strip()
+        if not line or len(line) > 60 or ":" in line or "," in line:
+            continue
+        if any(ch in line for ch in "@0123456789/") or "http" in line.lower():
+            continue
+        words = line.split()
+        if not (2 <= len(words) <= 4):
+            continue
+        lowered = [w.lower().strip(",.") for w in words]
+        if any(w in _NAME_STOPWORDS or w in _NAME_NON_NAME_WORDS for w in lowered):
+            continue
+        if not all(w[0].isalpha() for w in words):
+            continue
+        return line
+    return None
+
+
+def _extract_phone(text: str) -> str | None:
+    """Best-effort: first phone-shaped match with a sane digit count.
+
+    Rejects the classic false positive — two 4-digit years with no "+"/parens.
+    """
+    for match in _PHONE_PATTERN.finditer(text):
+        candidate = match.group(0)
+        digits = re.sub(r"\D", "", candidate)
+        if not (8 <= len(digits) <= 15):
+            continue
+        runs = re.findall(r"\d+", candidate)
+        looks_like_year_range = (
+            "+" not in candidate
+            and "(" not in candidate
+            and len(runs) <= 2
+            and all(len(r) == 4 for r in runs)
+        )
+        if looks_like_year_range:
+            continue
+        return candidate
+    return None
+
+
 class RegexResumeParser:
     """Heuristic parser — zero external calls."""
 
@@ -237,6 +313,8 @@ class RegexResumeParser:
             education=[],
             work_experience=[],
             parser_used="regex",
+            full_name=_extract_name(text),
+            phone=_extract_phone(text),
         )
 
 
@@ -280,7 +358,7 @@ class LlmResumeParser:
                     "You extract structured resume data. You never invent "
                     "content: every claim must be traceable to the source text."
                 ),
-                max_tokens=2500,
+                max_tokens=3000,
                 route="P1",
             )
         except LlmStrictError:
@@ -311,6 +389,20 @@ class LlmResumeParser:
                 s for s in parsed.skills
                 if s.name and s.name.lower().strip() in src_lower
             ]
+
+        # ---- identity fields must be traceable to the source text ----
+        # (headline/summary/location stay prompt-disciplined: they are visible
+        # in the form and reviewed before Save.)
+        norm_src = re.sub(r"\s+", " ", text).strip().lower()
+        if parsed.full_name:
+            norm_name = re.sub(r"\s+", " ", parsed.full_name).strip().lower()
+            if not norm_name or norm_name not in norm_src:
+                logger.info("P1 dropped unverifiable full_name=%r", parsed.full_name)
+                parsed.full_name = None
+        if parsed.phone:
+            if re.sub(r"\D", "", parsed.phone) not in re.sub(r"\D", "", text):
+                logger.info("P1 dropped unverifiable phone=%r", parsed.phone)
+                parsed.phone = None
 
         parsed.raw_text = text
         parsed.parser_used = self._provider.name

@@ -132,6 +132,17 @@ def _run_resume_parse(
             "skills_extracted": len(result.skills),
             "years_of_experience": result.years_of_experience,
             "seniority": getattr(result, "seniority", None),
+            # Identity payload for the profile form's "Auto-fill" action.
+            # Deliberately NOT written to first_name/last_name/headline/bio/
+            # location/phone columns: the user reviews the filled form and
+            # persists it through the normal PUT /profiles/me save.
+            "autofill": {
+                "full_name": result.full_name,
+                "headline": result.headline,
+                "summary": result.summary,
+                "location": result.location,
+                "phone": result.phone,
+            },
         }
 
         # --- Close out the versioned resume row with evidence (plan §3) ---
@@ -453,6 +464,68 @@ def upload_resume(
         "resume_url": resume_url,
         "size_bytes": len(content),
         "parsing": "started",
+    }
+
+
+@router.post("/me/resume/reparse")
+def reparse_resume(
+    background_tasks: BackgroundTasks,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+):
+    """Re-run the parse for the latest stored resume — no re-upload needed.
+
+    Powers the profile form's Auto-fill retry: a parse that failed (e.g. an AI
+    outage under ``LLM_STRICT``) or one from before identity extraction can be
+    re-run against the file already on disk.
+    """
+    profile = db.scalar(select(Profile).where(Profile.user_id == current_user.id))
+    if profile is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Profile not found for this user account.",
+        )
+
+    resume = db.scalar(
+        select(Resume)
+        .where(Resume.profile_id == profile.id)
+        .order_by(Resume.created_at.desc())
+        .limit(1)
+    )
+    if resume is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No resume on file — upload one first.",
+        )
+
+    # Ownership + traversal check mirrors download_resume (plan §21).
+    stored_name = Path(resume.file_path or "").name
+    target_path = UPLOAD_DIR / stored_name
+    if not stored_name.startswith(f"{profile.id}_") or ".." in stored_name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Stored resume file no longer exists on disk; upload it again.",
+        )
+    if not target_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Stored resume file no longer exists on disk; upload it again.",
+        )
+
+    content = target_path.read_bytes()
+    resume.parse_status = "parsing"  # optimistic hint, mirrors upload
+    db.commit()
+
+    background_tasks.add_task(
+        _run_resume_parse,
+        profile_id=profile.id,
+        file_bytes=content,
+        extension=Path(stored_name).suffix.lower(),
+        stored_filename=stored_name,
+    )
+    return {
+        "status": "parsing",
+        "message": "Re-parsing resume — the form auto-fill refreshes when it finishes.",
     }
 
 
