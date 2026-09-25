@@ -6,10 +6,12 @@ import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
-import { api, getJobDetail, getMyApplications } from "@/lib/api";
+import { api, getJobDetail, getMyApplications, saveJob } from "@/lib/api";
 import { JobDetail } from "@/lib/types";
+import { formatSalary } from "@/lib/format";
 import {
   ArrowLeft,
+  Bookmark,
   Briefcase,
   Building2,
   Calendar,
@@ -81,6 +83,35 @@ export default function JobDetailPage() {
       return;
     }
     apply();
+  };
+
+  // Save-for-later (wires the previously dead saveJob() helper so the
+  // /saved page's "Save roles from a job page" instruction is real).
+  const [isSaved, setIsSaved] = useState(false);
+  const { mutate: save, isPending: isSaving } = useMutation({
+    mutationFn: () => saveJob(jobId, token!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["applications", "me"] });
+      setIsSaved(true);
+      toast.success("Saved — find it under Saved Jobs.");
+    },
+    onError: (err: unknown) => {
+      const status = (err as { status?: number })?.status;
+      if (status === 409) {
+        setIsSaved(true);
+        toast.info("This job is already in your saved list.");
+      } else {
+        toast.error(err instanceof Error ? err.message : "Could not save this job");
+      }
+    },
+  });
+
+  const handleSave = () => {
+    if (!user) {
+      router.push("/login");
+      return;
+    }
+    save();
   };
 
   if (isLoading) {
@@ -179,9 +210,7 @@ export default function JobDetailPage() {
               <div className="text-xl font-bold text-white flex items-center lg:justify-end gap-1">
                 <DollarSign className="h-5 w-5 text-emerald-400" />
                 <span>
-                  {job.salary_min ? `$${(job.salary_min / 1000).toFixed(0)}k` : ""}
-                  {job.salary_min && job.salary_max ? " - " : ""}
-                  {job.salary_max ? `$${(job.salary_max / 1000).toFixed(0)}k` : ""}
+                  {formatSalary(job.salary_min, job.salary_max, job.salary_currency)}
                 </span>
                 <span className="text-xs text-zinc-400 font-normal">/ year</span>
               </div>
@@ -196,19 +225,30 @@ export default function JobDetailPage() {
                   Application Submitted
                 </div>
               ) : (
-                <button
-                  type="button"
-                  onClick={handleApply}
-                  disabled={isPending}
-                  className="inline-flex items-center gap-2 rounded-xl bg-teal-500 px-6 py-3 text-sm font-semibold text-zinc-950 shadow-lg shadow-teal-500/25 hover:bg-teal-400 active:scale-[0.98] transition-all disabled:opacity-60 disabled:pointer-events-none"
-                >
-                  {isPending ? (
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-950 border-t-transparent" />
-                  ) : (
-                    <Send className="h-4 w-4" />
-                  )}
-                  {isPending ? "Submitting Application..." : "Apply with Profile & Resume"}
-                </button>
+                <div className="flex flex-wrap items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={handleApply}
+                    disabled={isPending}
+                    className="inline-flex items-center gap-2 rounded-xl bg-teal-500 px-6 py-3 text-sm font-semibold text-zinc-950 shadow-lg shadow-teal-500/25 hover:bg-teal-400 active:scale-[0.98] transition-all disabled:opacity-60 disabled:pointer-events-none"
+                  >
+                    {isPending ? (
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-950 border-t-transparent" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                    {isPending ? "Submitting Application..." : "Apply with Profile & Resume"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSave}
+                    disabled={isSaving}
+                    className="inline-flex items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-900/60 px-5 py-3 text-sm font-semibold text-zinc-200 hover:bg-zinc-800 active:scale-[0.98] transition-all disabled:opacity-60"
+                  >
+                    <Bookmark className="h-4 w-4" />
+                    {isSaving ? "Saving..." : isSaved ? "Saved ✓" : "Save Job"}
+                  </button>
+                </div>
               )}
             </div>
           </div>

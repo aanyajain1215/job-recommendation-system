@@ -38,7 +38,7 @@ export default function NewJobPage() {
   const [isRemote, setIsRemote] = useState(false);
   const [salaryMin, setSalaryMin] = useState<number | "">("");
   const [salaryMax, setSalaryMax] = useState<number | "">("");
-  const [salaryCurrency, setSalaryCurrency] = useState("USD");
+  const [salaryCurrency, setSalaryCurrency] = useState("INR");
 
   // Skills
   const [skills, setSkills] = useState<JobSkillInput[]>([]);

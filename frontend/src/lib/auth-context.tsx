@@ -8,7 +8,7 @@ import React, {
   useState,
 } from "react";
 import { AuthResponse, LoginPayload, RegisterPayload, User } from "./types";
-import { getBrowserApiBaseUrl } from "./api";
+import { ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY, getBrowserApiBaseUrl } from "./api";
 
 interface AuthContextType {
   user: User | null;
@@ -21,9 +21,6 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-const ACCESS_TOKEN_KEY = "jobrec_access_token";
-const REFRESH_TOKEN_KEY = "jobrec_refresh_token";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);

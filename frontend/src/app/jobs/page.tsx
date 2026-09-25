@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { getJobs, searchJobsNL } from "@/lib/api";
 import { JobDetail, JobNlResponse } from "@/lib/types";
+import { formatSalary } from "@/lib/format";
 import {
   ArrowUpDown,
   Briefcase,
@@ -541,9 +542,7 @@ export default function JobsPage() {
                     <div className="flex items-center gap-1 text-base font-bold text-white sm:justify-end">
                       <DollarSign className="h-4 w-4 text-emerald-400" />
                       <span>
-                        {job.salary_min ? `$${(job.salary_min / 1000).toFixed(0)}k` : ""}
-                        {job.salary_min && job.salary_max ? " - " : ""}
-                        {job.salary_max ? `$${(job.salary_max / 1000).toFixed(0)}k` : ""}
+                        {formatSalary(job.salary_min, job.salary_max, job.salary_currency)}
                       </span>
                     </div>
                   ) : (

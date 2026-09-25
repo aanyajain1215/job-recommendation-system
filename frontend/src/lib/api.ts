@@ -572,6 +572,17 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Single source of truth for the localStorage auth keys.
+ *
+ * auth-context writes them on login/register; `api.request()` reads the
+ * access token to attach `Authorization`. (Both used to diverge — the
+ * request helper looked up `jobrec_token`, so authenticated `api.*` calls
+ * silently sent no token and the backend answered 401 "Not authenticated".)
+ */
+export const ACCESS_TOKEN_KEY = "jobrec_access_token";
+export const REFRESH_TOKEN_KEY = "jobrec_refresh_token";
+
 export const api = {
   async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const base = getBrowserApiBaseUrl();
@@ -585,7 +596,7 @@ export const api = {
     }
 
     if (!headers.has("Authorization") && typeof window !== "undefined") {
-      const token = localStorage.getItem("jobrec_token");
+      const token = localStorage.getItem(ACCESS_TOKEN_KEY);
       if (token) {
         headers.set("Authorization", `Bearer ${token}`);
       }
