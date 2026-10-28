@@ -140,14 +140,28 @@ export default function SavedJobsPage() {
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => handleApply(app)}
-                  disabled={busyId === app.id}
-                  className="rounded-lg bg-teal-500 px-3.5 py-1.5 text-xs font-semibold text-zinc-950 hover:bg-teal-400 disabled:opacity-50"
-                >
-                  {busyId === app.id ? "Working…" : "Apply Now"}
-                </button>
+                {app.job?.external_url ? (
+                  // Open the live posting in a new tab; still flip the saved row
+                  // to an application internally (Tracker keeps working).
+                  <a
+                    href={app.job.external_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => handleApply(app)}
+                    className="rounded-lg bg-teal-500 px-3.5 py-1.5 text-xs font-semibold text-zinc-950 hover:bg-teal-400"
+                  >
+                    {busyId === app.id ? "Working…" : "Apply Now ↗"}
+                  </a>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleApply(app)}
+                    disabled={busyId === app.id}
+                    className="rounded-lg bg-teal-500 px-3.5 py-1.5 text-xs font-semibold text-zinc-950 hover:bg-teal-400 disabled:opacity-50"
+                  >
+                    {busyId === app.id ? "Working…" : "Apply Now"}
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => handleUnsave(app.id)}

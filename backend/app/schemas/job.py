@@ -84,6 +84,10 @@ class JobDetailResponse(BaseModel):
     # ---- additive Phase 1 (plan §5/§13) ----
     family: str | None = None
     project_relevance: str | None = None
+    # Real posting URL (Adzuna /details/<id> or the employer's own page) so the
+    # UI can send the seeker to the live opening.  None for native postings,
+    # which are applied to in-app.
+    external_url: str | None = None
 
 
 class JobListResponse(BaseModel):

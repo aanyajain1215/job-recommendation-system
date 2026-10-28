@@ -17,6 +17,7 @@ import {
   Calendar,
   CheckCircle,
   DollarSign,
+  ExternalLink,
   Globe,
   MapPin,
   Send,
@@ -77,11 +78,17 @@ export default function JobDetailPage() {
     },
   });
 
-  const handleApply = () => {
+  const handleApply = (e?: React.MouseEvent) => {
     if (!user) {
+      e?.preventDefault();
       router.push("/login");
       return;
     }
+    // Send the seeker to the REAL posting in a new tab.  We use a plain
+    // <a target="_blank"> (href set in JSX) so this runs as a genuine user
+    // gesture — window.open() after an awaited fetch gets popup-blocked.
+    // In parallel we still record the application internally so the Tracker,
+    // stats and feedback loop keep working.
     apply();
   };
 
@@ -226,19 +233,37 @@ export default function JobDetailPage() {
                 </div>
               ) : (
                 <div className="flex flex-wrap items-center justify-end gap-3">
-                  <button
-                    type="button"
-                    onClick={handleApply}
-                    disabled={isPending}
-                    className="inline-flex items-center gap-2 rounded-xl bg-teal-500 px-6 py-3 text-sm font-semibold text-zinc-950 shadow-lg shadow-teal-500/25 hover:bg-teal-400 active:scale-[0.98] transition-all disabled:opacity-60 disabled:pointer-events-none"
-                  >
-                    {isPending ? (
-                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-950 border-t-transparent" />
-                    ) : (
+                  {job.external_url ? (
+                    // Real opening available → open it in a new tab, and still
+                    // record the application internally (Tracker/stats) via the
+                    // same click handler.
+                    <a
+                      href={job.external_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={handleApply}
+                      className="inline-flex items-center gap-2 rounded-xl bg-teal-500 px-6 py-3 text-sm font-semibold text-zinc-950 shadow-lg shadow-teal-500/25 hover:bg-teal-400 active:scale-[0.98] transition-all"
+                    >
                       <Send className="h-4 w-4" />
-                    )}
-                    {isPending ? "Submitting Application..." : "Apply with Profile & Resume"}
-                  </button>
+                      Apply on Company Site
+                      <ExternalLink className="h-3.5 w-3.5 opacity-70" />
+                    </a>
+                  ) : (
+                    // Native in-app posting (no external URL) → apply internally.
+                    <button
+                      type="button"
+                      onClick={handleApply}
+                      disabled={isPending}
+                      className="inline-flex items-center gap-2 rounded-xl bg-teal-500 px-6 py-3 text-sm font-semibold text-zinc-950 shadow-lg shadow-teal-500/25 hover:bg-teal-400 active:scale-[0.98] transition-all disabled:opacity-60 disabled:pointer-events-none"
+                    >
+                      {isPending ? (
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-950 border-t-transparent" />
+                      ) : (
+                        <Send className="h-4 w-4" />
+                      )}
+                      {isPending ? "Submitting Application..." : "Apply with Profile & Resume"}
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={handleSave}

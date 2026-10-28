@@ -80,7 +80,10 @@ def fetch_adzuna(query: str, page: int = 1) -> list[dict]:
                 "salary_min": row.get("salary_min"),
                 "salary_max": row.get("salary_max"),
                 "currency": None,  # Adzuna returns local currency — parsed from text/geo later
-                "url": row.get("redirect_url") or "",
+                # Stable details page, NOT redirect_url: the API's redirect_url is
+                # an /land/ad/ link carrying a signed `se=` token (session/IP-bound,
+                # rots to 403 in a different browser). /details/<id> is permalink-stable.
+                "url": f"https://www.adzuna.in/details/{row.get('id')}",
                 "posted_at": row.get("created") or "",
                 "is_remote": "remote" in ((row.get("title") or "") + (location.get("display_name") or "")).lower(),
             }

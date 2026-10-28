@@ -187,6 +187,11 @@ export interface JobDetail {
   family?: string | null;
   /** §14 "Powered by: <project> — <band>" (only surfaced at Moderate+). */
   project_relevance?: string | null;
+  /**
+   * Live external posting (Adzuna /details/<id> or the employer's page).
+   * Absent/null for native in-app postings → Apply stays internal.
+   */
+  external_url?: string | null;
 }
 
 export interface JobListResponse {

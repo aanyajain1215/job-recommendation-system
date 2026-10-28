@@ -23,6 +23,8 @@ class JobSummaryOut(BaseModel):
     salary_min: int | None = None
     salary_max: int | None = None
     salary_currency: str = "USD"
+    # Live posting URL so saved/tracker rows can deep-link to the real opening.
+    external_url: str | None = None
     company: CompanySummary | None = None
 
 

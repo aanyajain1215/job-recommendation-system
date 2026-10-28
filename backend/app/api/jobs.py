@@ -71,6 +71,7 @@ def _format_job_response(
         relevance_score=relevance_score,
         snippet=snippet,
         family=job.family.name if job.family is not None else None,
+        external_url=job.external_url,
     )
 
 

@@ -667,6 +667,7 @@ class ContentRecommender:
             skills=skills_list,
             applicant_count=applicants,
             relevance_score=relevance,
+            external_url=job.external_url,
         )
 
     @classmethod

@@ -50,6 +50,7 @@ def _format_job_summary(job: Job) -> JobSummaryOut:
         salary_min=job.salary_min,
         salary_max=job.salary_max,
         salary_currency=job.salary_currency,
+        external_url=job.external_url,
         company=CompanySummary.model_validate(job.company) if job.company else None,
     )
 
