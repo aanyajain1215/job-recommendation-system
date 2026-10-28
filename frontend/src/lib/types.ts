@@ -754,8 +754,41 @@ export interface OnboardingPairsResponse {
   note: string;
 }
 
+// ---------------- Adaptive (multi-option) onboarding ---------------- //
+
+export interface OnboardingQuestion {
+  index: number;
+  question: string;
+  a: OnboardingPairOption;
+  b: OnboardingPairOption;
+  c: OnboardingPairOption;
+}
+
+export interface OnboardingWeightPreview {
+  component: string;
+  label: string;
+  weight: number;
+}
+
+export interface OnboardingFlowResponse {
+  question: OnboardingQuestion | null;
+  components: { component: string; label: string }[];
+  preview_weights: OnboardingWeightPreview[];
+  answered: number;
+  remaining: number;
+  min_questions: number;
+  max_questions: number;
+  note: string;
+}
+
+export interface OnboardingAnswer {
+  index: number;
+  chosen: "a" | "b" | "c";
+}
+
 export interface OnboardingCompletePayload {
-  choices: { pair_index: number; chosen: "a" | "b" }[];
+  choices?: { pair_index: number; chosen: "a" | "b" }[];
+  answers?: OnboardingAnswer[];
   target_family?: string;
 }
 

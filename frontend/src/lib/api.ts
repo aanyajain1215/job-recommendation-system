@@ -20,6 +20,8 @@ import {
   OnboardingCompletePayload,
   OnboardingCompleteResponse,
   OnboardingPairsResponse,
+  OnboardingFlowResponse,
+  OnboardingAnswer,
   ParseFailuresResponse,
   PreferenceState,
   ProfileDetail,
@@ -557,6 +559,29 @@ export async function getOnboardingPairs(): Promise<OnboardingPairsResponse> {
   const base = getBrowserApiBaseUrl();
   const res = await fetch(`${base}/api/v1/onboarding/pairs`, { cache: "no-store" });
   if (!res.ok) throw new Error("Failed to load onboarding questions");
+  return res.json();
+}
+
+// ---------------- Adaptive onboarding ---------------- //
+
+export async function getOnboardingFlow(): Promise<OnboardingFlowResponse> {
+  const base = getBrowserApiBaseUrl();
+  const res = await fetch(`${base}/api/v1/onboarding/flow`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Failed to start the onboarding flow");
+  return res.json();
+}
+
+export async function nextOnboardingQuestion(
+  answers: OnboardingAnswer[],
+): Promise<OnboardingFlowResponse> {
+  const base = getBrowserApiBaseUrl();
+  const res = await fetch(`${base}/api/v1/onboarding/next`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ answers }),
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error("Failed to get the next question");
   return res.json();
 }
 
