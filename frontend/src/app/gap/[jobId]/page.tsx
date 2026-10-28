@@ -104,7 +104,7 @@ export default function GapPage() {
               <Layers className="h-3.5 w-3.5" /> Skill Gap Analysis
             </span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-zinc-100">
             {gap.job_title}
           </h1>
           <div className="mt-4 flex flex-wrap gap-3 text-xs sm:text-sm">
@@ -136,7 +136,7 @@ export default function GapPage() {
                 <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-rose-400">
                   <Target className="h-3.5 w-3.5" /> Weakest link
                 </span>
-                <p className="mt-1.5 text-lg font-bold text-white">{gap.weakest_link}</p>
+                <p className="mt-1.5 text-lg font-bold text-zinc-100">{gap.weakest_link}</p>
                 <p className="mt-0.5 text-xs text-zinc-400">
                   Highest weight × still missing — start here.
                 </p>
@@ -166,7 +166,7 @@ export default function GapPage() {
         <section>
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-lg font-bold text-white">Every requirement, classified</h2>
+              <h2 className="text-lg font-bold text-zinc-100">Every requirement, classified</h2>
               <p className="text-xs text-zinc-500 mt-0.5">
                 Hover any chip for the evidence behind its class.
               </p>
@@ -179,7 +179,7 @@ export default function GapPage() {
         {/* CTA → roadmap */}
         <div className="rounded-2xl border border-teal-500/25 bg-gradient-to-r from-teal-950/40 to-zinc-900/60 p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h3 className="text-sm font-bold text-white">Turn this gap into a plan</h3>
+            <h3 className="text-sm font-bold text-zinc-100">Turn this gap into a plan</h3>
             <p className="mt-1 text-xs text-zinc-400 max-w-lg">
               The roadmap sequences the missing skills into phases with hour estimates —
               built from this exact analysis.

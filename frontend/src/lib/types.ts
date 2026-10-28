@@ -88,6 +88,21 @@ export interface CompanySummary {
   is_verified: boolean;
 }
 
+/** Employer-facing company profile (richer than CompanySummary). */
+export interface CompanyDetail {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  website?: string | null;
+  location?: string | null;
+  logo_url?: string | null;
+  industry?: string | null;
+  company_size?: string | null;
+  is_verified: boolean;
+  open_postings: number;
+}
+
 export interface ProfileSummary {
   id: string;
   first_name: string;
@@ -161,10 +176,32 @@ export interface JobCreatePayload {
   skills?: JobSkillInput[];
 }
 
+/** PUT /jobs/{id} — every field optional (omitted = unchanged). */
+export interface JobUpdatePayload {
+  title?: string;
+  description?: string;
+  requirements?: string;
+  employment_type?: EmploymentType;
+  experience_level?: ExperienceLevel;
+  location?: string;
+  is_remote?: boolean;
+  salary_min?: number | null;
+  salary_max?: number | null;
+  salary_currency?: string;
+  status?: JobStatus;
+  skills?: JobSkillInput[];
+  /** Canonical family name; "" clears it. */
+  family?: string;
+}
+
 export interface JobDetail {
   id: string;
-  company_id: string;
-  posted_by_user_id: string;
+  /** Null for transient live listings (Adzuna) — they have no DB row. */
+  company_id?: string | null;
+  /** Null for transient live listings (Adzuna) — they have no DB row. */
+  posted_by_user_id?: string | null;
+  /** "native" = posted on this platform; "adzuna" = fetched live at query time. */
+  source?: string;
   title: string;
   description: string;
   requirements?: string | null;
@@ -282,6 +319,199 @@ export interface ApplicationItem {
   created_at?: string;
   updated_at: string;
   job?: JobDetail | null;
+}
+
+// ---------------- E1: employer applicant pipeline ---------------- //
+
+export interface ApplicantProfile {
+  id: string;
+  user_id: string;
+  first_name: string;
+  last_name: string;
+  headline?: string | null;
+  location?: string | null;
+  phone?: string | null;
+  resume_url?: string | null;
+  years_of_experience?: number | null;
+}
+
+/** Applicant row as the employer sees it (adds profile + contact). */
+export interface EmployerApplication {
+  id: string;
+  job_id: string;
+  user_id: string;
+  status: ApplicationStatus;
+  cover_note?: string | null;
+  resume_url_snapshot?: string | null;
+  applied_at: string;
+  created_at?: string;
+  updated_at: string;
+  applicant?: ApplicantProfile | null;
+  user_email?: string | null;
+}
+
+export interface PipelineCounts {
+  applied: number;
+  viewed: number;
+  shortlisted: number;
+  interview: number;
+  rejected: number;
+  offer: number;
+  saved: number;
+}
+
+export interface PostingPipeline {
+  job_id: string;
+  title: string;
+  status: JobStatus;
+  total: number;
+  counts: PipelineCounts;
+  recent_7d: number;
+  days_open: number;
+  applications_per_day: number;
+}
+
+// ---------------- E2: reverse talent match ---------------- //
+
+export interface TalentCandidate {
+  application_id: string;
+  profile_id?: string | null;
+  name: string;
+  headline?: string | null;
+  location?: string | null;
+  years_of_experience?: number | null;
+  resume_url?: string | null;
+  email?: string | null;
+  status: ApplicationStatus;
+  applied_at: string;
+  /** Same 0-100 scale the candidate sees for this job. */
+  fit_score: number;
+  /** Per-component 0-100 breakdown (the explainable-fit bars). */
+  components: Record<string, number>;
+  matched_skills: string[];
+  missing_required: string[];
+  /** Skills the candidate lacks but can transfer into (skill2vec adjacency). */
+  transferable: string[];
+}
+
+export interface PostingTalent {
+  job_id: string;
+  title: string;
+  total_applicants: number;
+  scored: number;
+  job_skills: string[];
+  candidates: TalentCandidate[];
+}
+
+// ---------------- E3: posting insights ---------------- //
+
+export interface JdCheck {
+  label: string;
+  ok: boolean;
+  detail: string;
+}
+
+export interface JdHealth {
+  /** 0-100, share of checks passed. */
+  score: number;
+  checks: JdCheck[];
+}
+
+export interface SalaryBenchmark {
+  family?: string | null;
+  peer_jobs: number;
+  median_min_usd?: number | null;
+  median_max_usd?: number | null;
+  /** Where this posting's midpoint sits among peer midpoints (0-100). */
+  midpoint_percentile?: number | null;
+  /** Share of peers that are remote (0-1). */
+  remote_share?: number | null;
+}
+
+export interface SkillMarketRow {
+  skill: string;
+  /** Demand: live published jobs requiring the skill. */
+  jobs_requiring: number;
+  /** Supply: profiles holding it — AGGREGATE only, never who holds it. */
+  seekers_holding: number;
+  /** demand - supply; positive = scarce. */
+  gap: number;
+}
+
+export interface PostingInsights {
+  job_id: string;
+  title: string;
+  jd_health: JdHealth;
+  benchmark?: SalaryBenchmark | null;
+  required_skill_market: SkillMarketRow[];
+  family_top_demand: SkillMarketRow[];
+}
+
+// ---------------- E4: performance analytics ---------------- //
+
+export interface DailyApplications {
+  /** ISO date (YYYY-MM-DD). */
+  date: string;
+  count: number;
+}
+
+export interface StageConversion {
+  /** % of applicants that reached each rung (0-100). */
+  viewed_rate: number;
+  shortlist_rate: number;
+  interview_rate: number;
+  offer_rate: number;
+  rejection_rate: number;
+}
+
+export interface PostingPerformance {
+  job_id: string;
+  title: string;
+  total: number;
+  /** Daily counts for the last 30 days, zero-filled. */
+  series: DailyApplications[];
+  conversion: StageConversion;
+  recent_7d: number;
+  days_since_last_application?: number | null;
+  /** Avg days from apply → latest stage change, over moved candidates. */
+  avg_days_to_last_move?: number | null;
+  health: "idle" | "hot" | "steady" | "stale";
+}
+
+// ---------------- E5: what-if relaxer ---------------- //
+
+export interface WhatIfRequest {
+  /** Canonical required-skill names to un-require. */
+  drop_required_skills?: string[];
+  experience_level?: ExperienceLevel | null;
+  is_remote?: boolean | null;
+  salary_min?: number | null;
+  salary_max?: number | null;
+}
+
+export interface SkillRelaxOption {
+  skill: string;
+  reach_if_dropped: number;
+  /** reach_if_dropped - baseline reach (>= 0). */
+  gain: number;
+}
+
+export interface WhatIfResult {
+  job_id: string;
+  title: string;
+  applied: WhatIfRequest;
+  /** Aggregate market reach: profiles holding every required skill. */
+  reach_before: number;
+  reach_after: number;
+  total_seekers: number;
+  /** Own applicants only. */
+  applicants_scored: number;
+  avg_fit_before?: number | null;
+  avg_fit_after?: number | null;
+  jd_health_before: number;
+  jd_health_after: number;
+  drop_options: SkillRelaxOption[];
+  effects: string[];
 }
 
 // ---------------- Phase 2: Gap · Roadmap · Simulator · Careers ---------------- //

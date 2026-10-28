@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #09090b;
-  --foreground: #f4f4f5;
+  --background: #f7f2ea;
+  --foreground: #2b2017;
 }
 
 @theme inline {
@@ -12,6 +12,173 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/*
+ * ────────────────────────────────────────────────────────────────────────
+ * NEUTRAL ELEGANCE — light, gallery-warm theme
+ *
+ * Swatches: #FFDBBB (peach) · #CCBEB1 (taupe) · #997E67 (mid brown)
+ *           #664930 (espresso)
+ *
+ * The whole app expresses its contrast structure through Tailwind's
+ * `zinc` (surfaces/text) + accent scales, so this single @theme block
+ * re-tones every page, card, badge and button at once. The ramps are
+ * re-semantized for a light product:
+ *
+ *   zinc  950 = cream page · 900 = white card · 800 = taupe border/surface
+ *         100–300 = dark inks (heading → body) · 400–600 = muted warm meta
+ *         (text levels run dark→light as the number grows, exactly like
+ *         the old dark theme's visual hierarchy)
+ *   teal  (primary accent) 500 = espresso CTA · 400/300 = accent text
+ *         200/950 = peach (selection, gradient washes)
+ *   emerald = warm olive (match/positive) · amber = ochre (warning)
+ *   rose/red = terracotta (danger) · indigo/violet/purple = walnut (employer)
+ *   cyan = caramel stat accents · sky = pale clay (live/info)
+ * ────────────────────────────────────────────────────────────────────────
+ */
+@theme {
+  /* Warm neutrals (surfaces run light, ink runs dark) */
+  --color-zinc-50: #fffdf9;
+  --color-zinc-100: #2b2017;
+  --color-zinc-200: #453527;
+  --color-zinc-300: #664930;
+  --color-zinc-400: #7e6552;
+  --color-zinc-500: #997e67;
+  --color-zinc-600: #8a7161;
+  --color-zinc-700: #b5a493;
+  --color-zinc-800: #ccbeb1;
+  --color-zinc-900: #ffffff;
+  --color-zinc-950: #f7f2ea;
+
+  /* Primary accent: espresso solids, warm accent text, peach lights */
+  --color-teal-50: #fff7f0;
+  --color-teal-100: #ffeee1;
+  --color-teal-200: #ffdbbb;
+  --color-teal-300: #8f6a49;
+  --color-teal-400: #7a593b;
+  --color-teal-500: #664930;
+  --color-teal-600: #573d25;
+  --color-teal-700: #4a331f;
+  --color-teal-800: #3d2a19;
+  --color-teal-900: #2f2114;
+  /* teal-950 intentionally breaks the ramp: peach wash for hero gradients
+     (from-teal-950/30) and light-on-espresso text (text-teal-950) */
+  --color-teal-950: #ffdbbb;
+
+  /* Positive / match — warm olive */
+  --color-emerald-50: #f5f7f0;
+  --color-emerald-100: #ebefe3;
+  --color-emerald-200: #d8e0c8;
+  --color-emerald-300: #5f6b4e;
+  --color-emerald-400: #4f5b3e;
+  --color-emerald-500: #6e7c5a;
+  --color-emerald-600: #45513a;
+  --color-emerald-700: #3a4430;
+  --color-emerald-800: #2f3727;
+  --color-emerald-900: #252b1f;
+  --color-emerald-950: #1d2118;
+
+  /* Warning / draft — ochre gold */
+  --color-amber-50: #fff9f0;
+  --color-amber-100: #fff1df;
+  --color-amber-200: #92652d;
+  --color-amber-300: #8a5e2b;
+  --color-amber-400: #7e5622;
+  --color-amber-500: #c9974f;
+  --color-amber-600: #a87b3a;
+  --color-amber-700: #8c652f;
+  --color-amber-800: #715126;
+  --color-amber-900: #573f1e;
+  --color-amber-950: #3e2c14;
+
+  /* Danger — terracotta clay */
+  --color-rose-50: #fdf3f0;
+  --color-rose-100: #fae6e0;
+  --color-rose-200: #bc6552;
+  --color-rose-300: #b05744;
+  --color-rose-400: #a34e3b;
+  --color-rose-500: #96452f;
+  --color-rose-600: #7e3a28;
+  --color-rose-700: #68301f;
+  --color-rose-800: #54271a;
+  --color-rose-900: #421f14;
+  --color-rose-950: #33170f;
+
+  --color-red-50: #fdf3f0;
+  --color-red-100: #fae6e0;
+  --color-red-200: #bc6552;
+  --color-red-300: #b05744;
+  --color-red-400: #a34e3b;
+  --color-red-500: #96452f;
+  --color-red-600: #7e3a28;
+  --color-red-700: #68301f;
+  --color-red-800: #54271a;
+  --color-red-900: #421f14;
+  --color-red-950: #4e2a20;
+
+  /* Employer surfaces — walnut */
+  --color-indigo-50: #faf5f0;
+  --color-indigo-100: #f3e9df;
+  --color-indigo-200: #e7d5c3;
+  --color-indigo-300: #8a6547;
+  --color-indigo-400: #7a5639;
+  --color-indigo-500: #6b4831;
+  --color-indigo-600: #573b27;
+  --color-indigo-700: #472f1f;
+  --color-indigo-800: #38251a;
+  --color-indigo-900: #2b1c14;
+  --color-indigo-950: #20130e;
+
+  --color-violet-50: #faf5f0;
+  --color-violet-100: #f3e9df;
+  --color-violet-200: #e7d5c3;
+  --color-violet-300: #8a6547;
+  --color-violet-400: #7a5639;
+  --color-violet-500: #6b4831;
+  --color-violet-600: #573b27;
+  --color-violet-700: #472f1f;
+  --color-violet-800: #38251a;
+  --color-violet-900: #2b1c14;
+  --color-violet-950: #20130e;
+
+  --color-purple-50: #faf5f0;
+  --color-purple-100: #f3e9df;
+  --color-purple-200: #e7d5c3;
+  --color-purple-300: #8a6547;
+  --color-purple-400: #7a5639;
+  --color-purple-500: #6b4831;
+  --color-purple-600: #573b27;
+  --color-purple-700: #472f1f;
+  --color-purple-800: #38251a;
+  --color-purple-900: #2b1c14;
+  --color-purple-950: #20130e;
+
+  /* Stat highlights — caramel */
+  --color-cyan-50: #faf6f1;
+  --color-cyan-100: #f3ebe1;
+  --color-cyan-200: #e5d5c2;
+  --color-cyan-300: #8a6b45;
+  --color-cyan-400: #a5835f;
+  --color-cyan-500: #b99873;
+  --color-cyan-600: #6b5544;
+  --color-cyan-700: #574537;
+  --color-cyan-800: #453629;
+  --color-cyan-900: #35291f;
+  --color-cyan-950: #271d15;
+
+  /* Live / info — pale clay */
+  --color-sky-50: #fff8f3;
+  --color-sky-100: #fff0e5;
+  --color-sky-200: #ffdfc9;
+  --color-sky-300: #8a6547;
+  --color-sky-400: #d9a983;
+  --color-sky-500: #c9916b;
+  --color-sky-600: #a87350;
+  --color-sky-700: #8a5d41;
+  --color-sky-800: #6d4934;
+  --color-sky-900: #533728;
+  --color-sky-950: #3b271d;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
@@ -19,8 +186,8 @@ body {
 }
 
 mark {
-  background-color: rgba(20, 184, 166, 0.25);
-  color: #5eead4;
+  background-color: rgba(255, 219, 187, 0.7);
+  color: #4a331f;
   font-weight: 600;
   padding: 0.05rem 0.25rem;
   border-radius: 0.25rem;

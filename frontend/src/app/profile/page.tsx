@@ -363,7 +363,7 @@ export default function ProfilePage() {
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-zinc-800/80 pb-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white flex items-center gap-2">
+          <h1 className="text-3xl font-bold tracking-tight text-zinc-100 flex items-center gap-2">
             <UserIcon className="h-7 w-7 text-teal-400" />
             Profile Builder & Resume
           </h1>
@@ -402,7 +402,7 @@ export default function ProfilePage() {
       <form onSubmit={handleSaveProfile} className="mt-8 space-y-8">
         {/* Resume Upload Card */}
         <section className="rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-6 backdrop-blur">
-          <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+          <h2 className="text-lg font-semibold text-zinc-100 flex items-center gap-2">
             <FileCheck className="h-5 w-5 text-teal-400" />
             Resume Document
           </h2>
@@ -471,7 +471,7 @@ export default function ProfilePage() {
                   type="button"
                   onClick={handleReparse}
                   disabled={parseBusy}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs font-medium text-zinc-300 hover:text-white transition-colors disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs font-medium text-zinc-300 hover:text-zinc-100 transition-colors disabled:opacity-50"
                 >
                   <RefreshCw className={`h-3.5 w-3.5 ${isAutofilling ? "animate-spin" : ""}`} />
                   Re-parse
@@ -483,7 +483,7 @@ export default function ProfilePage() {
                   href={`http://localhost:8000${profile.resume_url}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs font-medium text-zinc-300 hover:text-white transition-colors"
+                  className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs font-medium text-zinc-300 hover:text-zinc-100 transition-colors"
                 >
                   Download / View
                 </a>
@@ -494,7 +494,7 @@ export default function ProfilePage() {
 
         {/* Basic Personal Details */}
         <section className="rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-6 backdrop-blur">
-          <h2 className="text-lg font-semibold text-white">Basic Information</h2>
+          <h2 className="text-lg font-semibold text-zinc-100">Basic Information</h2>
 
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
@@ -593,7 +593,7 @@ export default function ProfilePage() {
         <section className="rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-6 backdrop-blur">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-white">Skills & Proficiencies</h2>
+              <h2 className="text-lg font-semibold text-zinc-100">Skills & Proficiencies</h2>
               <p className="mt-1 text-xs text-zinc-400">
                 Directly matches against employer job requirements in the recommendation system.
               </p>
@@ -636,7 +636,7 @@ export default function ProfilePage() {
                     key={s.id}
                     type="button"
                     onClick={() => handleAddSkill(s.name, s.category)}
-                    className="flex w-full items-center justify-between px-3 py-2 text-left text-sm text-zinc-200 hover:bg-teal-500/20 hover:text-white"
+                    className="flex w-full items-center justify-between px-3 py-2 text-left text-sm text-zinc-200 hover:bg-teal-500/20 hover:text-zinc-100"
                   >
                     <span>{s.name}</span>
                     <span className="text-xs text-zinc-500 uppercase">{s.category}</span>
@@ -654,7 +654,7 @@ export default function ProfilePage() {
                 className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border border-zinc-800/80 bg-zinc-950/50 p-3"
               >
                 <div className="flex items-center gap-2">
-                  <span className="font-semibold text-sm text-white">{skill.skill_name}</span>
+                  <span className="font-semibold text-sm text-zinc-100">{skill.skill_name}</span>
                   {skill.category && (
                     <span className="rounded bg-zinc-800 px-2 py-0.5 text-[10px] uppercase text-zinc-400">
                       {skill.category}
@@ -706,7 +706,7 @@ export default function ProfilePage() {
         {/* Work Experience */}
         <section className="rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-6 backdrop-blur">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+            <h2 className="text-lg font-semibold text-zinc-100 flex items-center gap-2">
               <Briefcase className="h-5 w-5 text-teal-400" />
               Work Experience
             </h2>
@@ -800,7 +800,7 @@ export default function ProfilePage() {
         {/* Education */}
         <section className="rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-6 backdrop-blur">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+            <h2 className="text-lg font-semibold text-zinc-100 flex items-center gap-2">
               <GraduationCap className="h-5 w-5 text-teal-400" />
               Education
             </h2>

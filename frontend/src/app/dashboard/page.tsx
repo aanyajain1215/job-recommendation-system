@@ -24,6 +24,7 @@ import {
   CheckCircle,
   Clock,
   Compass,
+  ExternalLink,
   FileCheck,
   FileText,
   PlusCircle,
@@ -35,6 +36,10 @@ import {
   Wifi,
   Zap,
 } from "lucide-react";
+
+/** Transient live listing (fetched from Adzuna at query time, no DB row). */
+const isLiveJob = (job: JobDetail) =>
+  job.source === "adzuna" || job.id.startsWith("adzuna-");
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -107,7 +112,7 @@ export default function DashboardPage() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-zinc-800/80 pb-8">
         <div>
           <div className="flex items-center gap-2.5">
-            <h1 className="text-3xl font-bold tracking-tight text-white">
+            <h1 className="text-3xl font-bold tracking-tight text-zinc-100">
               Hello,{" "}
               {profile?.first_name || user.profile?.first_name
                 ? `${profile?.first_name || user.profile?.first_name}`
@@ -167,7 +172,7 @@ export default function DashboardPage() {
                       <UserIcon className="h-6 w-6" />
                     </div>
                     <div>
-                      <h2 className="text-lg font-semibold text-white">
+                      <h2 className="text-lg font-semibold text-zinc-100">
                         {profile?.first_name} {profile?.last_name}
                       </h2>
                       <p className="text-xs text-zinc-400">{user.email}</p>
@@ -175,7 +180,7 @@ export default function DashboardPage() {
                   </div>
                   <Link
                     href="/profile"
-                    className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs text-zinc-300 hover:text-white"
+                    className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs text-zinc-300 hover:text-zinc-100"
                   >
                     Edit Profile
                   </Link>
@@ -236,7 +241,7 @@ export default function DashboardPage() {
                   <div className="flex items-center gap-3">
                     <FileCheck className="h-5 w-5 text-teal-400" />
                     <div>
-                      <p className="text-sm font-medium text-white">
+                      <p className="text-sm font-medium text-zinc-100">
                         {profile?.resume_url ? "Resume Active on File" : "No Resume Uploaded"}
                       </p>
                       <p className="text-xs text-zinc-400">
@@ -262,7 +267,7 @@ export default function DashboardPage() {
                     <span className="text-xs font-medium uppercase tracking-wider">Applied</span>
                     <Clock className="h-4 w-4 text-cyan-400" />
                   </div>
-                  <p className="mt-3 text-2xl font-bold text-white">
+                  <p className="mt-3 text-2xl font-bold text-zinc-100">
                     {appStats?.total_applied ?? 0}
                   </p>
                   <p className="mt-1 text-xs text-zinc-500">Active applications</p>
@@ -272,7 +277,7 @@ export default function DashboardPage() {
                     <span className="text-xs font-medium uppercase tracking-wider">Shortlisted</span>
                     <TrendingUp className="h-4 w-4 text-teal-400" />
                   </div>
-                  <p className="mt-3 text-2xl font-bold text-white">
+                  <p className="mt-3 text-2xl font-bold text-zinc-100">
                     {appStats?.shortlisted ?? 0}
                   </p>
                   <p className="mt-1 text-xs text-zinc-500">Under review</p>
@@ -282,7 +287,7 @@ export default function DashboardPage() {
                     <span className="text-xs font-medium uppercase tracking-wider">Offers</span>
                     <CheckCircle className="h-4 w-4 text-emerald-400" />
                   </div>
-                  <p className="mt-3 text-2xl font-bold text-white">
+                  <p className="mt-3 text-2xl font-bold text-zinc-100">
                     {appStats?.offer ?? 0}
                   </p>
                   <p className="mt-1 text-xs text-zinc-500">Received offers</p>
@@ -293,7 +298,7 @@ export default function DashboardPage() {
               <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-6 backdrop-blur">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                    <h2 className="text-lg font-semibold text-zinc-100 flex items-center gap-2">
                       <Sparkles className="h-5 w-5 text-teal-400" />
                       Top Recommended Jobs
                     </h2>
@@ -337,12 +342,24 @@ export default function DashboardPage() {
                               <span className="text-[10px] text-zinc-400">Remote</span>
                             )}
                           </div>
-                          <Link
-                            href={`/jobs/${item.job.id}`}
-                            className="font-semibold text-sm text-white group-hover:text-teal-400 line-clamp-1"
-                          >
-                            {item.job.title}
-                          </Link>
+                          {isLiveJob(item.job) ? (
+                            <a
+                              href={item.job.external_url || "#"}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Opens the live posting on Adzuna in a new tab"
+                              className="font-semibold text-sm text-zinc-100 group-hover:text-teal-400 line-clamp-1"
+                            >
+                              {item.job.title}
+                            </a>
+                          ) : (
+                            <Link
+                              href={`/jobs/${item.job.id}`}
+                              className="font-semibold text-sm text-zinc-100 group-hover:text-teal-400 line-clamp-1"
+                            >
+                              {item.job.title}
+                            </Link>
+                          )}
                           <p className="text-xs text-zinc-400 mt-0.5">{item.job.company.name}</p>
 
                           {item.matched_skills.length > 0 && (
@@ -364,13 +381,26 @@ export default function DashboardPage() {
                           )}
                         </div>
 
-                        <Link
-                          href={`/jobs/${item.job.id}`}
-                          className="mt-4 inline-flex items-center justify-between text-xs font-medium text-teal-400 group-hover:text-teal-300 pt-2 border-t border-zinc-800/60"
-                        >
-                          <span>Review & Apply</span>
-                          <ArrowRight className="h-3 w-3" />
-                        </Link>
+                        {isLiveJob(item.job) ? (
+                          <a
+                            href={item.job.external_url || "#"}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Opens the live posting on Adzuna in a new tab"
+                            className="mt-4 inline-flex items-center justify-between text-xs font-medium text-teal-400 group-hover:text-teal-300 pt-2 border-t border-zinc-800/60"
+                          >
+                            <span>View on Adzuna</span>
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                        ) : (
+                          <Link
+                            href={`/jobs/${item.job.id}`}
+                            className="mt-4 inline-flex items-center justify-between text-xs font-medium text-teal-400 group-hover:text-teal-300 pt-2 border-t border-zinc-800/60"
+                          >
+                            <span>Review & Apply</span>
+                            <ArrowRight className="h-3 w-3" />
+                          </Link>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -383,7 +413,7 @@ export default function DashboardPage() {
               <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-6 backdrop-blur">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                    <h2 className="text-lg font-semibold text-zinc-100 flex items-center gap-2">
                       <Briefcase className="h-5 w-5 text-indigo-400" />
                       Your Job Postings ({employerJobs.length})
                     </h2>
@@ -403,7 +433,7 @@ export default function DashboardPage() {
                 {employerJobs.length === 0 ? (
                   <div className="mt-8 rounded-xl border border-dashed border-zinc-800 p-8 text-center">
                     <Building2 className="mx-auto h-8 w-8 text-zinc-600" />
-                    <p className="mt-2 text-sm font-medium text-white">No active job listings yet</p>
+                    <p className="mt-2 text-sm font-medium text-zinc-100">No active job listings yet</p>
                     <p className="mt-1 text-xs text-zinc-400">
                       Publish your first role to start receiving AI-ranked applicants.
                     </p>
@@ -424,7 +454,7 @@ export default function DashboardPage() {
                       >
                         <div>
                           <div className="flex items-center gap-2">
-                            <span className="font-bold text-white hover:text-indigo-300">
+                            <span className="font-bold text-zinc-100 hover:text-indigo-300">
                               <Link href={`/jobs/${job.id}`}>{job.title}</Link>
                             </span>
                             {job.is_remote && (
@@ -433,7 +463,7 @@ export default function DashboardPage() {
                                 Remote
                               </span>
                             )}
-                            <span className="rounded bg-zinc-800 px-2 py-0.5 text-[10px] uppercase text-zinc-400">
+                            <span className="rounded bg-zinc-800 px-2 py-0.5 text-[10px] uppercase text-zinc-300">
                               {job.status}
                             </span>
                           </div>
@@ -452,7 +482,7 @@ export default function DashboardPage() {
                         <div className="flex items-center gap-3 shrink-0">
                           <Link
                             href={`/jobs/${job.id}`}
-                            className="rounded border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs text-zinc-300 hover:text-white"
+                            className="rounded border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs text-zinc-300 hover:text-zinc-100"
                           >
                             View
                           </Link>
@@ -512,7 +542,7 @@ export default function DashboardPage() {
             <div className="mt-3 space-y-2">
               <Link
                 href="/jobs"
-                className="block rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-3 text-xs text-zinc-300 hover:border-zinc-700 hover:text-white transition-colors"
+                className="block rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-3 text-xs text-zinc-300 hover:border-zinc-700 hover:text-zinc-100 transition-colors"
               >
                 Browse All Jobs
               </Link>
@@ -520,31 +550,31 @@ export default function DashboardPage() {
                 <>
                   <Link
                     href="/profile"
-                    className="block rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-3 text-xs text-zinc-300 hover:border-zinc-700 hover:text-white transition-colors"
+                    className="block rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-3 text-xs text-zinc-300 hover:border-zinc-700 hover:text-zinc-100 transition-colors"
                   >
                     Manage Profile & Skills
                   </Link>
                   <Link
                     href="/tracker"
-                    className="block rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-3 text-xs text-zinc-300 hover:border-zinc-700 hover:text-white transition-colors"
+                    className="block rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-3 text-xs text-zinc-300 hover:border-zinc-700 hover:text-zinc-100 transition-colors"
                   >
                     Application Tracker
                   </Link>
                   <Link
                     href="/saved"
-                    className="block rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-3 text-xs text-zinc-300 hover:border-zinc-700 hover:text-white transition-colors"
+                    className="block rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-3 text-xs text-zinc-300 hover:border-zinc-700 hover:text-zinc-100 transition-colors"
                   >
                     Saved Jobs
                   </Link>
                   <Link
                     href="/resume-optimize"
-                    className="block rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-3 text-xs text-zinc-300 hover:border-zinc-700 hover:text-white transition-colors"
+                    className="block rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-3 text-xs text-zinc-300 hover:border-zinc-700 hover:text-zinc-100 transition-colors"
                   >
                     Resume Optimizer
                   </Link>
                   <Link
                     href="/settings"
-                    className="block rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-3 text-xs text-zinc-300 hover:border-zinc-700 hover:text-white transition-colors"
+                    className="block rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-3 text-xs text-zinc-300 hover:border-zinc-700 hover:text-zinc-100 transition-colors"
                   >
                     Personalization Settings
                   </Link>
@@ -552,7 +582,7 @@ export default function DashboardPage() {
               ) : (
                 <Link
                   href="/jobs/new"
-                  className="block rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-3 text-xs text-zinc-300 hover:border-zinc-700 hover:text-white transition-colors"
+                  className="block rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-3 text-xs text-zinc-300 hover:border-zinc-700 hover:text-zinc-100 transition-colors"
                 >
                   Post a New Opportunity
                 </Link>

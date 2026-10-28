@@ -21,6 +21,13 @@ from app.services.ingest.parse import (
     parse_salary,
     parse_years,
 )
+from app.services.ingest.structure import (
+    assign_family,
+    extract_skills,
+    load_families,
+    load_surface_pairs,
+    resolve_currency,
+)
 from app.services.ingest.validate import (
     DedupeBook,
     RunReport,
@@ -31,10 +38,14 @@ from app.services.ingest.validate import (
 __all__ = [
     "DedupeBook",
     "RunReport",
+    "assign_family",
     "clean_text",
     "detect_employment_type",
     "detect_remote",
+    "extract_skills",
     "fetch_all",
+    "load_families",
+    "load_surface_pairs",
     "map_seniority",
     "normalize_signature",
     "parse_location",
@@ -43,5 +54,6 @@ __all__ = [
     "provider_names",
     "quality_gates",
     "read_landing",
+    "resolve_currency",
     "write_landing",
 ]

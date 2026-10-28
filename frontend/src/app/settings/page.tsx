@@ -67,7 +67,7 @@ export default function SettingsPage() {
             <Settings2 className="h-4 w-4" />
             Your preferences
           </div>
-          <h1 className="mt-1 text-3xl font-bold tracking-tight text-white">Personalization Settings</h1>
+          <h1 className="mt-1 text-3xl font-bold tracking-tight text-zinc-100">Personalization Settings</h1>
           <p className="mt-1 text-sm text-zinc-400">
             The model adapts the 8 scoring weights from your feedback — bounded, shrunk toward
             defaults, and fully resettable (plan §16). Scores stay deterministic; only weights move.
@@ -98,13 +98,13 @@ export default function SettingsPage() {
               <p className="text-[11px] font-medium uppercase tracking-wider text-zinc-400">
                 Feedback events
               </p>
-              <p className="mt-1.5 text-2xl font-bold text-white">{prefs.n_events}</p>
+              <p className="mt-1.5 text-2xl font-bold text-zinc-100">{prefs.n_events}</p>
             </div>
             <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-4">
               <p className="text-[11px] font-medium uppercase tracking-wider text-zinc-400">
                 Shrinkage toward defaults
               </p>
-              <p className="mt-1.5 text-2xl font-bold text-white">
+              <p className="mt-1.5 text-2xl font-bold text-zinc-100">
                 {(prefs.shrinkage * 100).toFixed(0)}%
               </p>
               <p className="mt-1 text-[11px] text-zinc-500">n / (n + 10), empirical-Bayes</p>
@@ -113,12 +113,12 @@ export default function SettingsPage() {
               <p className="text-[11px] font-medium uppercase tracking-wider text-zinc-400">
                 Skill leans
               </p>
-              <p className="mt-1.5 text-2xl font-bold text-white">{prefs.affinities.length}</p>
+              <p className="mt-1.5 text-2xl font-bold text-zinc-100">{prefs.affinities.length}</p>
             </div>
           </div>
 
           {prefs.personalization_note && (
-            <div className="mt-4 flex items-start gap-2 rounded-xl border border-teal-500/20 bg-teal-500/5 p-4 text-xs text-teal-200/90">
+            <div className="mt-4 flex items-start gap-2 rounded-xl border border-teal-500/20 bg-teal-500/5 p-4 text-xs text-teal-300/90">
               <Info className="mt-px h-4 w-4 flex-shrink-0 text-teal-400" />
               {prefs.personalization_note}
             </div>

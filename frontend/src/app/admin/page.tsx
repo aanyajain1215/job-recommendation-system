@@ -185,7 +185,7 @@ export default function AdminPage() {
           <ShieldCheck className="h-4 w-4" />
           Admin Console · plan §22
         </div>
-        <h1 className="mt-1 text-3xl font-bold tracking-tight text-white">
+        <h1 className="mt-1 text-3xl font-bold tracking-tight text-zinc-100">
           Operations & Data Integrity
         </h1>
         <p className="mt-1 text-sm text-zinc-400">
@@ -240,7 +240,7 @@ export default function AdminPage() {
                     <p className="text-[10px] uppercase tracking-wider text-zinc-500">
                       {tile.label}
                     </p>
-                    <p className="mt-1 text-sm font-bold text-white">{tile.value}</p>
+                    <p className="mt-1 text-sm font-bold text-zinc-100">{tile.value}</p>
                   </div>
                 ))}
               </div>
@@ -435,7 +435,7 @@ export default function AdminPage() {
         </div>
 
         {mergeReport && (
-          <div className="mt-4 rounded-xl border border-teal-500/25 bg-teal-500/5 p-4 text-xs text-teal-200">
+          <div className="mt-4 rounded-xl border border-teal-500/25 bg-teal-500/5 p-4 text-xs text-teal-300">
             <p className="font-semibold text-teal-300">
               Merged “{mergeReport.source.name}” → “{mergeReport.target.name}” · embedding{" "}
               {mergeReport.embedding_refreshed ? "refreshed" : "kept"}
@@ -585,7 +585,7 @@ export default function AdminPage() {
               <tbody className="text-zinc-300">
                 {models.map((m) => (
                   <tr key={m.id} className="border-t border-zinc-800/60">
-                    <td className="py-2 font-semibold text-white">{m.name}</td>
+                    <td className="py-2 font-semibold text-zinc-100">{m.name}</td>
                     <td className="font-mono">{m.version}</td>
                     <td>
                       {m.active ? (

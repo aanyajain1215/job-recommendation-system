@@ -20,7 +20,7 @@ export default async function Home() {
     <div className="flex flex-1 flex-col">
       {/* Hero Section */}
       <section className="relative overflow-hidden border-b border-zinc-800/80 bg-gradient-to-b from-zinc-900/40 via-zinc-950 to-zinc-950 px-4 py-20 sm:px-6 lg:px-8">
-        <div className="absolute inset-0 -z-10 bg-[radial-gradient(45rem_50rem_at_top,rgba(20,184,166,0.15),transparent)]" />
+        <div className="absolute inset-0 -z-10 bg-[radial-gradient(45rem_50rem_at_top,rgba(255,219,187,0.5),transparent)]" />
 
         <div className="mx-auto max-w-4xl text-center">
           <div className="inline-flex items-center gap-2 rounded-full border border-teal-500/30 bg-teal-500/10 px-3.5 py-1 text-xs font-semibold text-teal-300 backdrop-blur">
@@ -28,7 +28,7 @@ export default async function Home() {
             Two-Stage Retrieve + Rank Recommendation Engine
           </div>
 
-          <h1 className="mt-6 text-4xl font-extrabold tracking-tight text-white sm:text-6xl">
+          <h1 className="mt-6 text-4xl font-extrabold tracking-tight text-zinc-100 sm:text-6xl">
             Where talent meets opportunity{" "}
             <span className="bg-gradient-to-r from-teal-400 via-teal-200 to-cyan-400 bg-clip-text text-transparent">
               through real AI matching
@@ -51,7 +51,7 @@ export default async function Home() {
 
             <Link
               href="/login"
-              className="inline-flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900/70 px-5 py-3 text-sm font-medium text-zinc-200 hover:bg-zinc-800 hover:text-white transition-colors"
+              className="inline-flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900/70 px-5 py-3 text-sm font-medium text-zinc-200 hover:bg-zinc-800 hover:text-zinc-100 transition-colors"
             >
               Sign In to Your Feed
             </Link>
@@ -64,7 +64,7 @@ export default async function Home() {
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-teal-500/10 text-teal-400 ring-1 ring-teal-500/30">
               <Cpu className="h-5 w-5" />
             </div>
-            <h3 className="mt-4 text-base font-semibold text-white">
+            <h3 className="mt-4 text-base font-semibold text-zinc-100">
               Semantic ANN Retrieval
             </h3>
             <p className="mt-2 text-xs leading-relaxed text-zinc-400">
@@ -76,7 +76,7 @@ export default async function Home() {
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-400 ring-1 ring-indigo-500/30">
               <Layers className="h-5 w-5" />
             </div>
-            <h3 className="mt-4 text-base font-semibold text-white">
+            <h3 className="mt-4 text-base font-semibold text-zinc-100">
               Two-Stage Re-Ranking
             </h3>
             <p className="mt-2 text-xs leading-relaxed text-zinc-400">
@@ -88,7 +88,7 @@ export default async function Home() {
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-400 ring-1 ring-cyan-500/30">
               <Zap className="h-5 w-5" />
             </div>
-            <h3 className="mt-4 text-base font-semibold text-white">
+            <h3 className="mt-4 text-base font-semibold text-zinc-100">
               Active Feedback Loop
             </h3>
             <p className="mt-2 text-xs leading-relaxed text-zinc-400">

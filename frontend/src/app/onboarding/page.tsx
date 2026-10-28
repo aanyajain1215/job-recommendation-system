@@ -164,7 +164,7 @@ export default function OnboardingPage() {
       <div className="mx-auto max-w-3xl px-4 py-14 sm:px-6 lg:px-8">
         <div className="rounded-2xl border border-teal-500/25 bg-zinc-900/50 p-8 text-center">
           <CheckCircle2 className="mx-auto h-10 w-10 text-teal-400" />
-          <h1 className="mt-4 text-2xl font-bold text-white">Your starting weights are set</h1>
+          <h1 className="mt-4 text-2xl font-bold text-zinc-100">Your starting weights are set</h1>
           <p className="mt-2 text-sm text-zinc-400">{result.message}</p>
           {result.target_family && (
             <p className="mt-2 text-xs text-teal-300">
@@ -219,7 +219,7 @@ export default function OnboardingPage() {
           <Sparkles className="h-3.5 w-3.5" />
           Adaptive setup · plan §6 M5
         </div>
-        <h1 className="mt-3 text-3xl font-bold tracking-tight text-white">
+        <h1 className="mt-3 text-3xl font-bold tracking-tight text-zinc-100">
           What do you look for in a job?
         </h1>
         <p className="mx-auto mt-2 max-w-2xl text-sm text-zinc-400">

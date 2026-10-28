@@ -36,7 +36,7 @@ function AffinityCard({
     <div className="group rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5 transition-colors hover:border-zinc-700">
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="min-w-0">
-          <h3 className="text-sm font-bold text-white truncate">{entry.family}</h3>
+          <h3 className="text-sm font-bold text-zinc-100 truncate">{entry.family}</h3>
           <span className="text-[11px] text-zinc-500">
             {entry.matched_count}/{entry.core_skill_count} core skills matched
             {entry.transfer_count > 0 && ` · ${entry.transfer_count} transferable`}
@@ -168,7 +168,7 @@ export default function CareersPage() {
           <span className="inline-flex items-center gap-1.5 rounded-full border border-teal-500/30 bg-teal-500/10 px-3 py-1 text-xs font-bold text-teal-300 mb-3">
             <Route className="h-3.5 w-3.5" /> Alternative Career Discovery
           </span>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-zinc-100">
             Where else your skills take you
           </h1>
           <p className="mt-2 text-sm text-zinc-400 max-w-2xl">
@@ -196,7 +196,7 @@ export default function CareersPage() {
         <section>
           <div className="flex items-center gap-2 mb-4">
             <Sparkles className="h-4 w-4 text-teal-400" />
-            <h2 className="text-lg font-bold text-white">Above your threshold</h2>
+            <h2 className="text-lg font-bold text-zinc-100">Above your threshold</h2>
           </div>
           {data.suggestions.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-zinc-800 bg-zinc-900/30 p-10 text-center">
@@ -223,7 +223,7 @@ export default function CareersPage() {
         <section>
           <div className="flex items-center gap-2 mb-4">
             <Shuffle className="h-4 w-4 text-violet-400" />
-            <h2 className="text-lg font-bold text-white">Curated starting points</h2>
+            <h2 className="text-lg font-bold text-zinc-100">Curated starting points</h2>
             <span className="text-xs text-zinc-600">· same scoring, never threshold-filtered</span>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -236,7 +236,7 @@ export default function CareersPage() {
         {/* Cross-links */}
         <div className="rounded-2xl border border-teal-500/25 bg-gradient-to-r from-teal-950/40 to-zinc-900/60 p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h3 className="text-sm font-bold text-white">See what a switch would cost</h3>
+            <h3 className="text-sm font-bold text-zinc-100">See what a switch would cost</h3>
             <p className="mt-1 text-xs text-zinc-400 max-w-lg">
               The What-If simulator re-scores your profile against every candidate job
               under any mutation — skills, salary, location, or work mode.

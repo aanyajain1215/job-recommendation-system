@@ -78,7 +78,7 @@ export default function ResumeOptimizePage() {
           <FileSearch className="h-4 w-4" />
           Resume Optimizer · plan §13
         </div>
-        <h1 className="mt-1 text-3xl font-bold tracking-tight text-white">
+        <h1 className="mt-1 text-3xl font-bold tracking-tight text-zinc-100">
           ATS Report & Grounded Suggestions
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-zinc-400">
@@ -137,10 +137,10 @@ export default function ResumeOptimizePage() {
           {/* Disclaimer — anti-fabrication contract */}
           <div className="mt-6 flex items-start gap-3 rounded-xl border border-teal-500/20 bg-teal-500/5 p-4">
             <ShieldCheck className="mt-0.5 h-5 w-5 flex-shrink-0 text-teal-400" />
-            <div className="text-xs text-teal-200/90">
-              <p className="font-semibold text-teal-300">{result.disclaimer}</p>
-              <p className="mt-1 text-teal-200/60">
-                Analyzing: <span className="text-white">{result.job_title}</span>
+            <div className="text-xs text-teal-300/90">
+              <p className="font-semibold text-teal-400">{result.disclaimer}</p>
+              <p className="mt-1 text-teal-300/80">
+                Analyzing: <span className="text-zinc-100">{result.job_title}</span>
                 {result.violations_dropped > 0 && (
                   <span className="ml-2 text-amber-300">
                     · {result.violations_dropped} suggestion(s) dropped by the evidence validator
@@ -158,7 +158,7 @@ export default function ResumeOptimizePage() {
                   <FileSearch className="h-4 w-4 text-teal-400" />
                   ATS checks
                 </h2>
-                <span className="rounded-full bg-zinc-800 px-3 py-1 text-xs font-bold text-white">
+                <span className="rounded-full bg-zinc-800 px-3 py-1 text-xs font-bold text-zinc-100">
                   {result.ats.ats_score}/100
                 </span>
               </div>

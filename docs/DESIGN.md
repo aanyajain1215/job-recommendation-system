@@ -1,7 +1,7 @@
 # JobRec — Technical Design
 ## AI-Powered Job Recommendation & Career Path Intelligence System
 
-**Status:** v1.3 — all phases implemented: LLM = OpenAI (default), stack = Next.js + FastAPI, primary job API = **Adzuna**, corpus = live-first + **preprocessing pipeline (§20.1)**, synthetic interaction bootstrap confirmed. M5 Bradley-Terry elicitation shipped (§6); admin console (§22) live.
+**Status:** v1.3 — all phases implemented: LLM = Gemini (default), stack = Next.js + FastAPI, primary job API = **Adzuna**, corpus = live-first + **preprocessing pipeline (§20.1)**, synthetic interaction bootstrap confirmed. M5 Bradley-Terry elicitation shipped (§6); admin console (§22) live.
 **Scope:** Full-system design: data model, deterministic scoring engine, trained models, LLM layer, APIs, UI, evaluation, file-by-file implementation plan.
 
 ---

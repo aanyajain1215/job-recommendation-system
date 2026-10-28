@@ -4,9 +4,11 @@ import {
   ApplicationItem,
   ApplicationStats,
   ApplicationStatus,
+  CompanyDetail,
   ConfigSaveResponse,
   DiscoverResponse,
   DuplicatesResponse,
+  EmployerApplication,
   FeedbackPayload,
   FeedbackResponse,
   GapResponse,
@@ -14,6 +16,8 @@ import {
   JobDetail,
   JobListResponse,
   JobNlResponse,
+  JobStatus,
+  JobUpdatePayload,
   LlmUsageResponse,
   MergeReport,
   ModelRegistryItem,
@@ -23,6 +27,10 @@ import {
   OnboardingFlowResponse,
   OnboardingAnswer,
   ParseFailuresResponse,
+  PostingInsights,
+  PostingPerformance,
+  PostingPipeline,
+  PostingTalent,
   PreferenceState,
   ProfileDetail,
   ProfileUpdatePayload,
@@ -36,6 +44,8 @@ import {
   SimulationListResponse,
   Skill,
   StepCompleteResponse,
+  WhatIfRequest,
+  WhatIfResult,
 } from "./types";
 
 export type ReadinessResponse = {
@@ -258,6 +268,133 @@ export async function deleteJob(jobId: string, token: string): Promise<void> {
   if (!res.ok) {
     throw new Error("Failed to delete job");
   }
+}
+
+// ---------------- Employer API (E0: company + posting lifecycle) ---------------- //
+
+export async function getMyCompany(token: string): Promise<CompanyDetail> {
+  return authedJson(`${getBrowserApiBaseUrl()}/api/v1/employer/company`, token);
+}
+
+/** For employers who registered without a company — 409 if one exists. */
+export async function createMyCompany(payload: { name: string }, token: string): Promise<CompanyDetail> {
+  return authedJson(`${getBrowserApiBaseUrl()}/api/v1/employer/company`, token, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+/** Partial update — omitted fields stay unchanged; "" clears an optional field. */
+export async function updateMyCompany(
+  payload: Partial<Omit<CompanyDetail, "id" | "slug" | "is_verified" | "open_postings">>,
+  token: string,
+): Promise<CompanyDetail> {
+  return authedJson(`${getBrowserApiBaseUrl()}/api/v1/employer/company`, token, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function setPostingStatus(
+  jobId: string,
+  next: JobStatus,
+  token: string,
+): Promise<JobDetail> {
+  return authedJson(`${getBrowserApiBaseUrl()}/api/v1/employer/postings/${jobId}/status`, token, {
+    method: "PATCH",
+    body: JSON.stringify({ status: next }),
+  });
+}
+
+/** Clone a posting; the clone is created as a DRAFT. */
+export async function duplicatePosting(jobId: string, token: string): Promise<JobDetail> {
+  return authedJson(`${getBrowserApiBaseUrl()}/api/v1/employer/postings/${jobId}/duplicate`, token, {
+    method: "POST",
+  });
+}
+
+/** Content edit for an existing posting (lifecycle goes via setPostingStatus). */
+export async function updateJob(
+  jobId: string,
+  payload: JobUpdatePayload,
+  token: string,
+): Promise<JobDetail> {
+  return authedJson(`${getBrowserApiBaseUrl()}/api/v1/jobs/${jobId}`, token, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+// ---------------- Employer API (E1: applicant pipeline) ---------------- //
+
+/** Funnel aggregates for one posting (rows come from getJobApplicants). */
+export async function getPostingPipeline(jobId: string, token: string): Promise<PostingPipeline> {
+  return authedJson(`${getBrowserApiBaseUrl()}/api/v1/employer/postings/${jobId}/pipeline`, token);
+}
+
+/** All applicant rows for one posting, newest first. */
+export async function getJobApplicants(jobId: string, token: string): Promise<EmployerApplication[]> {
+  return authedJson(`${getBrowserApiBaseUrl()}/api/v1/employer/jobs/${jobId}/applications`, token);
+}
+
+/** Move one applicant to a different pipeline stage. */
+export async function setApplicationStatus(
+  applicationId: string,
+  next: ApplicationStatus,
+  token: string,
+): Promise<EmployerApplication> {
+  return authedJson(
+    `${getBrowserApiBaseUrl()}/api/v1/employer/applications/${applicationId}/status`,
+    token,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ status: next }),
+    },
+  );
+}
+
+// ---------------- Employer API (E2: reverse talent match) ---------------- //
+
+/**
+ * Reverse-match ranking of this posting's OWN applicants (the global seeker
+ * pool is never exposed to employers).
+ */
+export async function getPostingTalent(jobId: string, token: string): Promise<PostingTalent> {
+  return authedJson(`${getBrowserApiBaseUrl()}/api/v1/employer/postings/${jobId}/talent`, token);
+}
+
+// ---------------- Employer API (E3: insights) ---------------- //
+
+/** JD health, salary benchmark and supply/demand gaps for one posting. */
+export async function getPostingInsights(jobId: string, token: string): Promise<PostingInsights> {
+  return authedJson(`${getBrowserApiBaseUrl()}/api/v1/employer/postings/${jobId}/insights`, token);
+}
+
+// ---------------- Employer API (E4: performance) ---------------- //
+
+/** 30-day application series, stage conversion and health for one posting. */
+export async function getPostingPerformance(
+  jobId: string,
+  token: string,
+): Promise<PostingPerformance> {
+  return authedJson(`${getBrowserApiBaseUrl()}/api/v1/employer/postings/${jobId}/performance`, token);
+}
+
+// ---------------- Employer API (E5: what-if relaxer) ---------------- //
+
+/**
+ * Simulate relaxing a posting's constraints. Never modifies the posting —
+ * apply the result explicitly with updateJob.
+ */
+export async function simulateWhatIf(
+  jobId: string,
+  payload: WhatIfRequest,
+  token: string,
+): Promise<WhatIfResult> {
+  return authedJson(`${getBrowserApiBaseUrl()}/api/v1/employer/postings/${jobId}/whatif`, token, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 // ---------------- Recommendations API ---------------- //

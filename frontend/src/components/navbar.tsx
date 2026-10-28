@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { Briefcase, Bookmark, Building2, Compass, GitBranch, ListChecks, LogOut, PlusCircle, Route, Settings as SettingsIcon, ShieldCheck, Sparkles, User as UserIcon } from "lucide-react";
+import { Briefcase, Bookmark, Building2, Compass, FileText, GitBranch, LayoutDashboard, ListChecks, LogOut, PlusCircle, Route, Settings as SettingsIcon, ShieldCheck, Sparkles, User as UserIcon } from "lucide-react";
 
 export function Navbar() {
   const pathname = usePathname();
@@ -44,70 +44,73 @@ export function Navbar() {
               <Briefcase className="h-5 w-5 text-zinc-950" />
             </div>
             <div className="flex flex-col">
-              <span className="text-lg font-bold tracking-tight text-white flex items-center gap-1.5">
+              <span className="text-lg font-bold tracking-tight text-zinc-100 flex items-center gap-1.5">
                 JobRec
                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-teal-400 animate-pulse" />
               </span>
             </div>
           </Link>
 
-          {/* Nav items */}
+          {/* Nav items — role aware: seekers and employers see different tools */}
           <nav className="hidden md:flex items-center gap-1">
-            <Link
-              href="/jobs"
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                pathname === "/jobs"
-                  ? "text-teal-400 bg-zinc-900/60"
-                  : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/40"
-              }`}
-            >
-              <Compass className="h-4 w-4" />
-              Find Jobs
-            </Link>
-
-            {user?.role === "employer" && (
+            {user?.role === "employer" ? (
+              /* ---------------- Employer surface ---------------- */
               <>
                 <Link
-                  href="/jobs/new"
+                  href="/hiring"
                   className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    pathname === "/jobs/new"
-                      ? "text-indigo-400 bg-zinc-900/60"
+                    pathname === "/hiring"
+                      ? "text-teal-400 bg-zinc-900/60"
                       : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/40"
                   }`}
                 >
-                  <PlusCircle className="h-4 w-4" />
-                  Post a Job
+                  <LayoutDashboard className="h-4 w-4" />
+                  Hiring
                 </Link>
                 <Link
-                  href="/dashboard"
+                  href="/hiring/postings"
                   className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    pathname === "/dashboard"
-                      ? "text-indigo-400 bg-zinc-900/60"
+                    pathname.startsWith("/hiring/postings")
+                      ? "text-teal-400 bg-zinc-900/60"
+                      : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/40"
+                  }`}
+                >
+                  <FileText className="h-4 w-4" />
+                  Postings
+                </Link>
+                <Link
+                  href="/hiring/company"
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    pathname === "/hiring/company"
+                      ? "text-teal-400 bg-zinc-900/60"
                       : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/40"
                   }`}
                 >
                   <Building2 className="h-4 w-4" />
-                  Employer Hub
+                  Company
+                </Link>
+                <Link
+                  href="/jobs/new"
+                  className="ml-1 inline-flex items-center gap-1.5 rounded-lg bg-teal-500 px-3 py-1.5 text-sm font-semibold text-zinc-950 shadow-sm shadow-teal-500/20 hover:bg-teal-400 active:scale-[0.98] transition-all"
+                >
+                  <PlusCircle className="h-4 w-4" />
+                  Post a job
                 </Link>
               </>
-            )}
-
-            {user?.role === "admin" && (
-              <Link
-                href="/admin"
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  pathname === "/admin"
-                    ? "text-rose-400 bg-zinc-900/60"
-                    : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/40"
-                }`}
-              >
-                <ShieldCheck className="h-4 w-4 text-rose-400" />
-                Admin
-              </Link>
-            )}
-
-            {user?.role === "job_seeker" && (
+            ) : user?.role === "job_seeker" ? (
+              /* ---------------- Job-seeker surface ---------------- */
               <>
+                <Link
+                  href="/jobs"
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    pathname === "/jobs"
+                      ? "text-teal-400 bg-zinc-900/60"
+                      : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/40"
+                  }`}
+                >
+                  <Compass className="h-4 w-4" />
+                  Find Jobs
+                </Link>
                 <Link
                   href="/recommendations"
                   className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
@@ -150,7 +153,7 @@ export function Navbar() {
                   }`}
                 >
                   <UserIcon className="h-4 w-4" />
-                  Profile & Resume
+                  Profile &amp; Resume
                 </Link>
                 <Link
                   href="/tracker"
@@ -186,6 +189,33 @@ export function Navbar() {
                   Settings
                 </Link>
               </>
+            ) : (
+              /* ---------------- Signed-out + admin fallback ---------------- */
+              <Link
+                href="/jobs"
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  pathname === "/jobs"
+                    ? "text-teal-400 bg-zinc-900/60"
+                    : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/40"
+                }`}
+              >
+                <Compass className="h-4 w-4" />
+                Find Jobs
+              </Link>
+            )}
+
+            {user?.role === "admin" && (
+              <Link
+                href="/admin"
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  pathname === "/admin"
+                    ? "text-rose-400 bg-zinc-900/60"
+                    : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/40"
+                }`}
+              >
+                <ShieldCheck className="h-4 w-4 text-rose-400" />
+                Admin
+              </Link>
             )}
           </nav>
         </div>
@@ -199,8 +229,8 @@ export function Navbar() {
               {getRoleBadge(user.role)}
 
               <Link
-                href="/dashboard"
-                className="flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/70 px-3 py-1.5 text-xs text-zinc-300 hover:border-zinc-700 hover:text-white transition-colors"
+                href={user.role === "employer" ? "/hiring" : "/dashboard"}
+                className="flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/70 px-3 py-1.5 text-xs text-zinc-300 hover:border-zinc-700 hover:text-zinc-100 transition-colors"
               >
                 <UserIcon className="h-3.5 w-3.5 text-zinc-400" />
                 <span className="max-w-[140px] truncate">
@@ -222,7 +252,7 @@ export function Navbar() {
             <div className="flex items-center gap-2.5">
               <Link
                 href="/login"
-                className="px-3.5 py-1.5 text-sm font-medium text-zinc-300 hover:text-white transition-colors"
+                className="px-3.5 py-1.5 text-sm font-medium text-zinc-300 hover:text-zinc-100 transition-colors"
               >
                 Sign In
               </Link>

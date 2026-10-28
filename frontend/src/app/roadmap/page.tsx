@@ -27,7 +27,7 @@ function bandChipClass(band: string): string {
     case "medium":
       return "border-cyan-500/30 bg-cyan-500/10 text-cyan-300";
     default:
-      return "border-zinc-600 bg-zinc-800 text-zinc-400";
+      return "border-zinc-600 bg-zinc-800 text-zinc-300";
   }
 }
 
@@ -170,7 +170,7 @@ function RoadmapContent() {
               </span>
             )}
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-zinc-100">
             {roadmap.job_title}
           </h1>
           <p className="mt-2 text-sm text-zinc-400 max-w-2xl">{roadmap.summary}</p>
@@ -181,7 +181,7 @@ function RoadmapContent() {
               <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
                 <Clock className="h-3 w-3" /> Total effort
               </span>
-              <p className="mt-1 text-lg font-black text-white">{roadmap.total_hours}h</p>
+              <p className="mt-1 text-lg font-black text-zinc-100">{roadmap.total_hours}h</p>
             </div>
             <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-3">
               <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
@@ -221,7 +221,7 @@ function RoadmapContent() {
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 mt-8">
         {/* Completion notice */}
         {notice && (
-          <div className="mb-5 flex items-center justify-between rounded-xl border border-teal-500/25 bg-teal-500/5 px-4 py-2.5 text-sm text-teal-200">
+          <div className="mb-5 flex items-center justify-between rounded-xl border border-teal-500/25 bg-teal-500/5 px-4 py-2.5 text-sm text-teal-300">
             <span className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-teal-400" /> {notice}
             </span>
@@ -271,13 +271,13 @@ function RoadmapContent() {
         <div className="mt-8 flex flex-wrap gap-3">
           <Link
             href={`/gap/${roadmap.job_id}`}
-            className="inline-flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900/70 px-4 py-2.5 text-sm font-semibold text-zinc-300 hover:border-zinc-700 hover:text-white transition-colors"
+            className="inline-flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900/70 px-4 py-2.5 text-sm font-semibold text-zinc-300 hover:border-zinc-700 hover:text-zinc-100 transition-colors"
           >
             <ArrowLeft className="h-4 w-4" /> Review the gap first
           </Link>
           <Link
             href="/simulator"
-            className="inline-flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900/70 px-4 py-2.5 text-sm font-semibold text-zinc-300 hover:border-zinc-700 hover:text-white transition-colors"
+            className="inline-flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900/70 px-4 py-2.5 text-sm font-semibold text-zinc-300 hover:border-zinc-700 hover:text-zinc-100 transition-colors"
           >
             What-If Simulator <ArrowRight className="h-4 w-4" />
           </Link>

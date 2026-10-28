@@ -4,6 +4,7 @@ from app.api.admin import router as admin_router
 from app.api.applications import router as applications_router
 from app.api.auth import router as auth_router
 from app.api.careers import router as careers_router
+from app.api.employer import router as employer_router
 from app.api.feedback import router as feedback_router
 from app.api.gap import router as gap_router
 from app.api.health import router as health_router
@@ -45,3 +46,5 @@ api_router.include_router(project_mapping_router)
 # ---- Phase 5 (plan §18/§22): admin surface + M5 onboarding elicitation ----
 api_router.include_router(admin_router)
 api_router.include_router(onboarding_router)
+# ---- Phase E0 (employer experience): company profile + posting lifecycle ----
+api_router.include_router(employer_router)

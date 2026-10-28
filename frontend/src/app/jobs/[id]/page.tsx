@@ -133,7 +133,7 @@ export default function JobDetailPage() {
     return (
       <div className="mx-auto max-w-4xl px-4 py-16 text-center">
         <Briefcase className="mx-auto h-12 w-12 text-zinc-600" />
-        <h1 className="mt-4 text-2xl font-bold text-white">Job Not Found</h1>
+        <h1 className="mt-4 text-2xl font-bold text-zinc-100">Job Not Found</h1>
         <p className="mt-2 text-sm text-zinc-400">The position you are looking for does not exist or has been closed.</p>
         <Link
           href="/jobs"
@@ -152,7 +152,7 @@ export default function JobDetailPage() {
       <div className="mb-6">
         <Link
           href="/jobs"
-          className="inline-flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white transition-colors"
+          className="inline-flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-100 transition-colors"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           Back to all opportunities
@@ -182,7 +182,7 @@ export default function JobDetailPage() {
               </span>
             </div>
 
-            <h1 className="mt-3 text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+            <h1 className="mt-3 text-3xl font-extrabold tracking-tight text-zinc-100 sm:text-4xl">
               {job.title}
             </h1>
 
@@ -214,7 +214,7 @@ export default function JobDetailPage() {
           {/* Action Box */}
           <div className="lg:text-right shrink-0">
             {job.salary_min || job.salary_max ? (
-              <div className="text-xl font-bold text-white flex items-center lg:justify-end gap-1">
+              <div className="text-xl font-bold text-zinc-100 flex items-center lg:justify-end gap-1">
                 <DollarSign className="h-5 w-5 text-emerald-400" />
                 <span>
                   {formatSalary(job.salary_min, job.salary_max, job.salary_currency)}
@@ -285,7 +285,7 @@ export default function JobDetailPage() {
         {/* Left 2 Cols: Description & Requirements */}
         <div className="lg:col-span-2 space-y-8">
           <section className="rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-6 backdrop-blur space-y-4">
-            <h2 className="text-lg font-bold text-white">About the Position</h2>
+            <h2 className="text-lg font-bold text-zinc-100">About the Position</h2>
             <div className="text-sm leading-relaxed text-zinc-300 whitespace-pre-wrap">
               {job.description}
             </div>
@@ -293,7 +293,7 @@ export default function JobDetailPage() {
 
           {job.requirements && (
             <section className="rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-6 backdrop-blur space-y-4">
-              <h2 className="text-lg font-bold text-white">Role Requirements & Qualifications</h2>
+              <h2 className="text-lg font-bold text-zinc-100">Role Requirements & Qualifications</h2>
               <div className="text-sm leading-relaxed text-zinc-300 whitespace-pre-wrap">
                 {job.requirements}
               </div>

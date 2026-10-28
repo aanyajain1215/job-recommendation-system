@@ -245,12 +245,21 @@ class TestFeedbackAndPreferencesApi:
 
         served_ids = [item["job"]["id"] for item in feed.json()["items"]]
         assert served_ids, "feed must serve at least one job"
+        # Live Adzuna items are transient (ids like "adzuna-…") — only
+        # platform jobs have DB rows/snapshots, so keep the UUID ids.
+        platform_ids = []
+        for served in served_ids:
+            try:
+                platform_ids.append(UUID(served))
+            except ValueError:
+                continue
+        assert platform_ids, "feed must serve at least one platform job"
         with SessionLocal() as db:
             target_id = db.scalar(
                 select(Job.id)
                 .join(Job.skills)
                 .where(
-                    Job.id.in_([UUID(s) for s in served_ids]),
+                    Job.id.in_(platform_ids),
                     JobSkill.is_required.is_(True),
                 )
                 .limit(1)

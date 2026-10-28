@@ -71,7 +71,7 @@ export default function RegisterPage() {
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-teal-500/10 text-teal-400 ring-1 ring-teal-500/30">
             <Briefcase className="h-6 w-6" />
           </div>
-          <h2 className="mt-4 text-2xl font-bold tracking-tight text-white">
+          <h2 className="mt-4 text-2xl font-bold tracking-tight text-zinc-100">
             Create your account
           </h2>
           <p className="mt-1.5 text-sm text-zinc-400">
@@ -96,7 +96,7 @@ export default function RegisterPage() {
               onClick={() => setRole("job_seeker")}
               className={`relative flex flex-col items-start rounded-xl border p-4 text-left transition-all ${
                 role === "job_seeker"
-                  ? "border-teal-500/80 bg-teal-500/10 text-white shadow-sm ring-1 ring-teal-500/40"
+                  ? "border-teal-500/80 bg-teal-500/10 text-zinc-100 shadow-sm ring-1 ring-teal-500/40"
                   : "border-zinc-800 bg-zinc-950/40 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"
               }`}
             >
@@ -110,7 +110,7 @@ export default function RegisterPage() {
                   </span>
                 )}
               </div>
-              <p className="mt-3 font-semibold text-sm text-white">Job Seeker</p>
+              <p className="mt-3 font-semibold text-sm text-zinc-100">Job Seeker</p>
               <p className="mt-0.5 text-xs text-zinc-400">
                 Discover AI-matched roles and track applications
               </p>
@@ -121,7 +121,7 @@ export default function RegisterPage() {
               onClick={() => setRole("employer")}
               className={`relative flex flex-col items-start rounded-xl border p-4 text-left transition-all ${
                 role === "employer"
-                  ? "border-indigo-500/80 bg-indigo-500/10 text-white shadow-sm ring-1 ring-indigo-500/40"
+                  ? "border-indigo-500/80 bg-indigo-500/10 text-zinc-100 shadow-sm ring-1 ring-indigo-500/40"
                   : "border-zinc-800 bg-zinc-950/40 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"
               }`}
             >
@@ -135,7 +135,7 @@ export default function RegisterPage() {
                   </span>
                 )}
               </div>
-              <p className="mt-3 font-semibold text-sm text-white">Employer</p>
+              <p className="mt-3 font-semibold text-sm text-zinc-100">Employer</p>
               <p className="mt-0.5 text-xs text-zinc-400">
                 Post positions and get ranked candidate recommendations
               </p>

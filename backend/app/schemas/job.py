@@ -60,9 +60,12 @@ class JobUpdateRequest(BaseModel):
 class JobDetailResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: UUID
-    company_id: UUID
-    posted_by_user_id: UUID
+    # str, not UUID: live Adzuna results are addressed as `adzuna-<external_id>`
+    # (transient — Adzuna has no details API, cards link out to the provider).
+    id: str
+    # None for live results, which belong to no platform employer/company.
+    company_id: UUID | None = None
+    posted_by_user_id: UUID | None = None
     title: str
     description: str
     requirements: str | None = None
@@ -88,6 +91,9 @@ class JobDetailResponse(BaseModel):
     # UI can send the seeker to the live opening.  None for native postings,
     # which are applied to in-app.
     external_url: str | None = None
+    # "native" = posted on this platform (apply in-app, tracked);
+    # "adzuna"   = live result fetched at search time (external link only).
+    source: str = "native"
 
 
 class JobListResponse(BaseModel):

@@ -112,7 +112,7 @@ export default function TrackerPage() {
           <ListChecks className="h-4 w-4" />
           Application Tracker
         </div>
-        <h1 className="mt-1 text-3xl font-bold tracking-tight text-white">Your Pipeline</h1>
+        <h1 className="mt-1 text-3xl font-bold tracking-tight text-zinc-100">Your Pipeline</h1>
         <p className="mt-1 text-sm text-zinc-400">
           Move each application through the stages — updates persist to your tracker (plan §19).
         </p>
@@ -126,7 +126,7 @@ export default function TrackerPage() {
               <span className="text-[11px] font-medium uppercase tracking-wider">{tile.label}</span>
               <tile.icon className={`h-4 w-4 ${tile.color}`} />
             </div>
-            <p className="mt-2 text-2xl font-bold text-white">{tile.value}</p>
+            <p className="mt-2 text-2xl font-bold text-zinc-100">{tile.value}</p>
           </div>
         ))}
       </div>
@@ -176,7 +176,7 @@ export default function TrackerPage() {
               </Link>
               <Link
                 href="/saved"
-                className="rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2 text-xs font-semibold text-zinc-300 hover:text-white"
+                className="rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2 text-xs font-semibold text-zinc-300 hover:text-zinc-100"
               >
                 Saved Jobs
               </Link>
@@ -192,7 +192,7 @@ export default function TrackerPage() {
                 <div className="flex flex-wrap items-center gap-2">
                   <Link
                     href={`/jobs/${app.job_id}`}
-                    className="truncate font-semibold text-white hover:text-teal-400"
+                    className="truncate font-semibold text-zinc-100 hover:text-teal-400"
                   >
                     {app.job?.title || "Job posting"}
                   </Link>

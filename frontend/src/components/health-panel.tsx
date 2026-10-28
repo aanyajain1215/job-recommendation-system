@@ -28,7 +28,7 @@ function StatusBadge({ ok }: { ok: boolean }) {
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
-    <div className="grid gap-1 border-b border-white/5 py-3 last:border-b-0">
+    <div className="grid gap-1 border-b border-zinc-800/60 py-3 last:border-b-0">
       <dt className="text-xs uppercase tracking-wide text-zinc-500">{label}</dt>
       <dd className="font-mono text-sm break-all text-zinc-200">{value}</dd>
     </div>
@@ -47,11 +47,11 @@ export function HealthPanel({ initial }: HealthPanelProps) {
   }
 
   return (
-    <section className="w-full max-w-2xl rounded-2xl border border-white/10 bg-zinc-900/70 p-6 shadow-2xl shadow-teal-950/40 backdrop-blur">
+    <section className="w-full max-w-2xl rounded-2xl border border-zinc-800/60 bg-zinc-900/70 p-6 shadow-2xl shadow-teal-950/40 backdrop-blur">
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
           <p className="text-sm font-medium text-teal-400">Foundation check</p>
-          <h2 className="mt-1 text-xl font-semibold text-white">
+          <h2 className="mt-1 text-xl font-semibold text-zinc-100">
             Frontend → API → Postgres
           </h2>
           <p className="mt-2 text-sm text-zinc-400">

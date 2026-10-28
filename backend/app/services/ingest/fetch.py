@@ -47,23 +47,45 @@ def _get_json(url: str, params: dict | None = None, timeout: int = 20) -> dict:
 # Provider adapters → raw posting dict
 # ---------------------------------------------------------------------------
 
-def fetch_adzuna(query: str, page: int = 1) -> list[dict]:
+def fetch_adzuna_search(
+    query: str,
+    page: int = 1,
+    *,
+    results_per_page: int = 25,
+    where: str | None = None,
+    sort_by: str | None = None,
+    full_time: int | None = None,
+    timeout: float | None = None,
+) -> tuple[list[dict], int]:
+    """Live Adzuna search → (raw postings, total match count).
+
+    Used by the query-time live search (`app.services.live_jobs`): `where` is
+    Adzuna's location filter, `sort_by` its own ordering ("date" | "salary" |
+    None = best match), `full_time` restricts to permanent roles when set.
+    Raises on transport/provider errors — callers degrade to platform-only.
+    """
     settings = get_settings()
     if not (settings.adzuna_app_id and settings.adzuna_app_key):
         raise RuntimeError("ADZUNA_APP_ID/ADZUNA_APP_KEY not configured")
     country = settings.adzuna_country or "in"
     url = f"https://api.adzuna.com/v1/api/jobs/{country}/search/{page}"
+    params: dict = {
+        "app_id": settings.adzuna_app_id,
+        "app_key": settings.adzuna_app_key,
+        "content-type": "application/json",
+        "results_per_page": results_per_page,
+        "what": query,
+    }
+    if full_time is not None:
+        params["full_time"] = full_time
+    if where:
+        params["where"] = where
+    if sort_by:
+        params["sort_by"] = sort_by
     data = _get_json(
         url,
-        {
-            "app_id": settings.adzuna_app_id,
-            "app_key": settings.adzuna_app_key,
-            "content-type": "application/json",
-            "results_per_page": 25,
-            "what": query,
-            "full_time": 1,
-        },
-        timeout=settings.ingest_http_timeout,
+        params,
+        timeout=timeout if timeout is not None else settings.ingest_http_timeout,
     )
     out: list[dict] = []
     for row in data.get("results", []):
@@ -88,7 +110,14 @@ def fetch_adzuna(query: str, page: int = 1) -> list[dict]:
                 "is_remote": "remote" in ((row.get("title") or "") + (location.get("display_name") or "")).lower(),
             }
         )
-    return out
+    return out, int(data.get("count") or 0)
+
+
+def fetch_adzuna(query: str, page: int = 1) -> list[dict]:
+    # Pipeline landing keeps its historical behaviour: full-time only, no
+    # location filter, best-match ordering (plan §20.1).
+    postings, _total = fetch_adzuna_search(query, page, full_time=1)
+    return postings
 
 
 def fetch_arbeitnow(query: str, page: int = 1) -> list[dict]:

@@ -24,10 +24,19 @@ from app.schemas.job import (
     JobUpdateRequest,
 )
 from app.schemas.user import CompanySummary
-from app.services import nl_search
+from app.services import live_jobs, nl_search
 from app.services.skill_normalizer import build_db_normalizer, resolve_skill
 
 router = APIRouter(tags=["jobs"])
+
+# Platform matches considered for a merged (platform + live) search page —
+# enough for any realistic on-platform corpus, bounded so one request can't
+# drag thousands of rows into memory.
+_MERGE_PLATFORM_CAP = 500
+
+# Unfiltered browse fills from this live query so the catalog page shows
+# real-time openings instead of (an empty or fixed) pre-loaded corpus.
+_DEFAULT_BROWSE_QUERY = "software engineer"
 
 
 def _format_job_response(
@@ -49,7 +58,7 @@ def _format_job_response(
             )
 
     return JobDetailResponse(
-        id=job.id,
+        id=str(job.id),
         company_id=job.company_id,
         posted_by_user_id=job.posted_by_user_id,
         title=job.title,
@@ -72,7 +81,69 @@ def _format_job_response(
         snippet=snippet,
         family=job.family.name if job.family is not None else None,
         external_url=job.external_url,
+        source=getattr(job, "source", None) or "native",
     )
+
+
+def _paginate_merged(
+    platform_items: list[JobDetailResponse],
+    *,
+    live_query: str,
+    live_location: str | None,
+    sort_by: str,
+    offset: int,
+    page_size: int,
+) -> tuple[list[JobDetailResponse], int]:
+    """One offset-paginated window over platform matches + live Adzuna results.
+
+    Platform postings come first (they are applyable/tracked on this site),
+    live results fill the rest — fetched page-by-page from Adzuna at request
+    time.  Provider failures degrade to platform-only (search_postings
+    returns ([], 0)).  Dedupe is title+company against the platform window
+    and within the live slice; `total` keeps Adzuna's own count, so it can
+    run slightly high when dedupe drops a duplicate.
+    """
+    p_count = len(platform_items)
+    live_total = 0
+    live_slice: list[JobDetailResponse] = []
+
+    start = max(0, offset - p_count)
+    end = offset + page_size - p_count
+    if end > 0:
+        first_page = start // page_size + 1
+        last_page = (end - 1) // page_size + 1
+        pages: dict[int, list[dict]] = {}
+        for page_no in range(first_page, last_page + 1):
+            rows, total = live_jobs.search_postings(
+                live_query,
+                location=live_location,
+                page=page_no,
+                page_size=page_size,
+                sort_by=sort_by,
+            )
+            if page_no == first_page:
+                live_total = total
+            pages[page_no] = rows
+
+        platform_keys = {
+            f"{(p.title or '').strip().lower()}|{(p.company.name or '').strip().lower()}"
+            for p in platform_items
+        }
+        seen: set[str] = set()
+        for index in range(start, end):
+            rows = pages.get(index // page_size + 1) or []
+            within = index % page_size
+            if within >= len(rows):
+                continue
+            item = live_jobs.to_response(rows[within])
+            key = f"{item.title.strip().lower()}|{item.company.name.strip().lower()}"
+            if key in seen or key in platform_keys:
+                continue
+            seen.add(key)
+            live_slice.append(item)
+
+    window = platform_items[offset : offset + page_size]
+    return window + live_slice, p_count + live_total
 
 
 @router.post("/jobs", response_model=JobDetailResponse, status_code=status.HTTP_201_CREATED)
@@ -306,10 +377,6 @@ def list_jobs(
                 )
             )
 
-    # Total count
-    count_query = select(func.count()).select_from(query.subquery())
-    total = db.scalar(count_query) or 0
-
     # Sorting
     if sort_by == "salary":
         query = query.order_by(
@@ -326,18 +393,57 @@ def list_jobs(
 
     offset = (page - 1) * page_size
 
-    if query_text and rank_column is not None and snippet_column is not None:
-        query_with_extras = query.add_columns(rank_column, snippet_column).offset(offset).limit(page_size)
-        rows = db.execute(query_with_extras).all()
-        items = [
-            _format_job_response(
-                row[0],
-                relevance_score=round(float(row[1]) * 100, 1) if row[1] is not None else None,
-                snippet=str(row[2]) if row[2] else None,
-            )
-            for row in rows
+    # Live leg: keyword queries always hit Adzuna at request time; a pure
+    # browse (no filters at all) fills with a default live query so the
+    # catalog is never a fixed pre-loaded corpus.  Filter-only views stay on
+    # the platform's own rows — the live provider only takes what+where+sort,
+    # so letting it through would silently ignore precise filters.
+    has_filters = any(
+        [
+            location,
+            is_remote is not None,
+            work_mode is not None,
+            employment_type is not None,
+            experience_level is not None,
+            skill,
+            company_id,
+            company,
+            industry,
+            family,
+            skills,
+            min_salary,
         ]
+    )
+    live_query = query_text or (None if has_filters else _DEFAULT_BROWSE_QUERY)
+
+    if live_query:
+        if rank_column is not None and snippet_column is not None:
+            platform_rows = db.execute(
+                query.add_columns(rank_column, snippet_column).limit(_MERGE_PLATFORM_CAP)
+            ).all()
+            platform_items = [
+                _format_job_response(
+                    row[0],
+                    relevance_score=round(float(row[1]) * 100, 1) if row[1] is not None else None,
+                    snippet=str(row[2]) if row[2] else None,
+                )
+                for row in platform_rows
+            ]
+        else:
+            platform_rows = db.scalars(query.limit(_MERGE_PLATFORM_CAP)).all()
+            platform_items = [_format_job_response(j) for j in platform_rows]
+        items, total = _paginate_merged(
+            platform_items,
+            live_query=live_query,
+            live_location=location,
+            sort_by=sort_by,
+            offset=offset,
+            page_size=page_size,
+        )
     else:
+        # Filter-only view: platform postings only.
+        count_query = select(func.count()).select_from(query.subquery())
+        total = db.scalar(count_query) or 0
         query = query.offset(offset).limit(page_size)
         jobs = db.scalars(query).all()
         items = [_format_job_response(j) for j in jobs]
@@ -381,14 +487,35 @@ def nl_search_jobs(
 
     candidates = list(db.scalars(query.limit(nl_search.CANDIDATE_CAP)).all())
     ranked = nl_search.hybrid_rank(db, candidates, filters)
+    platform_items = [_format_job_response(job) for job in ranked]
 
+    # Live leg: the parsed keywords/skills become the Adzuna `what` query, so
+    # NL search also sees real-time listings (provider failure → platform only).
+    live_query = (
+        " ".join(
+            part
+            for part in [filters.keywords or "", *list(filters.skills)[:4]]
+            if part and part.strip()
+        ).strip()
+        or q.strip()
+    )
     offset = (page - 1) * page_size
-    page_items = ranked[offset : offset + page_size]
-    items = [_format_job_response(job) for job in page_items]
+    if live_query:
+        items, total = _paginate_merged(
+            platform_items,
+            live_query=live_query,
+            live_location=filters.location,
+            sort_by="relevance",
+            offset=offset,
+            page_size=page_size,
+        )
+    else:
+        total = len(platform_items)
+        items = platform_items[offset : offset + page_size]
 
     return JobNlResponse(
         items=items,
-        total=len(ranked),
+        total=total,
         mode=mode,
         parsed_filters=nl_search.parsed_filters_dict(filters),
         q=q,
@@ -397,10 +524,29 @@ def nl_search_jobs(
 
 @router.get("/jobs/{job_id}", response_model=JobDetailResponse)
 def get_job_detail(
-    job_id: UUID,
+    job_id: str,
     db: Annotated[Session, Depends(get_db)],
 ) -> JobDetailResponse:
-    """Retrieve detailed view of a single job."""
+    """Retrieve detailed view of a single job.
+
+    Live Adzuna results are addressed as `adzuna-<external_id>` but have no
+    detail page here — Adzuna exposes no details API, so their cards link
+    straight to the provider.  A live id (or any unparseable id) is an honest
+    404 rather than a path-validation 422.
+    """
+    if live_jobs.is_live_id(job_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Live listings open on the provider's site.",
+        )
+    try:
+        job_uuid = UUID(job_id)
+    except (ValueError, TypeError, AttributeError):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Job posting not found.",
+        )
+
     job = db.scalar(
         select(Job)
         .options(
@@ -408,7 +554,7 @@ def get_job_detail(
             selectinload(Job.family),
             selectinload(Job.skills).joinedload(JobSkill.skill),
         )
-        .where(Job.id == job_id)
+        .where(Job.id == job_uuid)
     )
     if job is None:
         raise HTTPException(
@@ -417,7 +563,7 @@ def get_job_detail(
         )
 
     applicant_count = db.scalar(
-        select(func.count(Application.id)).where(Application.job_id == job_id)
+        select(func.count(Application.id)).where(Application.job_id == job_uuid)
     ) or 0
 
     return _format_job_response(job, applicant_count=applicant_count)

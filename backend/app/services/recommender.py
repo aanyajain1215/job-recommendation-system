@@ -614,6 +614,10 @@ class ContentRecommender:
 
     @classmethod
     def _job_detail(cls, job: Job, relevance: float) -> JobDetailResponse:
+        source = getattr(job, "source", None) or "native"
+        # Live rows are transient: they reference no DB rows, so every surface
+        # (search, feed) agrees that their FK columns are null.
+        live = source == "adzuna"
         skills_list = [
             JobSkillRequirement(
                 skill_name=js.skill.name,
@@ -647,9 +651,9 @@ class ContentRecommender:
             applicants = 0
 
         return JobDetailResponse(
-            id=job.id,
-            company_id=job.company_id,
-            posted_by_user_id=job.posted_by_user_id,
+            id=str(job.id),
+            company_id=None if live else job.company_id,
+            posted_by_user_id=None if live else job.posted_by_user_id,
             title=job.title,
             description=job.description,
             requirements=job.requirements,
@@ -668,6 +672,7 @@ class ContentRecommender:
             applicant_count=applicants,
             relevance_score=relevance,
             external_url=job.external_url,
+            source=source,
         )
 
     @classmethod

@@ -78,10 +78,10 @@ export default function SavedJobsPage() {
           <BookmarkCheck className="h-4 w-4" />
           Saved for later
         </div>
-        <h1 className="mt-1 text-3xl font-bold tracking-tight text-white">Saved Jobs</h1>
+        <h1 className="mt-1 text-3xl font-bold tracking-tight text-zinc-100">Saved Jobs</h1>
         <p className="mt-1 text-sm text-zinc-400">
           Shortlist roles now, apply when you&apos;re ready — saved rows persist as{" "}
-          <code className="rounded bg-zinc-800 px-1.5 py-0.5 text-[11px] text-teal-300">status=saved</code>.
+          <code className="rounded bg-zinc-800 px-1.5 py-0.5 text-[11px] text-teal-600">status=saved</code>.
         </p>
       </div>
 
@@ -117,7 +117,7 @@ export default function SavedJobsPage() {
                   <Briefcase className="h-4 w-4 flex-shrink-0 text-teal-400" />
                   <Link
                     href={`/jobs/${app.job_id}`}
-                    className="truncate font-semibold text-white hover:text-teal-400"
+                    className="truncate font-semibold text-zinc-100 hover:text-teal-400"
                   >
                     {app.job?.title || "Job posting"}
                   </Link>

@@ -196,7 +196,7 @@ export default function SimulatorPage() {
           <span className="inline-flex items-center gap-1.5 rounded-full border border-teal-500/30 bg-teal-500/10 px-3 py-1 text-xs font-bold text-teal-300 mb-3">
             <Wand2 className="h-3.5 w-3.5" /> What-If Simulator
           </span>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-zinc-100">
             Try a change before you make it
           </h1>
           <p className="mt-2 text-sm text-zinc-400 max-w-2xl">
@@ -212,7 +212,7 @@ export default function SimulatorPage() {
         <div className="space-y-5">
           <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-bold text-white flex items-center gap-2">
+              <h2 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
                 <Plus className="h-4 w-4 text-teal-400" /> Your mutation
               </h2>
               <button
@@ -409,7 +409,7 @@ export default function SimulatorPage() {
 
           {/* Past runs */}
           <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
-            <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-3">
+            <h2 className="text-sm font-bold text-zinc-100 flex items-center gap-2 mb-3">
               <History className="h-4 w-4 text-zinc-500" /> Recent runs
             </h2>
             {history.length === 0 ? (
@@ -470,7 +470,7 @@ export default function SimulatorPage() {
             </div>
           ) : (
             <div className="space-y-6">
-              <div className="flex items-center gap-2 text-sm font-bold text-white">
+              <div className="flex items-center gap-2 text-sm font-bold text-zinc-100">
                 <Zap className="h-4 w-4 text-teal-400 fill-current" />
                 Simulation results
                 <span className="ml-auto text-xs font-medium text-zinc-500">

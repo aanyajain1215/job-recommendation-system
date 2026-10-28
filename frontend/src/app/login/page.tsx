@@ -47,7 +47,7 @@ export default function LoginPage() {
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-teal-500/10 text-teal-400 ring-1 ring-teal-500/30">
             <Briefcase className="h-6 w-6" />
           </div>
-          <h2 className="mt-4 text-2xl font-bold tracking-tight text-white">
+          <h2 className="mt-4 text-2xl font-bold tracking-tight text-zinc-100">
             Welcome back
           </h2>
           <p className="mt-1.5 text-sm text-zinc-400">

@@ -38,7 +38,7 @@ export function PhaseTimeline({
               {pIdx + 1}
             </div>
             <div>
-              <span className="block text-sm font-bold text-white">{phase.label}</span>
+              <span className="block text-sm font-bold text-zinc-100">{phase.label}</span>
               <span className="flex items-center gap-1 text-xs text-zinc-400">
                 <Clock className="h-3 w-3" /> ~{phase.est_hours}h · {phase.steps.length} step
                 {phase.steps.length === 1 ? "" : "s"}
@@ -92,7 +92,7 @@ export function PhaseTimeline({
                         <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-500">
                           <span>#{step.seq}</span>
                           {step.category && (
-                            <span className="rounded bg-zinc-800 px-1.5 py-0.5 uppercase tracking-wide">
+                            <span className="rounded bg-zinc-800 px-1.5 py-0.5 uppercase tracking-wide text-zinc-300">
                               {step.category}
                             </span>
                           )}

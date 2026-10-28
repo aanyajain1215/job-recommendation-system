@@ -18,7 +18,7 @@ function bandChip(band: string): string {
     case "medium":
       return "border-cyan-500/30 bg-cyan-500/10 text-cyan-300";
     default:
-      return "border-zinc-600 bg-zinc-800 text-zinc-400";
+      return "border-zinc-600 bg-zinc-800 text-zinc-300";
   }
 }
 
@@ -110,7 +110,7 @@ export function DeltaTable({ result }: { result: ResultDelta }) {
       {result.target && (
         <div className="rounded-2xl border border-teal-500/25 bg-zinc-900/60 p-4 sm:p-5">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-            <span className="flex items-center gap-2 text-sm font-bold text-white">
+            <span className="flex items-center gap-2 text-sm font-bold text-zinc-100">
               <Target className="h-4 w-4 text-teal-400" />
               Target role: {result.target.job_title}
             </span>

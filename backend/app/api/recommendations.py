@@ -1,4 +1,6 @@
 from typing import Annotated
+import logging
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
@@ -11,8 +13,10 @@ from app.models.recommendation import Recommendation
 from app.models.skill import ProfileSkill
 from app.models.user import User
 from app.schemas.recommendation import RecommendationFeedResponse
-from app.services import personalization
+from app.services import live_jobs, personalization
 from app.services.recommender import ContentRecommender, generate_candidates
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/recommendations", tags=["recommendations"])
 
@@ -57,6 +61,18 @@ def get_recommendation_feed(
     # 2. Hybrid candidate generation (KNN ∪ FTS ∪ skill → RRF), fully eager-loaded
     candidates = generate_candidates(db, profile, limit)
 
+    # 2b. Live leg — real-time Adzuna results for the profile's own text.
+    # Transient rows (never persisted): the feed is served fresh from the
+    # provider instead of a fixed pre-loaded corpus; failures degrade to
+    # platform-only.
+    try:
+        live_candidates = live_jobs.live_candidates(db, profile, limit)
+    except Exception:  # noqa: BLE001 - live leg is best-effort
+        log.exception("live candidate leg failed; serving platform-only feed")
+        live_candidates = []
+    if live_candidates:
+        candidates = list(candidates) + live_candidates
+
     # 3. Score → rerank → diversify → explain (M4 weights/affinities, §16)
     weights, m4_note, _shrink = personalization.effective_weights(
         db, profile.user_id
@@ -76,10 +92,14 @@ def get_recommendation_feed(
     # The commit also flushes any embedding cache-fills computed above.
     try:
         for item in feed.items:
+            # Live results are transient (no jobs row) — snapshot only what
+            # the DB actually knows, so the offline eval loop keeps its FK.
+            if item.job.source == "adzuna":
+                continue
             db.add(
                 Recommendation(
                     profile_id=profile.id,
-                    job_id=item.job.id,
+                    job_id=UUID(item.job.id),
                     snapshot={
                         "match_score": item.match_score,
                         "components": item.explanation.components

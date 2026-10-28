@@ -63,7 +63,7 @@ Postgres is published on host port **55432** because 5432/5433 were already in u
 
 LLM routes degrade gracefully without keys; set `OPENAI_API_KEY` (or `LLM_PROVIDER=gemini` + `GEMINI_API_KEY`) in `.env` to enable them. **Kill switch:** `LLM_ENABLED=false` forces every route to its deterministic fallback. **Trial mode:** `LLM_STRICT=true` inverts the graceful degradation — any AI failure (missing provider, API error, validator rejection) returns HTTP 502 with the reason instead of silently falling back, so you can see exactly which features work with the LLM; set it back to `false` afterwards. Optional **explanation polish**: `EXPLAIN_LLM=true` lets the LLM rewrite explanation wording only — a digit-multiset validator discards the polish unless every number survives verbatim (default off).
 
-**Auto-ingestion:** the `ingest` service re-runs the live pipeline (fetch → clean → parse → structure → quality gates → upsert) on a timer — every `INGEST_INTERVAL_SECONDS` (default 6h), rotating through the query set defined in `docker-compose.yml`. Upserts are keyed by external id, so cycles are idempotent. Pause it with `docker compose stop ingest`; resume with `docker compose start ingest`.
+**Live jobs, no pre-loaded corpus:** jobs come from two places only — employers post their own listings on the platform (native, applied to in-app), and every keyword search hits **Adzuna at query time** (also merged into unfiltered browse and the recommendation feed). Nothing is ingested into the database: live results are transient, carry `source: "adzuna"` and `adzuna-<id>` ids, and their cards link out to the provider (Adzuna exposes no details API). The offline pipeline remains available for manual/corpus runs: `docker exec jobrec-backend python scripts/fetch_jobs_live.py --query "..."`; one-time removal of the legacy ingested corpus: `docker exec jobrec-backend python scripts/purge_ingest.py`.
 
 **Resume auto-fill:** on the Profile page, *Auto-fill from resume* uploads (or reuses) the stored resume, waits for the AI parse, and fills the editable form — name, headline, summary, location, phone, years, skills, education, work history. Nothing lands in the profile until you review the fields and press **Save Profile**; every field stays manually editable. Identity values the parser cannot verify against the resume text are dropped rather than trusted, and failed or pre-identity parses can be re-run from the stored file with the **Re-parse** button (`POST /profiles/me/resume/reparse`).
 
@@ -71,8 +71,8 @@ LLM routes degrade gracefully without keys; set `OPENAI_API_KEY` (or `LLM_PROVID
 
 - `frontend/` — Next.js App Router (19 pages: feed, gap, roadmap, simulator, careers, NL search, tracker, saved, settings, resume optimizer, onboarding, admin, …)
 - `backend/` — FastAPI + Alembic; `app/api` (58 paths), `app/services`, `ml/` training + evaluation
-- `backend/scripts/` — corpus ingestion (Adzuna/Arbeitnow/Remotive/Jobicy → preprocess → embed) and synthetic interaction bootstrap
-- `docker-compose.yml` — Postgres, API, frontend, ingest timer
+- `backend/scripts/` — offline corpus pipeline (Adzuna/Arbeitnow/Remotive/Jobicy → preprocess → embed), one-time `purge_ingest.py`, and the historical synthetic interaction bootstrap
+- `docker-compose.yml` — Postgres, API, frontend
 
 ## Testing
 

@@ -98,7 +98,7 @@ export function ExplanationCard({ gap }: { gap: GapResponse }) {
       </div>
 
       {/* Recommended action — deterministic, first missing required skill wins */}
-      <div className="mt-4 flex items-start gap-2 rounded-xl border border-teal-500/20 bg-teal-500/5 p-3 text-sm text-teal-200">
+      <div className="mt-4 flex items-start gap-2 rounded-xl border border-teal-500/20 bg-teal-500/5 p-3 text-sm text-teal-300">
         <Lightbulb className="mt-0.5 h-4 w-4 flex-shrink-0 text-teal-400" />
         <span>{recommendedAction}</span>
       </div>

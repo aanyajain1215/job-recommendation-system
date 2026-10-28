@@ -12,12 +12,16 @@ import {
   Calendar,
   Compass,
   DollarSign,
+  ExternalLink,
   MapPin,
   Search,
   Sparkles,
   Wifi,
   X,
 } from "lucide-react";
+
+/** Transient live listing (fetched from Adzuna at query time, no DB row). */
+const isLiveJob = (job: JobDetail) => job.source === "adzuna" || job.id.startsWith("adzuna-");
 
 export default function JobsPage() {
   const [jobs, setJobs] = useState<JobDetail[]>([]);
@@ -175,7 +179,7 @@ export default function JobsPage() {
           <Compass className="h-4 w-4" />
           Full-Text Search & Catalog
         </div>
-        <h1 className="mt-1 text-3xl font-bold tracking-tight text-white sm:text-4xl">
+        <h1 className="mt-1 text-3xl font-bold tracking-tight text-zinc-100 sm:text-4xl">
           Search Open Positions
         </h1>
         <p className="mt-1 text-sm text-zinc-400">
@@ -347,7 +351,7 @@ export default function JobsPage() {
             {q && (
               <span className="inline-flex items-center gap-1 rounded-full bg-teal-500/10 px-2.5 py-0.5 text-teal-300 ring-1 ring-teal-500/30">
                 Query: &quot;{q}&quot;
-                <button type="button" onClick={() => setQ("")} className="hover:text-white">
+                <button type="button" onClick={() => setQ("")} className="hover:text-zinc-100">
                   <X className="h-3 w-3" />
                 </button>
               </span>
@@ -356,7 +360,7 @@ export default function JobsPage() {
             {location && (
               <span className="inline-flex items-center gap-1 rounded-full bg-zinc-800 px-2.5 py-0.5 text-zinc-300">
                 Location: {location}
-                <button type="button" onClick={() => setLocation("")} className="hover:text-white">
+                <button type="button" onClick={() => setLocation("")} className="hover:text-zinc-100">
                   <X className="h-3 w-3" />
                 </button>
               </span>
@@ -365,7 +369,7 @@ export default function JobsPage() {
             {isRemote && (
               <span className="inline-flex items-center gap-1 rounded-full bg-teal-500/10 px-2.5 py-0.5 text-teal-300 ring-1 ring-teal-500/30">
                 Remote Only
-                <button type="button" onClick={() => setIsRemote(undefined)} className="hover:text-white">
+                <button type="button" onClick={() => setIsRemote(undefined)} className="hover:text-zinc-100">
                   <X className="h-3 w-3" />
                 </button>
               </span>
@@ -374,7 +378,7 @@ export default function JobsPage() {
             {employmentType && (
               <span className="inline-flex items-center gap-1 rounded-full bg-zinc-800 px-2.5 py-0.5 text-zinc-300 capitalize">
                 {employmentType.replace("_", "-")}
-                <button type="button" onClick={() => setEmploymentType("")} className="hover:text-white">
+                <button type="button" onClick={() => setEmploymentType("")} className="hover:text-zinc-100">
                   <X className="h-3 w-3" />
                 </button>
               </span>
@@ -383,7 +387,7 @@ export default function JobsPage() {
             {experienceLevel && (
               <span className="inline-flex items-center gap-1 rounded-full bg-zinc-800 px-2.5 py-0.5 text-zinc-300 capitalize">
                 {experienceLevel}
-                <button type="button" onClick={() => setExperienceLevel("")} className="hover:text-white">
+                <button type="button" onClick={() => setExperienceLevel("")} className="hover:text-zinc-100">
                   <X className="h-3 w-3" />
                 </button>
               </span>
@@ -392,7 +396,7 @@ export default function JobsPage() {
             {skillFilter && (
               <span className="inline-flex items-center gap-1 rounded-full bg-indigo-500/10 px-2.5 py-0.5 text-indigo-300 ring-1 ring-indigo-500/30">
                 Skill: {skillFilter}
-                <button type="button" onClick={() => setSkillFilter("")} className="hover:text-white">
+                <button type="button" onClick={() => setSkillFilter("")} className="hover:text-zinc-100">
                   <X className="h-3 w-3" />
                 </button>
               </span>
@@ -413,7 +417,7 @@ export default function JobsPage() {
       {nlResult && (
         <div className="mt-6 rounded-xl border border-teal-500/30 bg-teal-500/5 p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex flex-wrap items-center gap-2 text-xs text-teal-200">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-teal-300">
               <Sparkles className="h-3.5 w-3.5 text-teal-400" />
               <span>
                 AI search &quot;{nlResult.q}&quot; → <strong>{nlResult.total}</strong> result(s)
@@ -442,9 +446,9 @@ export default function JobsPage() {
                   type="button"
                   onClick={() => applyNlFilter(key, v)}
                   title="Move this parsed filter into the standard search form"
-                  className="inline-flex items-center gap-1 rounded-full bg-zinc-800 px-2.5 py-0.5 text-zinc-300 hover:bg-teal-500/20 hover:text-teal-200 transition-colors"
+                  className="inline-flex items-center gap-1 rounded-full bg-zinc-800 px-2.5 py-0.5 text-zinc-300 hover:bg-teal-500/20 hover:text-zinc-100 transition-colors"
                 >
-                  <span className="capitalize text-zinc-500">{key.replace(/_/g, " ")}:</span>
+                  <span className="capitalize text-zinc-400">{key.replace(/_/g, " ")}:</span>
                   {v === true ? "yes" : v === false ? "no" : String(v)}
                   <X className="h-3 w-3" />
                 </button>
@@ -457,8 +461,9 @@ export default function JobsPage() {
       {/* Meta Bar */}
       <div className="mt-6 flex items-center justify-between text-xs text-zinc-400">
         <span>
-          Found <strong className="text-white">{total}</strong> position(s)
+          Found <strong className="text-zinc-100">{total}</strong> position(s)
           {q && <span> for &quot;{q}&quot;</span>}
+          <span className="text-zinc-500"> · live from Adzuna + jobs posted on this platform</span>
         </span>
         <span className="capitalize">
           Ordering: {sortBy === "relevance" ? "Weighted Relevance" : sortBy === "salary" ? "Highest Compensation" : "Recent Date"}
@@ -473,7 +478,7 @@ export default function JobsPage() {
       ) : jobs.length === 0 ? (
         <div className="mt-8 rounded-2xl border border-zinc-800/80 bg-zinc-900/30 p-16 text-center">
           <Briefcase className="mx-auto h-10 w-10 text-zinc-600" />
-          <h3 className="mt-3 text-base font-semibold text-white">No matching opportunities found</h3>
+          <h3 className="mt-3 text-base font-semibold text-zinc-100">No matching opportunities found</h3>
           <p className="mt-1 text-xs text-zinc-400 max-w-sm mx-auto">
             Try adjusting your search terms, broadening keywords, or clearing remote/salary filters.
           </p>
@@ -487,10 +492,22 @@ export default function JobsPage() {
         </div>
       ) : (
         <div className="mt-6 space-y-4">
-          {jobs.map((job) => (
-            <Link
+          {jobs.map((job) => {
+            // Live listings open on Adzuna (no detail page); platform jobs route in-app.
+            const live = isLiveJob(job);
+            const Wrapper: React.ElementType = live ? "a" : Link;
+            const wrapperProps = live
+              ? {
+                  href: job.external_url || "#",
+                  target: "_blank",
+                  rel: "noopener noreferrer",
+                  title: "Opens the live posting on Adzuna in a new tab",
+                }
+              : { href: `/jobs/${job.id}` };
+            return (
+            <Wrapper
               key={job.id}
-              href={`/jobs/${job.id}`}
+              {...wrapperProps}
               className="group block rounded-2xl border border-zinc-800/80 bg-zinc-900/40 p-6 backdrop-blur hover:border-zinc-700 hover:bg-zinc-900/70 transition-all shadow-md"
             >
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
@@ -500,6 +517,16 @@ export default function JobsPage() {
                       <Building2 className="h-3.5 w-3.5 text-zinc-500" />
                       {job.company.name}
                     </span>
+
+                    {live && (
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full bg-sky-500/10 px-2 py-0.5 text-[11px] font-medium text-sky-300 ring-1 ring-sky-500/30"
+                        title="Fetched live from Adzuna — opens the original posting"
+                      >
+                        <ExternalLink className="h-2.5 w-2.5" />
+                        Live · Adzuna
+                      </span>
+                    )}
 
                     {job.is_remote && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-teal-500/10 px-2 py-0.5 text-[11px] font-medium text-teal-300 ring-1 ring-teal-500/30">
@@ -520,7 +547,7 @@ export default function JobsPage() {
                     )}
                   </div>
 
-                  <h2 className="mt-2 text-xl font-bold text-white group-hover:text-teal-300 transition-colors">
+                  <h2 className="mt-2 text-xl font-bold text-zinc-100 group-hover:text-teal-300 transition-colors">
                     {job.title}
                   </h2>
 
@@ -539,7 +566,7 @@ export default function JobsPage() {
 
                 <div className="sm:text-right shrink-0">
                   {job.salary_min || job.salary_max ? (
-                    <div className="flex items-center gap-1 text-base font-bold text-white sm:justify-end">
+                    <div className="flex items-center gap-1 text-base font-bold text-zinc-100 sm:justify-end">
                       <DollarSign className="h-4 w-4 text-emerald-400" />
                       <span>
                         {formatSalary(job.salary_min, job.salary_max, job.salary_currency)}
@@ -570,7 +597,7 @@ export default function JobsPage() {
                         setSkillFilter(sk.skill_name);
                         setPage(1);
                       }}
-                      className="inline-flex items-center gap-1 rounded bg-zinc-800/80 px-2 py-0.5 text-xs text-zinc-300 hover:bg-teal-500/20 hover:text-teal-200 transition-colors"
+                      className="inline-flex items-center gap-1 rounded bg-zinc-800/80 px-2 py-0.5 text-xs text-zinc-300 hover:bg-teal-500/20 hover:text-zinc-100 transition-colors"
                     >
                       <Sparkles className="h-2.5 w-2.5 text-teal-400" />
                       {sk.skill_name}
@@ -582,8 +609,9 @@ export default function JobsPage() {
                   </div>
                 </div>
               )}
-            </Link>
-          ))}
+            </Wrapper>
+            );
+          })}
         </div>
       )}
     </div>

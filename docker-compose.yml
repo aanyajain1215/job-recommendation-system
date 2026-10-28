@@ -72,42 +72,10 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  # Auto-ingestion timer (plan §20.1): re-runs the live pipeline on a cadence
-  # so the corpus stays fresh without manual script runs. Rotates through the
-  # query set below, one full cycle every INGEST_INTERVAL_SECONDS (6h default).
-  # Disabled on demand: docker compose stop ingest  (or remove from a profile).
-  ingest:
-    image: jobrec-backend:latest   # reuses the image the backend service builds
-    container_name: jobrec-ingest
-    volumes:
-      - ./backend:/app             # live code — same mount as the backend service
-    env_file:
-      - .env
-    environment:
-      DATABASE_URL: ${DATABASE_URL}
-      INGEST_INTERVAL_SECONDS: ${INGEST_INTERVAL_SECONDS:-21600}
-    entrypoint: ["sh", "-c"]
-    command:
-      - |
-        queries="python developer|data analyst|devops engineer|machine learning engineer"
-        interval="$${INGEST_INTERVAL_SECONDS:-21600}"
-        while true; do
-          IFS='|'
-          for q in $$queries; do
-            echo "[ingest] $$(date -u +%FT%TZ) fetching: $$q"
-            python scripts/fetch_jobs_live.py --query "$$q" --upsert \
-              || echo "[ingest] $$q failed - will retry next cycle"
-          done
-          IFS=' '
-          echo "[ingest] cycle complete; sleeping $$interval seconds"
-          sleep "$$interval"
-        done
-    depends_on:
-      postgres:
-        condition: service_healthy
-      backend:
-        condition: service_healthy
-    restart: unless-stopped
+  # Jobs are no longer pre-loaded: employers post native listings, and every
+  # keyword search fetches Adzuna live at query time (app/services/live_jobs.py).
+  # The offline pipeline remains available as a manual script:
+  #   docker exec jobrec-backend python scripts/fetch_jobs_live.py --query "..."
 
 volumes:
   postgres_data:

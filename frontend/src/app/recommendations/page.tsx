@@ -19,6 +19,7 @@ import {
   ChevronRight,
   Compass,
   DollarSign,
+  ExternalLink,
   GraduationCap,
   Layers,
   MapPin,
@@ -145,7 +146,7 @@ export default function RecommendationsPage() {
       };
     }
     return {
-      badge: "bg-zinc-800 text-zinc-400 border-zinc-700",
+      badge: "bg-zinc-800 text-zinc-300 border-zinc-700",
       ring: "border-zinc-800/80 hover:border-zinc-700",
       bar: "bg-zinc-600",
       label: "Low Fit",
@@ -163,7 +164,7 @@ export default function RecommendationsPage() {
               <Sparkles className="h-3.5 w-3.5 animate-pulse" />
               Content-Based Hybrid Engine
             </div>
-            <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-white">
+            <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-zinc-100">
               AI Job Recommendations
             </h1>
             <p className="mt-2 text-zinc-400 max-w-2xl text-sm sm:text-base">
@@ -176,7 +177,7 @@ export default function RecommendationsPage() {
             <button
               onClick={handleRefresh}
               disabled={refreshing}
-              className="inline-flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900/90 px-4 py-2.5 text-sm font-medium text-zinc-300 hover:bg-zinc-800 hover:text-white transition-all shadow-sm"
+              className="inline-flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900/90 px-4 py-2.5 text-sm font-medium text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 transition-all shadow-sm"
             >
               <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin text-teal-400" : ""}`} />
               Re-score Feed
@@ -271,7 +272,7 @@ export default function RecommendationsPage() {
         <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800/80 pb-4">
           <div className="flex items-center gap-2 text-sm text-zinc-400">
             <SlidersHorizontal className="h-4 w-4 text-teal-400" />
-            <span>Showing <strong className="text-white">{filteredItems.length}</strong> ranked jobs</span>
+            <span>Showing <strong className="text-zinc-100">{filteredItems.length}</strong> ranked jobs</span>
           </div>
 
           <div className="flex items-center gap-2">
@@ -281,8 +282,8 @@ export default function RecommendationsPage() {
                 onClick={() => setMinMatchThreshold(0)}
                 className={`px-3 py-1 rounded-md transition-colors ${
                   minMatchThreshold === 0
-                    ? "bg-zinc-800 text-white font-semibold"
-                    : "text-zinc-400 hover:text-white"
+                    ? "bg-zinc-800 text-zinc-100 font-semibold"
+                    : "text-zinc-400 hover:text-zinc-100"
                 }`}
               >
                 All Jobs
@@ -291,8 +292,8 @@ export default function RecommendationsPage() {
                 onClick={() => setMinMatchThreshold(35)}
                 className={`px-3 py-1 rounded-md transition-colors ${
                   minMatchThreshold === 35
-                    ? "bg-zinc-800 text-white font-semibold"
-                    : "text-zinc-400 hover:text-white"
+                    ? "bg-zinc-800 text-zinc-100 font-semibold"
+                    : "text-zinc-400 hover:text-zinc-100"
                 }`}
               >
                 ≥ 35% Match
@@ -301,8 +302,8 @@ export default function RecommendationsPage() {
                 onClick={() => setMinMatchThreshold(60)}
                 className={`px-3 py-1 rounded-md transition-colors ${
                   minMatchThreshold === 60
-                    ? "bg-zinc-800 text-white font-semibold"
-                    : "text-zinc-400 hover:text-white"
+                    ? "bg-zinc-800 text-zinc-100 font-semibold"
+                    : "text-zinc-400 hover:text-zinc-100"
                 }`}
               >
                 ≥ 60% Top Fits
@@ -330,6 +331,10 @@ export default function RecommendationsPage() {
           <div className="space-y-4">
             {filteredItems.map((item, index) => {
               const scoreStyle = getScoreColorClass(item.match_score);
+              // Live listing (fetched from Adzuna, no DB row): external link
+              // only — gap / roadmap / feedback are keyed to platform jobs.
+              const live =
+                item.job.source === "adzuna" || item.job.id.startsWith("adzuna-");
               return (
                 <div
                   key={item.job.id}
@@ -352,6 +357,17 @@ export default function RecommendationsPage() {
                         <span className="rounded-full bg-zinc-800/80 px-2.5 py-0.5 text-xs font-medium text-zinc-400">
                           #{index + 1} Best Match
                         </span>
+
+                        {/* Live external listing (Adzuna) */}
+                        {live && (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-full bg-sky-500/10 px-2.5 py-0.5 text-xs font-medium text-sky-300 border border-sky-500/30"
+                            title="Fetched live from Adzuna — opens the original posting"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                            Live · Adzuna
+                          </span>
+                        )}
 
                         {/* Phase 3: per-item rerank strategy / model version */}
                         {(item.model_version ||
@@ -383,12 +399,24 @@ export default function RecommendationsPage() {
                       </div>
 
                       {/* Title */}
-                      <Link
-                        href={`/jobs/${item.job.id}`}
-                        className="text-xl font-bold text-white group-hover:text-teal-400 transition-colors inline-block"
-                      >
-                        {item.job.title}
-                      </Link>
+                      {live ? (
+                        <a
+                          href={item.job.external_url || "#"}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Opens the live posting on Adzuna in a new tab"
+                          className="text-xl font-bold text-zinc-100 group-hover:text-teal-400 transition-colors inline-block"
+                        >
+                          {item.job.title}
+                        </a>
+                      ) : (
+                        <Link
+                          href={`/jobs/${item.job.id}`}
+                          className="text-xl font-bold text-zinc-100 group-hover:text-teal-400 transition-colors inline-block"
+                        >
+                          {item.job.title}
+                        </Link>
+                      )}
 
                       {/* Company & Meta */}
                       <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs sm:text-sm text-zinc-400">
@@ -485,63 +513,65 @@ export default function RecommendationsPage() {
                         </div>
                       </div>
 
-                      <div className="flex lg:flex-col gap-2">
-                        <Link
-                          href={`/gap/${item.job.id}`}
-                          className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-zinc-800 bg-zinc-900/70 px-3 py-2 text-xs font-semibold text-zinc-300 hover:border-teal-500/50 hover:text-teal-300 transition-colors"
-                        >
-                          <Target className="h-3.5 w-3.5" />
-                          Skill Gap
-                        </Link>
-                        <Link
-                          href={`/roadmap?jobId=${item.job.id}`}
-                          className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-zinc-800 bg-zinc-900/70 px-3 py-2 text-xs font-semibold text-zinc-300 hover:border-teal-500/50 hover:text-teal-300 transition-colors"
-                        >
-                          <Route className="h-3.5 w-3.5" />
-                          Roadmap
-                        </Link>
-
-                        {/* Phase 4 §16: feedback → M4 weight + affinity update */}
-                        <div className="relative">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setFeedbackMenu(
-                                feedbackMenu === item.job.id ? null : item.job.id,
-                              )
-                            }
-                            disabled={sendingFeedbackId === item.job.id}
-                            aria-expanded={feedbackMenu === item.job.id}
-                            className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-zinc-800 bg-zinc-900/70 px-3 py-2 text-xs font-semibold text-zinc-300 hover:border-teal-500/50 hover:text-teal-300 transition-colors disabled:opacity-50"
+                      {!live && (
+                        <div className="flex lg:flex-col gap-2">
+                          <Link
+                            href={`/gap/${item.job.id}`}
+                            className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-zinc-800 bg-zinc-900/70 px-3 py-2 text-xs font-semibold text-zinc-300 hover:border-teal-500/50 hover:text-teal-300 transition-colors"
                           >
-                            <ThumbsDown className="h-3.5 w-3.5" />
-                            {sendingFeedbackId === item.job.id
-                              ? "Saving…"
-                              : feedbackMenu === item.job.id
-                                ? "Close"
-                                : "Feedback"}
-                          </button>
-                          {feedbackMenu === item.job.id && (
-                            <div className="absolute right-0 bottom-full z-30 mb-1 w-48 rounded-xl border border-zinc-700 bg-zinc-900 p-1 shadow-2xl shadow-black/50">
-                              <p className="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-                                Why? (trains your model)
-                              </p>
-                              {FEEDBACK_REASONS.map((reason) => (
-                                <button
-                                  key={reason.value}
-                                  type="button"
-                                  onClick={() =>
-                                    handleFeedback(item.job.id, reason.value)
-                                  }
-                                  className="block w-full rounded-lg px-2.5 py-1.5 text-left text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
-                                >
-                                  {reason.label}
-                                </button>
-                              ))}
-                            </div>
-                          )}
+                            <Target className="h-3.5 w-3.5" />
+                            Skill Gap
+                          </Link>
+                          <Link
+                            href={`/roadmap?jobId=${item.job.id}`}
+                            className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-zinc-800 bg-zinc-900/70 px-3 py-2 text-xs font-semibold text-zinc-300 hover:border-teal-500/50 hover:text-teal-300 transition-colors"
+                          >
+                            <Route className="h-3.5 w-3.5" />
+                            Roadmap
+                          </Link>
+
+                          {/* Phase 4 §16: feedback → M4 weight + affinity update */}
+                          <div className="relative">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setFeedbackMenu(
+                                  feedbackMenu === item.job.id ? null : item.job.id,
+                                )
+                              }
+                              disabled={sendingFeedbackId === item.job.id}
+                              aria-expanded={feedbackMenu === item.job.id}
+                              className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-zinc-800 bg-zinc-900/70 px-3 py-2 text-xs font-semibold text-zinc-300 hover:border-teal-500/50 hover:text-teal-300 transition-colors disabled:opacity-50"
+                            >
+                              <ThumbsDown className="h-3.5 w-3.5" />
+                              {sendingFeedbackId === item.job.id
+                                ? "Saving…"
+                                : feedbackMenu === item.job.id
+                                  ? "Close"
+                                  : "Feedback"}
+                            </button>
+                            {feedbackMenu === item.job.id && (
+                              <div className="absolute right-0 bottom-full z-30 mb-1 w-48 rounded-xl border border-zinc-700 bg-zinc-900 p-1 shadow-2xl shadow-black/50">
+                                <p className="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+                                  Why? (trains your model)
+                                </p>
+                                {FEEDBACK_REASONS.map((reason) => (
+                                  <button
+                                    key={reason.value}
+                                    type="button"
+                                    onClick={() =>
+                                      handleFeedback(item.job.id, reason.value)
+                                    }
+                                    className="block w-full rounded-lg px-2.5 py-1.5 text-left text-xs text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 transition-colors"
+                                  >
+                                    {reason.label}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
+                      )}
 
                       {feedbackNotes[item.job.id] && (
                         <p className="max-w-[200px] text-[11px] leading-snug text-teal-400 lg:text-right">
@@ -549,13 +579,26 @@ export default function RecommendationsPage() {
                         </p>
                       )}
 
-                      <Link
-                        href={`/jobs/${item.job.id}`}
-                        className="inline-flex items-center gap-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-zinc-950 font-semibold px-4 py-2.5 text-sm transition-all shadow-md shadow-teal-500/20"
-                      >
-                        View & Apply
-                        <ChevronRight className="h-4 w-4" />
-                      </Link>
+                      {live ? (
+                        <a
+                          href={item.job.external_url || "#"}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Opens the live posting on Adzuna in a new tab"
+                          className="inline-flex items-center gap-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-zinc-950 font-semibold px-4 py-2.5 text-sm transition-all shadow-md shadow-teal-500/20"
+                        >
+                          View on Adzuna
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                      ) : (
+                        <Link
+                          href={`/jobs/${item.job.id}`}
+                          className="inline-flex items-center gap-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-zinc-950 font-semibold px-4 py-2.5 text-sm transition-all shadow-md shadow-teal-500/20"
+                        >
+                          View & Apply
+                          <ChevronRight className="h-4 w-4" />
+                        </Link>
+                      )}
                     </div>
                   </div>
                 </div>
