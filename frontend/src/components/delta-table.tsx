@@ -59,7 +59,7 @@ export function DeltaTable({ result }: { result: ResultDelta }) {
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
-            Mean score · before
+            Average match · before
           </span>
           <div className="mt-1 text-2xl font-black text-zinc-300">
             {result.before.mean_score}
@@ -75,7 +75,7 @@ export function DeltaTable({ result }: { result: ResultDelta }) {
 
         <div className="rounded-2xl border border-teal-500/30 bg-teal-500/5 p-4">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-teal-400">
-            Mean score · after
+            Average match · after
           </span>
           <div className="mt-1 text-2xl font-black text-teal-300">
             {result.after.mean_score}
@@ -96,11 +96,11 @@ export function DeltaTable({ result }: { result: ResultDelta }) {
           <div className="mt-1 space-y-1 text-sm text-zinc-300">
             <div className="flex items-center gap-1.5">
               <Sparkles className="h-3.5 w-3.5 text-teal-400" />
-              {improved} of {rows.length} candidates improved
+              {improved} of {rows.length} jobs improved
             </div>
             <div className="flex items-center gap-1.5">
               <Crown className="h-3.5 w-3.5 text-amber-400" />
-              {eligibleFlips} newly high-readiness
+              {eligibleFlips} newly strong matches
             </div>
           </div>
         </div>

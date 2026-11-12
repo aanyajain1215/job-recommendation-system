@@ -120,7 +120,7 @@ function RoadmapContent() {
           <Route className="h-6 w-6 text-teal-400 absolute inset-0 m-auto animate-pulse" />
         </div>
         <p className="mt-4 text-sm text-zinc-400 font-medium">
-          Sequencing skills into phases...
+          Building your learning plan...
         </p>
       </div>
     );

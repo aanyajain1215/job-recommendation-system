@@ -309,7 +309,7 @@ export default function JobDetailPage() {
               Skill Requirements
             </h3>
             <p className="mt-1 text-xs text-zinc-500">
-              Evaluated for ANN candidate matching and ranking scores.
+              Skills the employer is looking for on this role.
             </p>
 
             <div className="mt-4 space-y-2.5">
@@ -347,7 +347,6 @@ export default function JobDetailPage() {
               About {job.company.name}
             </h3>
             <div className="mt-3 space-y-2 text-xs text-zinc-400">
-              <p>Organization Slug: <span className="font-mono text-zinc-300">{job.company.slug}</span></p>
               <p>Location: <span className="text-zinc-300">{job.location}</span></p>
             </div>
           </div>

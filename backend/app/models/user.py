@@ -84,6 +84,7 @@ class User(Base):
         "Application",
         back_populates="user",
         cascade="all, delete-orphan",
+        overlaps="applications,profile",
     )
     interactions: Mapped[list["Interaction"]] = relationship(
         "Interaction",

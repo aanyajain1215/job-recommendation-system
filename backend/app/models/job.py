@@ -132,6 +132,26 @@ class Job(Base):
         DateTime(timezone=True),
         nullable=True,
     )
+    embedding_backend: Mapped[str | None] = mapped_column(
+        String(30),
+        nullable=True,
+    )
+    embedding_model: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+    )
+    embedding_version: Mapped[str | None] = mapped_column(
+        String(30),
+        nullable=True,
+    )
+    embedding_dimension: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+    )
+    embedding_content_hash: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True,
+    )
     search_vector = mapped_column(TSVECTOR, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

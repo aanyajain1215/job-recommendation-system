@@ -156,10 +156,7 @@ def _note_for(
     comp, _delta = deltas[0]
     verb = "raised" if deltas[0][1] > 0 else "lowered"
     label = COMPONENT_LABELS.get(comp, comp.capitalize())
-    return (
-        f"{label} weight {verb} to {weights[comp]:.3f} "
-        "because of your recent feedback."
-    )
+    return f"{label} weight {verb} based on your recent feedback."
 
 
 def effective_weights(

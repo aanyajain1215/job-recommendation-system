@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -23,7 +24,6 @@ class JobSummaryOut(BaseModel):
     salary_min: int | None = None
     salary_max: int | None = None
     salary_currency: str = "USD"
-    # Live posting URL so saved/tracker rows can deep-link to the real opening.
     external_url: str | None = None
     company: CompanySummary | None = None
 
@@ -56,7 +56,6 @@ class ApplicationStatsOut(BaseModel):
     interview: int
     rejected: int
     offer: int
-    # ---- additive Phase 4 (plan §18/§19) ----
     saved: int = 0
     successful_skills: list[str] = []
     observation_note: str = ""
@@ -99,3 +98,17 @@ class EmployerApplicationOut(BaseModel):
 
 class ApplicationStatusUpdate(BaseModel):
     status: ApplicationStatus
+    reason: str | None = Field(default=None, max_length=255)
+
+
+class ApplicationStatusHistoryOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    application_id: UUID
+    previous_status: ApplicationStatus | None = None
+    new_status: ApplicationStatus
+    changed_at: datetime
+    changed_by_user_id: UUID | None = None
+    reason: str | None = None
+    metadata: dict[str, Any] | None = None

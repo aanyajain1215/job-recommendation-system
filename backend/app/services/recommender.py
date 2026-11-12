@@ -41,6 +41,7 @@ from app.models.skill import JobSkill, ProfileSkill
 from app.services.embeddings import (
     ensure_job_embeddings,
     ensure_profile_embedding,
+    is_compatible_embedding,
     to_usd,
 )
 from app.services.explanation import (
@@ -250,6 +251,7 @@ class _ProfileContext:
                 )
         self.possessed = set(self.seeker_skills)
         self.graph: SkillGraph = load_seed_graph()
+        self.profile = profile
         self.years = profile.years_of_experience
 
         self.project_skills: set[str] = set()
@@ -307,12 +309,13 @@ class _ProfileContext:
 
         cosine = None
         if self.profile_embedding is not None and job.embedding:
-            job_vec = np.asarray(job.embedding, dtype=np.float32)
-            denom = float(
-                np.linalg.norm(self.profile_embedding) * np.linalg.norm(job_vec)
-            )
-            if denom > 0:
-                cosine = float(np.dot(self.profile_embedding, job_vec) / denom)
+            if is_compatible_embedding(self.profile, job):
+                job_vec = np.asarray(job.embedding, dtype=np.float32)
+                denom = float(
+                    np.linalg.norm(self.profile_embedding) * np.linalg.norm(job_vec)
+                )
+                if denom > 0:
+                    cosine = float(np.dot(self.profile_embedding, job_vec) / denom)
 
         family = getattr(job, "family", None)
         job_family = family.name if family is not None else None
@@ -544,9 +547,7 @@ class ContentRecommender:
 
         first_outcome = scored[0][2]
         exploration_note = (
-            "Includes 1 exploratory suggestion (1-in-6 feed slots, "
-            f"propensity {exploration_propensity(settings.exploration_rate)}) "
-            "to surface adjacent career directions."
+            "Includes an exploratory role suggestion to help you discover related career paths."
             if explorer_slot is not None
             else None
         )

@@ -138,7 +138,7 @@ export default function GapPage() {
                 </span>
                 <p className="mt-1.5 text-lg font-bold text-zinc-100">{gap.weakest_link}</p>
                 <p className="mt-0.5 text-xs text-zinc-400">
-                  Highest weight × still missing — start here.
+                  Most important missing skill to learn first.
                 </p>
               </div>
             )}
@@ -168,7 +168,7 @@ export default function GapPage() {
             <div>
               <h2 className="text-lg font-bold text-zinc-100">Every requirement, classified</h2>
               <p className="text-xs text-zinc-500 mt-0.5">
-                Hover any chip for the evidence behind its class.
+                Hover over any skill to see why it appears here.
               </p>
             </div>
             <span className="text-xs text-zinc-500">{gap.classes.length} requirements</span>
@@ -181,15 +181,14 @@ export default function GapPage() {
           <div>
             <h3 className="text-sm font-bold text-zinc-100">Turn this gap into a plan</h3>
             <p className="mt-1 text-xs text-zinc-400 max-w-lg">
-              The roadmap sequences the missing skills into phases with hour estimates —
-              built from this exact analysis.
+              Turn these missing skills into a step-by-step learning plan with estimated study hours.
             </p>
           </div>
           <Link
             href={`/roadmap?jobId=${gap.job_id}`}
             className="inline-flex items-center gap-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-zinc-950 font-semibold px-5 py-2.5 text-sm transition-all shadow-md shadow-teal-500/20"
           >
-            Build my roadmap
+            Create Learning Plan
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>

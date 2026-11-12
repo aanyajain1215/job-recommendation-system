@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import Boolean, DateTime, Enum as SQLEnum, Float, ForeignKey, String, func
+from sqlalchemy import Boolean, DateTime, Enum as SQLEnum, Float, ForeignKey, Integer, String, func
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -42,6 +42,26 @@ class Skill(Base):
     )
     embedding_updated_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
+        nullable=True,
+    )
+    embedding_backend: Mapped[str | None] = mapped_column(
+        String(30),
+        nullable=True,
+    )
+    embedding_model: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
+    )
+    embedding_version: Mapped[str | None] = mapped_column(
+        String(30),
+        nullable=True,
+    )
+    embedding_dimension: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+    )
+    embedding_content_hash: Mapped[str | None] = mapped_column(
+        String(64),
         nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(

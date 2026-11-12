@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { ArrowRight, Briefcase, CheckCircle2, Lock, Mail } from "lucide-react";
+import { ArrowRight, Briefcase, Lock, Mail } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -32,12 +32,6 @@ export default function LoginPage() {
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const fillQuickCredentials = (demoEmail: string, demoPass: string) => {
-    setEmail(demoEmail);
-    setPassword(demoPass);
-    setError(null);
   };
 
   return (
@@ -117,31 +111,6 @@ export default function LoginPage() {
             )}
           </button>
         </form>
-
-        {/* Quick Fill for Fast Testing */}
-        <div className="pt-2 border-t border-zinc-800/80">
-          <p className="text-xs text-zinc-500 text-center mb-2">
-            Quick dev credentials (registered in step 2):
-          </p>
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <button
-              type="button"
-              onClick={() => fillQuickCredentials("aanya.seeker@example.com", "Password123!")}
-              className="flex items-center justify-center gap-1.5 rounded border border-zinc-800 bg-zinc-950/40 p-2 text-zinc-300 hover:border-teal-500/50 hover:bg-zinc-800/50 transition-colors"
-            >
-              <CheckCircle2 className="h-3 w-3 text-teal-400" />
-              Job Seeker
-            </button>
-            <button
-              type="button"
-              onClick={() => fillQuickCredentials("recruiter@technova.io", "SecurePassword456!")}
-              className="flex items-center justify-center gap-1.5 rounded border border-zinc-800 bg-zinc-950/40 p-2 text-zinc-300 hover:border-indigo-500/50 hover:bg-zinc-800/50 transition-colors"
-            >
-              <CheckCircle2 className="h-3 w-3 text-indigo-400" />
-              Employer
-            </button>
-          </div>
-        </div>
 
         <p className="text-center text-xs text-zinc-400">
           Don&apos;t have an account?{" "}

@@ -37,8 +37,13 @@ class NormalizationResult:
     original: str = ""             # raw input, preserved for evidence
 
 
+def canonical_alias_key(text: str) -> str:
+    """Canonical normalisation for aliases: trim, collapse internal whitespace, lowercase."""
+    return " ".join((text or "").strip().lower().split())
+
+
 def _norm(s: str) -> str:
-    return " ".join(s.strip().lower().split())
+    return canonical_alias_key(s)
 
 
 class SkillNormalizer:

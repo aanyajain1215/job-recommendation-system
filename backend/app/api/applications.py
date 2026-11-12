@@ -1,14 +1,15 @@
 """Applications API.
 
 Handles:
-- POST  /jobs/{job_id}/apply                 — Apply to a job (atomic application + interaction log)
+- POST  /jobs/{job_id}/apply                 — Apply to a job (atomic application + interaction log + status history)
 - GET   /applications/me                     — List candidate's applications (paginated)
 - GET   /applications/me/stats               — Lightweight aggregate stats for dashboard tiles
+- GET   /applications/{id}/history           — Audit trail of application status changes
 - GET   /employer/jobs/{job_id}/applications — Employer view of applicants (with strict ownership check)
-- PATCH /employer/applications/{id}/status   — Employer update applicant review status
+- PATCH /employer/applications/{id}/status   — Employer update applicant review status (with atomic history)
 """
 
-from typing import Annotated
+from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -18,7 +19,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import get_current_user, require_roles
 from app.core.db import get_db
-from app.models.application import Application
+from app.models.application import Application, ApplicationStatusHistory
 from app.models.enums import ApplicationStatus, InteractionType, JobStatus, UserRole
 from app.models.interaction import Interaction
 from app.models.job import Job
@@ -30,6 +31,7 @@ from app.schemas.applications import (
     ApplicationCreate,
     ApplicationOut,
     ApplicationStatsOut,
+    ApplicationStatusHistoryOut,
     ApplicationStatusUpdate,
     EmployerApplicationOut,
     JobSummaryOut,
@@ -72,18 +74,20 @@ def _format_application_out(app_rec: Application, job: Job | None = None) -> App
 
 
 def _format_employer_application_out(app_rec: Application) -> EmployerApplicationOut:
-    applicant_summary: ApplicantProfileSummary | None = None
-    if app_rec.profile:
+    profile = app_rec.profile
+    user = app_rec.user
+    applicant_summary = None
+    if profile:
         applicant_summary = ApplicantProfileSummary(
-            id=app_rec.profile.id,
-            user_id=app_rec.profile.user_id,
-            first_name=app_rec.profile.first_name,
-            last_name=app_rec.profile.last_name,
-            headline=app_rec.profile.headline,
-            location=app_rec.profile.location,
-            phone=app_rec.profile.phone,
-            resume_url=app_rec.resume_url_snapshot or app_rec.profile.resume_url,
-            years_of_experience=app_rec.profile.years_of_experience,
+            id=profile.id,
+            user_id=profile.user_id,
+            first_name=profile.first_name,
+            last_name=profile.last_name,
+            headline=profile.headline,
+            location=profile.location,
+            phone=profile.phone,
+            resume_url=profile.resume_url,
+            years_of_experience=profile.years_of_experience,
         )
 
     return EmployerApplicationOut(
@@ -97,19 +101,48 @@ def _format_employer_application_out(app_rec: Application) -> EmployerApplicatio
         created_at=app_rec.applied_at,
         updated_at=app_rec.updated_at,
         applicant=applicant_summary,
-        user_email=app_rec.user.email if app_rec.user else None,
+        user_email=user.email if user else None,
     )
 
 
+def _record_status_transition(
+    db: Session,
+    application: Application,
+    new_status: ApplicationStatus,
+    changed_by_user_id: UUID | None,
+    reason: str | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> ApplicationStatusHistory | None:
+    """Atomically updates application status and records an auditable history transition.
+
+    No-op update check: if new_status equals the current status, no duplicate history is written.
+    """
+    if application.status == new_status:
+        return None
+
+    prev_status = application.status
+    application.status = new_status
+    history = ApplicationStatusHistory(
+        application_id=application.id,
+        previous_status=prev_status,
+        new_status=new_status,
+        changed_by_user_id=changed_by_user_id,
+        reason=reason,
+        metadata_=metadata,
+    )
+    db.add(history)
+    return history
+
+
 # ---------------------------------------------------------------------------
-# Candidate Endpoints
+# Seeker Endpoints
 # ---------------------------------------------------------------------------
 
 @router.post(
     "/jobs/{job_id}/apply",
     response_model=ApplicationOut,
     status_code=status.HTTP_201_CREATED,
-    summary="Apply to a job posting",
+    summary="Apply for an active job posting",
 )
 def apply_to_job(
     job_id: UUID,
@@ -117,27 +150,8 @@ def apply_to_job(
     current_user: Annotated[User, Depends(require_roles(UserRole.JOB_SEEKER))],
     db: Annotated[Session, Depends(get_db)],
 ) -> ApplicationOut:
-    """Submit an application to a job.
-
-    Enforces:
-    - Candidate role requirement.
-    - Application-layer & DB-level idempotency ((job_id, user_id) unique index).
-    - Single atomic transaction linking the Application row and the 'apply' Interaction.
-    """
-    # 1. Early check for existing application
-    existing_app = db.scalar(
-        select(Application.id).where(
-            Application.job_id == job_id,
-            Application.user_id == current_user.id,
-        )
-    )
-    if existing_app:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Already applied to this job.",
-        )
-
-    # 2. Verify target job exists and is open
+    """Submit an application for a published job."""
+    # 1. Verify Job exists and is published
     job = db.scalar(
         select(Job)
         .options(selectinload(Job.company))
@@ -146,7 +160,20 @@ def apply_to_job(
     if not job:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Job posting not found or is no longer accepting applications.",
+            detail="Job posting not found or not currently accepting applications.",
+        )
+
+    # 2. Check for duplicate application
+    existing = db.scalar(
+        select(Application).where(
+            Application.job_id == job_id,
+            Application.user_id == current_user.id,
+        )
+    )
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Already applied to this job.",
         )
 
     # 3. Retrieve or ensure candidate Profile exists
@@ -160,7 +187,14 @@ def apply_to_job(
         db.add(profile)
         db.flush()
 
-    # 4. Atomic application + interaction creation in the same transaction
+    # Verify profile ownership (Phase 1.1)
+    if profile.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Profile does not belong to the current user.",
+        )
+
+    # 4. Atomic application + initial status history + interaction creation
     app_record = Application(
         job_id=job.id,
         user_id=current_user.id,
@@ -170,6 +204,17 @@ def apply_to_job(
         resume_url_snapshot=profile.resume_url,
     )
     db.add(app_record)
+    db.flush()
+
+    # Initial status history entry (Phase 2.3)
+    init_history = ApplicationStatusHistory(
+        application_id=app_record.id,
+        previous_status=None,
+        new_status=ApplicationStatus.APPLIED,
+        changed_by_user_id=current_user.id,
+        reason=payload.cover_note.strip() if payload.cover_note else "Initial application submission",
+    )
+    db.add(init_history)
 
     apply_interaction = Interaction(
         user_id=current_user.id,
@@ -253,9 +298,8 @@ def _successful_skill_observation(db: Session, user_id) -> tuple[list[str], str]
     ).all()
     names = [r[0] for r in rows]
     note = (
-        "Skills in your successful applications: "
-        + (", ".join(names) if names else "not enough data yet")
-        + " — a historical observation, not a causal claim."
+        "Common skills across your shortlisted and interview-stage applications: "
+        + (", ".join(names) if names else "apply to a few roles to see patterns here.")
     )
     return names, note
 
@@ -310,7 +354,7 @@ def save_job_for_later(
     current_user: Annotated[User, Depends(require_roles(UserRole.JOB_SEEKER))],
     db: Annotated[Session, Depends(get_db)],
 ) -> ApplicationOut:
-    """Idempotent save → Application(status=SAVED) + a 'save' interaction."""
+    """Idempotent save → Application(status=SAVED) + a 'save' interaction + status history."""
     job = db.scalar(
         select(Job).options(selectinload(Job.company)).where(Job.id == job_id)
     )
@@ -326,6 +370,16 @@ def save_job_for_later(
         )
     )
     if existing is not None:
+        if existing.status != ApplicationStatus.SAVED:
+            _record_status_transition(
+                db,
+                existing,
+                ApplicationStatus.SAVED,
+                current_user.id,
+                reason="Saved job for later",
+            )
+            db.commit()
+            db.refresh(existing)
         return _format_application_out(existing, job=job)
 
     profile = db.scalar(select(Profile).where(Profile.user_id == current_user.id))
@@ -346,6 +400,17 @@ def save_job_for_later(
         resume_url_snapshot=profile.resume_url,
     )
     db.add(record)
+    db.flush()
+
+    init_history = ApplicationStatusHistory(
+        application_id=record.id,
+        previous_status=None,
+        new_status=ApplicationStatus.SAVED,
+        changed_by_user_id=current_user.id,
+        reason="Saved job for later",
+    )
+    db.add(init_history)
+
     db.add(
         Interaction(
             user_id=current_user.id,
@@ -386,7 +451,7 @@ def update_my_application(
     current_user: Annotated[User, Depends(require_roles(UserRole.JOB_SEEKER))],
     db: Annotated[Session, Depends(get_db)],
 ) -> ApplicationOut:
-    """Seeker-side status move (applied → viewed → shortlisted → …)."""
+    """Seeker-side status move (applied → viewed → shortlisted → …) with atomic history."""
     record = db.scalar(
         select(Application)
         .options(selectinload(Application.job).selectinload(Job.company))
@@ -402,10 +467,81 @@ def update_my_application(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not own this application.",
         )
-    record.status = payload.status
+
+    _record_status_transition(
+        db,
+        record,
+        payload.status,
+        current_user.id,
+        reason=payload.reason or "Candidate updated application status",
+    )
     db.commit()
     db.refresh(record)
     return _format_application_out(record)
+
+
+@router.get(
+    "/applications/{application_id}/history",
+    response_model=list[ApplicationStatusHistoryOut],
+    summary="Retrieve audit status history for an application",
+)
+def get_application_status_history(
+    application_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+) -> list[ApplicationStatusHistoryOut]:
+    """Retrieve audit trail of status transitions for an application.
+
+    Strict authorization:
+    - Seeker who submitted the application
+    - Employer who posted the corresponding job
+    - Admin
+    """
+    app_rec = db.scalar(
+        select(Application)
+        .options(selectinload(Application.job))
+        .where(Application.id == application_id)
+    )
+    if not app_rec:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Application record not found.",
+        )
+
+    is_seeker = app_rec.user_id == current_user.id
+    is_employer = (
+        app_rec.job.posted_by_user_id == current_user.id
+        if app_rec.job
+        else False
+    )
+    is_admin = current_user.role == UserRole.ADMIN
+
+    if not (is_seeker or is_employer or is_admin):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to view status history for this application.",
+        )
+
+    stmt = (
+        select(ApplicationStatusHistory)
+        .where(ApplicationStatusHistory.application_id == application_id)
+        .order_by(ApplicationStatusHistory.changed_at.asc())
+    )
+    rows = db.scalars(stmt).all()
+
+    return [
+        ApplicationStatusHistoryOut(
+            id=r.id,
+            application_id=r.application_id,
+            previous_status=r.previous_status,
+            new_status=r.new_status,
+            changed_at=r.changed_at,
+            changed_by_user_id=r.changed_by_user_id,
+            reason=r.reason,
+            metadata=r.metadata_,
+        )
+        for r in rows
+    ]
 
 
 @router.delete(
@@ -454,11 +590,7 @@ def get_job_applicants(
     current_user: Annotated[User, Depends(require_roles(UserRole.EMPLOYER, UserRole.ADMIN))],
     db: Annotated[Session, Depends(get_db)],
 ) -> list[EmployerApplicationOut]:
-    """Retrieve all candidate applications for an employer's job posting.
-
-    Strict ownership check: Ensures the caller is the employer who posted the job
-    (or an admin), preventing horizontal privilege escalation.
-    """
+    """Retrieve all candidate applications for an employer's job posting."""
     job = db.scalar(select(Job).where(Job.id == job_id))
     if not job:
         raise HTTPException(
@@ -498,7 +630,7 @@ def update_application_status(
     current_user: Annotated[User, Depends(require_roles(UserRole.EMPLOYER, UserRole.ADMIN))],
     db: Annotated[Session, Depends(get_db)],
 ) -> EmployerApplicationOut:
-    """Employer updates candidate status in the hiring pipeline (e.g. shortlisted, offer)."""
+    """Employer updates candidate status in the hiring pipeline (with atomic audit history)."""
     app_record = db.scalar(
         select(Application)
         .options(
@@ -521,7 +653,13 @@ def update_application_status(
             detail="You do not have permission to modify this application.",
         )
 
-    app_record.status = payload.status
+    _record_status_transition(
+        db,
+        app_record,
+        payload.status,
+        current_user.id,
+        reason=payload.reason or "Employer moved candidate pipeline status",
+    )
     db.commit()
     db.refresh(app_record)
 

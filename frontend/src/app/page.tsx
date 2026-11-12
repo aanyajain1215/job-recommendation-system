@@ -1,21 +1,14 @@
 import Link from "next/link";
-import { HealthPanel } from "@/components/health-panel";
-import { fetchReadiness, getServerApiBaseUrl } from "@/lib/api";
 import {
   ArrowRight,
-  Briefcase,
+  CheckCircle2,
   Compass,
-  Cpu,
-  Layers,
+  ListChecks,
   Sparkles,
-  Zap,
+  Target,
 } from "lucide-react";
 
-export const dynamic = "force-dynamic";
-
-export default async function Home() {
-  const initial = await fetchReadiness(getServerApiBaseUrl());
-
+export default function Home() {
   return (
     <div className="flex flex-1 flex-col">
       {/* Hero Section */}
@@ -25,19 +18,19 @@ export default async function Home() {
         <div className="mx-auto max-w-4xl text-center">
           <div className="inline-flex items-center gap-2 rounded-full border border-teal-500/30 bg-teal-500/10 px-3.5 py-1 text-xs font-semibold text-teal-300 backdrop-blur">
             <Sparkles className="h-3.5 w-3.5" />
-            Two-Stage Retrieve + Rank Recommendation Engine
+            AI-Powered Job Matching
           </div>
 
           <h1 className="mt-6 text-4xl font-extrabold tracking-tight text-zinc-100 sm:text-6xl">
-            Where talent meets opportunity{" "}
+            Find roles that genuinely{" "}
             <span className="bg-gradient-to-r from-teal-400 via-teal-200 to-cyan-400 bg-clip-text text-transparent">
-              through real AI matching
+              fit your skills
             </span>
           </h1>
 
           <p className="mx-auto mt-6 max-w-2xl text-base sm:text-lg leading-relaxed text-zinc-400">
-            A genuine recommendation system with semantic pgvector candidate retrieval,
-            LightGBM re-ranking, and event-driven feedback loops. No mock data, no simple keyword filtering.
+            Upload your resume or list your skills to get personalized AI job recommendations,
+            clear skill-gap breakdowns, and an organized application tracker.
           </p>
 
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3.5">
@@ -53,7 +46,7 @@ export default async function Home() {
               href="/login"
               className="inline-flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900/70 px-5 py-3 text-sm font-medium text-zinc-200 hover:bg-zinc-800 hover:text-zinc-100 transition-colors"
             >
-              Sign In to Your Feed
+              Sign In
             </Link>
           </div>
         </div>
@@ -62,54 +55,85 @@ export default async function Home() {
         <div className="mx-auto mt-16 max-w-6xl grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-6 backdrop-blur hover:border-zinc-700 transition-colors">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-teal-500/10 text-teal-400 ring-1 ring-teal-500/30">
-              <Cpu className="h-5 w-5" />
+              <Sparkles className="h-5 w-5" />
             </div>
             <h3 className="mt-4 text-base font-semibold text-zinc-100">
-              Semantic ANN Retrieval
+              AI Skill Matching
             </h3>
             <p className="mt-2 text-xs leading-relaxed text-zinc-400">
-              pgvector powers 384-dimensional approximate nearest neighbor candidate generation from user profile embeddings.
+              Matches your skills, experience, and career goals against open roles so you see relevant opportunities first.
             </p>
           </div>
 
           <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-6 backdrop-blur hover:border-zinc-700 transition-colors">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-400 ring-1 ring-indigo-500/30">
-              <Layers className="h-5 w-5" />
+              <Target className="h-5 w-5" />
             </div>
             <h3 className="mt-4 text-base font-semibold text-zinc-100">
-              Two-Stage Re-Ranking
+              Clear Skill-Gap Breakdown
             </h3>
             <p className="mt-2 text-xs leading-relaxed text-zinc-400">
-              Top candidate jobs are scored using LightGBM on skill overlap, seniority alignment, salary band fit, and recency.
+              See which skills you already bring, what is missing, and a step-by-step learning plan to close the gap.
             </p>
           </div>
 
           <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-6 backdrop-blur hover:border-zinc-700 transition-colors">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-400 ring-1 ring-cyan-500/30">
-              <Zap className="h-5 w-5" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-600 ring-1 ring-cyan-500/30">
+              <Compass className="h-5 w-5" />
             </div>
             <h3 className="mt-4 text-base font-semibold text-zinc-100">
-              Active Feedback Loop
+              Learns What You Prefer
             </h3>
             <p className="mt-2 text-xs leading-relaxed text-zinc-400">
-              Every view, bookmark, application, and dismiss event sharpens your profile embedding in near real-time.
+              Saving roles, applying, and rating recommendations helps refine future matches to fit your preferences.
             </p>
           </div>
         </div>
       </section>
 
-      {/* Live System Diagnostics / Verification Panel */}
-      <section className="px-4 py-12 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-3xl">
-          <div className="mb-4 text-center">
+      {/* How It Works */}
+      <section className="px-4 py-14 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-5xl">
+          <div className="text-center">
             <p className="text-xs font-semibold uppercase tracking-wider text-teal-400">
-              Live Stack Telemetry
+              How It Works
             </p>
-            <p className="text-sm text-zinc-400">
-              PostgreSQL 16 + pgvector + FastAPI + Next.js
-            </p>
+            <h2 className="mt-1 text-2xl font-bold text-zinc-100">
+              From resume to offer in three steps
+            </h2>
           </div>
-          <HealthPanel initial={initial} />
+
+          <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-3">
+            <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-6">
+              <div className="flex items-center gap-2 text-sm font-semibold text-teal-400">
+                <CheckCircle2 className="h-4 w-4" />
+                1. Build your profile
+              </div>
+              <p className="mt-2 text-xs leading-relaxed text-zinc-400">
+                Upload your resume to auto-fill your experience and skills, or add them manually in minutes.
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-6">
+              <div className="flex items-center gap-2 text-sm font-semibold text-teal-400">
+                <Sparkles className="h-4 w-4" />
+                2. Review AI matches
+              </div>
+              <p className="mt-2 text-xs leading-relaxed text-zinc-400">
+                Browse roles ranked by fit, inspect skill-gap explanations, and preview What-If career scenarios.
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-6">
+              <div className="flex items-center gap-2 text-sm font-semibold text-teal-400">
+                <ListChecks className="h-4 w-4" />
+                3. Track every application
+              </div>
+              <p className="mt-2 text-xs leading-relaxed text-zinc-400">
+                Save promising roles, apply directly, and follow each application stage from submission to offer.
+              </p>
+            </div>
+          </div>
         </div>
       </section>
     </div>
