@@ -56,6 +56,7 @@ class ApplicationStatsOut(BaseModel):
     interview: int
     rejected: int
     offer: int
+    hired: int = 0
     # ---- additive Phase 4 (plan §18/§19) ----
     saved: int = 0
     successful_skills: list[str] = []

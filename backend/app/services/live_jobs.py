@@ -46,6 +46,7 @@ from app.services.ingest import (
     resolve_currency,
 )
 from app.services.ingest.fetch import fetch_adzuna_search
+from app.services import location_hint
 
 log = logging.getLogger(__name__)
 
@@ -65,6 +66,17 @@ LIVE_TIMEOUT_SECONDS = 8.0
 
 # Sort mapping → Adzuna's own `sort_by` (None = provider best-match).
 _ADZUNA_SORT = {"date": "date", "salary": "salary"}
+
+_LIVE_QUERY_FILLER = frozenset(
+    {
+        "a", "an", "and", "around", "at", "be", "best", "candidate",
+        "candidates", "find", "for", "freshers", "fresher", "get", "in",
+        "job", "jobs", "me", "more", "my", "of", "on", "openings",
+        "please", "position", "positions", "role", "roles", "search",
+        "show", "the", "to", "under", "vacancy", "vacancies", "want",
+        "with",
+    }
+)
 
 
 def is_live_id(job_id: str | None) -> bool:
@@ -98,7 +110,7 @@ def _parse_posted_at(raw: str | None) -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _map_posting(raw: dict) -> dict | None:
+def _map_posting(raw: dict, *, country: str | None = None) -> dict | None:
     """Raw Adzuna row → normalized posting (pipeline stages 2–4, no I/O).
 
     Returns None for junk rows (empty title / stub description) so quality
@@ -116,10 +128,10 @@ def _map_posting(raw: dict) -> dict | None:
         salary_max = int(emax) if emax is not None else None
         if salary_min is not None and salary_max is not None and salary_min > salary_max:
             salary_min, salary_max = salary_max, salary_min
-        salary_currency = resolve_currency("adzuna")
+        salary_currency = resolve_currency("adzuna", country)
     else:
         salary_min, salary_max, salary_currency = parse_salary(
-            title, default_currency=resolve_currency("adzuna")
+            title, default_currency=resolve_currency("adzuna", country)
         )
 
     raw_location = str(raw.get("location") or "").strip()
@@ -142,7 +154,7 @@ def _map_posting(raw: dict) -> dict | None:
         "is_remote": remote,
         "salary_min": salary_min,
         "salary_max": salary_max,
-        "currency": salary_currency or "USD",
+        "currency": salary_currency or resolve_currency("adzuna", country),
         "url": str(raw.get("url") or ""),
         "created_at": _parse_posted_at(raw.get("posted_at")),
         "employment_type": employment,
@@ -156,6 +168,7 @@ def search_postings(
     query: str,
     *,
     location: str | None = None,
+    country: str | None = None,
     page: int = 1,
     page_size: int = 20,
     sort_by: str | None = None,
@@ -163,30 +176,55 @@ def search_postings(
     """Live Adzuna search → (normalized postings, total match count).
 
     Never raises: provider/network failures log and return ([], 0) so the
-    caller degrades to platform postings alone.  Adzuna effectively ANDs the
-    terms of `what`, so a long query that matches nothing is retried once
-    with its first three words (recall rescue, still this query's results).
+    caller degrades to platform postings alone.  `country` selects the Adzuna
+    marketplace (de/us/in/…); when omitted the configured index is used.
+    Adzuna effectively ANDs the terms of `what`, so a long query that matches
+    nothing is retried once with its first three words (recall rescue, still
+    this query's results).
     """
-    key = (query.strip().lower(), (location or "").strip().lower(), page, page_size, sort_by)
+    country_code = (country or "").strip().lower() or None
+    key = (
+        query.strip().lower(),
+        (location or "").strip().lower(),
+        country_code,
+        page,
+        page_size,
+        sort_by,
+    )
     cached = _search_cache.get(key)
     if cached is not None and time.monotonic() - cached[0] < _CACHE_TTL_SECONDS:
         return cached[1], cached[2]
 
     def _fetch(what: str) -> tuple[list[dict], int]:
-        return fetch_adzuna_search(
-            what,
-            page=page,
-            results_per_page=page_size,
-            where=location or None,
-            sort_by=_ADZUNA_SORT.get(sort_by or "relevance"),
-            timeout=LIVE_TIMEOUT_SECONDS,
-        )
+        kwargs = {
+            "page": page,
+            "results_per_page": page_size,
+            "where": location or None,
+            "sort_by": _ADZUNA_SORT.get(sort_by or "relevance"),
+            "timeout": LIVE_TIMEOUT_SECONDS,
+        }
+        if country_code:
+            kwargs["country"] = country_code
+        return fetch_adzuna_search(what, **kwargs)
 
     try:
         rows, total = _fetch(query)
         tokens = query.split()
         if total == 0 and len(tokens) > 3:
             rows, total = _fetch(" ".join(tokens[:3]))
+        if total == 0 and len(tokens) > 3:
+            hint = location_hint.detect_location(query)
+            meaningful_source = (
+                location_hint.strip_location(query, hint) if hint is not None else query
+            )
+            meaningful = [
+                token
+                for token in meaningful_source.split()
+                if token.strip(" ,.!?").lower() not in _LIVE_QUERY_FILLER
+            ]
+            rescue_query = " ".join(meaningful).strip()
+            if rescue_query and rescue_query != query and rescue_query != " ".join(tokens[:3]):
+                rows, total = _fetch(rescue_query)
     except Exception:  # noqa: BLE001 - live leg must never break the page
         log.warning("live Adzuna search failed for %r; serving platform-only", query)
         return [], 0
@@ -194,7 +232,7 @@ def search_postings(
     postings: list[dict] = []
     seen: set[str] = set()
     for raw in rows:
-        posting = _map_posting(raw)
+        posting = _map_posting(raw, country=country_code)
         if posting is None or not posting["external_id"]:
             continue
         if posting["external_id"] in seen:

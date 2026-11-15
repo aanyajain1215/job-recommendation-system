@@ -124,14 +124,15 @@ def apply_to_job(
     - Application-layer & DB-level idempotency ((job_id, user_id) unique index).
     - Single atomic transaction linking the Application row and the 'apply' Interaction.
     """
-    # 1. Early check for existing application
+    # 1. A saved job is promoted to a real application; other existing
+    #    application rows remain idempotent conflicts.
     existing_app = db.scalar(
-        select(Application.id).where(
+        select(Application).where(
             Application.job_id == job_id,
             Application.user_id == current_user.id,
         )
     )
-    if existing_app:
+    if existing_app is not None and existing_app.status != ApplicationStatus.SAVED:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Already applied to this job.",
@@ -160,13 +161,36 @@ def apply_to_job(
         db.add(profile)
         db.flush()
 
+    cover_note = payload.cover_note.strip() if payload.cover_note else None
+
+    if existing_app is not None:
+        existing_app.status = ApplicationStatus.APPLIED
+        existing_app.cover_note = cover_note
+        existing_app.resume_url_snapshot = profile.resume_url
+        db.add(
+            Interaction(
+                user_id=current_user.id,
+                job_id=job.id,
+                event_type=InteractionType.APPLY,
+                metadata_={
+                    "source": "apply_api",
+                    "promoted_from": "saved",
+                    "has_cover_note": bool(cover_note),
+                    "resume_url_snapshot": profile.resume_url,
+                },
+            )
+        )
+        db.commit()
+        db.refresh(existing_app)
+        return _format_application_out(existing_app, job=job)
+
     # 4. Atomic application + interaction creation in the same transaction
     app_record = Application(
         job_id=job.id,
         user_id=current_user.id,
         profile_id=profile.id,
         status=ApplicationStatus.APPLIED,
-        cover_note=payload.cover_note.strip() if payload.cover_note else None,
+        cover_note=cover_note,
         resume_url_snapshot=profile.resume_url,
     )
     db.add(app_record)
@@ -236,6 +260,7 @@ def _successful_skill_observation(db: Session, user_id) -> tuple[list[str], str]
         ApplicationStatus.SHORTLISTED,
         ApplicationStatus.INTERVIEW,
         ApplicationStatus.OFFER,
+        ApplicationStatus.HIRED,
     )
     rows = db.execute(
         select(Skill.name, func.count(Skill.id))
@@ -293,6 +318,7 @@ def get_my_application_stats(
         interview=counts.get(ApplicationStatus.INTERVIEW, 0),
         rejected=counts.get(ApplicationStatus.REJECTED, 0),
         offer=counts.get(ApplicationStatus.OFFER, 0),
+        hired=counts.get(ApplicationStatus.HIRED, 0),
         saved=counts.get(ApplicationStatus.SAVED, 0),
         successful_skills=successful,
         observation_note=note,

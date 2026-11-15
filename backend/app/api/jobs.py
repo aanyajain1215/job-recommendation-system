@@ -1,19 +1,21 @@
+import logging
 import math
 from typing import Annotated
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, or_, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.api.deps import get_current_user, require_roles
+from app.api.deps import get_current_user, get_optional_user, require_roles
 from app.core.db import get_db
 from app.models.application import Application
 from app.models.company import Company
 from app.models.enums import EmploymentType, ExperienceLevel, JobStatus, UserRole, WorkMode
 from app.models.job import Job
 from app.models.job_family import JobFamily
-from app.models.skill import JobSkill, Skill
+from app.models.profile import Profile
+from app.models.skill import JobSkill, ProfileSkill, Skill
 from app.models.user import User
 from app.schemas.job import (
     JobCreateRequest,
@@ -24,10 +26,12 @@ from app.schemas.job import (
     JobUpdateRequest,
 )
 from app.schemas.user import CompanySummary
-from app.services import live_jobs, nl_search
+from app.services import live_jobs, location_hint, nl_search
+from app.services.gap_preview import annotate_skill_gaps
 from app.services.skill_normalizer import build_db_normalizer, resolve_skill
 
 router = APIRouter(tags=["jobs"])
+log = logging.getLogger(__name__)
 
 # Platform matches considered for a merged (platform + live) search page —
 # enough for any realistic on-platform corpus, bounded so one request can't
@@ -85,6 +89,50 @@ def _format_job_response(
     )
 
 
+def _annotate_gaps(
+    items: list[JobDetailResponse],
+    db: Session,
+    current_user: User | None,
+) -> None:
+    """Skill-gap previews for cards, when a signed-in seeker is viewing.
+
+    Best-effort: a graph/profile failure must never break the catalog, so the
+    cards simply ship without chips (the endpoint stays 200).
+    """
+    if current_user is None or not items:
+        return
+    try:
+        profile = db.scalar(
+            select(Profile)
+            .where(Profile.user_id == current_user.id)
+            .options(selectinload(Profile.skills).selectinload(ProfileSkill.skill))
+        )
+        annotate_skill_gaps(items, profile)
+    except Exception:  # noqa: BLE001 - preview is additive, never fatal
+        log.exception("skill-gap preview failed; serving cards without chips")
+
+
+def _live_item_key(item: JobDetailResponse) -> str:
+    return f"{(item.title or '').strip().lower()}|{(item.company.name or '').strip().lower()}"
+
+
+def _live_where(
+    hint: location_hint.LocationHint | None, location: str | None
+) -> str | None:
+    """Adzuna `where` for a detected location.
+
+    A country-level request is already scoped by the marketplace index; the
+    provider's `where` wants local place names (`where=Germany` on the German
+    index matches nothing, `Berlin` works).  So omit `where` for country
+    hints that have a dedicated index, and pass cities through.
+    """
+    if not location:
+        return None
+    if hint is not None and hint.is_country and hint.country_code:
+        return None
+    return location
+
+
 def _paginate_merged(
     platform_items: list[JobDetailResponse],
     *,
@@ -93,6 +141,8 @@ def _paginate_merged(
     sort_by: str,
     offset: int,
     page_size: int,
+    live_country: str | None = None,
+    location_priority: location_hint.LocationHint | None = None,
 ) -> tuple[list[JobDetailResponse], int]:
     """One offset-paginated window over platform matches + live Adzuna results.
 
@@ -102,45 +152,85 @@ def _paginate_merged(
     returns ([], 0)).  Dedupe is title+company against the platform window
     and within the live slice; `total` keeps Adzuna's own count, so it can
     run slightly high when dedupe drops a duplicate.
+
+    When `location_priority` is set (a country/city mentioned in the
+    free-text query), the merged window is re-ordered so jobs in that
+    location — from either source — come first: platform matches, live
+    matches, then everything else.  Without it the historical platform-first
+    order is preserved exactly.
     """
     p_count = len(platform_items)
     live_total = 0
-    live_slice: list[JobDetailResponse] = []
+    pages: dict[int, list[dict]] = {}
 
-    start = max(0, offset - p_count)
-    end = offset + page_size - p_count
-    if end > 0:
-        first_page = start // page_size + 1
-        last_page = (end - 1) // page_size + 1
-        pages: dict[int, list[dict]] = {}
-        for page_no in range(first_page, last_page + 1):
-            rows, total = live_jobs.search_postings(
-                live_query,
-                location=live_location,
-                page=page_no,
-                page_size=page_size,
-                sort_by=sort_by,
-            )
-            if page_no == first_page:
-                live_total = total
-            pages[page_no] = rows
+    if location_priority is not None:
+        # Priority view: fetch enough live pages to fill the requested merged
+        # window (bounded so a deep page cannot hammer the provider).
+        last_page = max(1, min(math.ceil((offset + page_size) / page_size), 5))
+        page_numbers = range(1, last_page + 1)
+        start = 0
+        end = 0
+    else:
+        start = max(0, offset - p_count)
+        end = offset + page_size - p_count
+        if end <= 0:
+            page_numbers = range(0)
+        else:
+            first_page = start // page_size + 1
+            last_page = (end - 1) // page_size + 1
+            page_numbers = range(first_page, last_page + 1)
 
-        platform_keys = {
-            f"{(p.title or '').strip().lower()}|{(p.company.name or '').strip().lower()}"
-            for p in platform_items
-        }
+    for page_no in page_numbers:
+        rows, total = live_jobs.search_postings(
+            live_query,
+            location=live_location,
+            country=live_country,
+            page=page_no,
+            page_size=page_size,
+            sort_by=sort_by,
+        )
+        if not pages:
+            live_total = total
+        pages[page_no] = rows
+
+    platform_keys = {_live_item_key(p) for p in platform_items}
+
+    if location_priority is not None:
+        live_items: list[JobDetailResponse] = []
         seen: set[str] = set()
-        for index in range(start, end):
-            rows = pages.get(index // page_size + 1) or []
-            within = index % page_size
-            if within >= len(rows):
-                continue
-            item = live_jobs.to_response(rows[within])
-            key = f"{item.title.strip().lower()}|{item.company.name.strip().lower()}"
-            if key in seen or key in platform_keys:
-                continue
-            seen.add(key)
-            live_slice.append(item)
+        for page_no in sorted(pages):
+            for posting in pages[page_no]:
+                item = live_jobs.to_response(posting)
+                key = _live_item_key(item)
+                if key in seen or key in platform_keys:
+                    continue
+                seen.add(key)
+                live_items.append(item)
+
+        def _preferred(item: JobDetailResponse) -> bool:
+            return location_hint.location_matches(item.location, location_priority)
+
+        ordered = (
+            [item for item in platform_items if _preferred(item)]
+            + [item for item in live_items if _preferred(item)]
+            + [item for item in platform_items if not _preferred(item)]
+            + [item for item in live_items if not _preferred(item)]
+        )
+        return ordered[offset : offset + page_size], p_count + live_total
+
+    live_slice: list[JobDetailResponse] = []
+    seen = set()
+    for index in range(start, end):
+        rows = pages.get(index // page_size + 1) or []
+        within = index % page_size
+        if within >= len(rows):
+            continue
+        item = live_jobs.to_response(rows[within])
+        key = _live_item_key(item)
+        if key in seen or key in platform_keys:
+            continue
+        seen.add(key)
+        live_slice.append(item)
 
     window = platform_items[offset : offset + page_size]
     return window + live_slice, p_count + live_total
@@ -264,13 +354,41 @@ def list_jobs(
     min_salary: int | None = None,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
+    current_user: Annotated[User | None, Depends(get_optional_user)] = None,
 ) -> JobListResponse:
     """Public job search with Postgres Full-Text Search (GIN), weighted ranking, and filters.
 
     Plan §15/§17 filter list: company, industry, family, skills[] (AND —
     every listed skill must be present, aliases canonicalized via the
-    normalizer without creating rows)."""
+    normalizer without creating rows).
+
+    Signed-in seekers additionally get per-card skill-gap previews (matched /
+    missing required / transferable + skill-match score), including for live
+    Adzuna rows that have no persisted detail page.
+    """
     query_text = (q or search or "").strip()
+    location_text = (location or "").strip() or None
+
+    # Country/city detection: the structured `location` field is
+    # authoritative (hard filter).  A country typed inside the free-text
+    # query becomes a soft ranking priority — other countries stay reachable,
+    # just below the requested one.
+    hint = (
+        location_hint.detect_location(location_text)
+        if location_text
+        else location_hint.detect_location(query_text)
+    )
+    soft_hint = hint if (hint is not None and location_text is None) else None
+    effective_location = location_text or (hint.label if hint else None)
+    search_text = (
+        location_hint.strip_location(query_text, soft_hint)
+        if soft_hint is not None
+        else query_text
+    )
+    if soft_hint is not None and not nl_search.content_tokens(search_text):
+        # The query was only the place ("jobs in Germany") — browse that
+        # country instead of sending a meaningless live `what`.
+        search_text = _DEFAULT_BROWSE_QUERY
 
     query = (
         select(Job)
@@ -285,13 +403,13 @@ def list_jobs(
     rank_column = None
     snippet_column = None
 
-    if query_text:
-        tsquery = func.websearch_to_tsquery("english", query_text)
+    if search_text:
+        tsquery = func.websearch_to_tsquery("english", search_text)
 
         match_clause = or_(
             Job.search_vector.op("@@")(tsquery),
-            Job.title.ilike(f"%{query_text}%"),
-            Job.description.ilike(f"%{query_text}%"),
+            Job.title.ilike(f"%{search_text}%"),
+            Job.description.ilike(f"%{search_text}%"),
         )
         query = query.where(match_clause)
 
@@ -303,8 +421,8 @@ def list_jobs(
             "StartSel=<mark>, StopSel=</mark>, MaxWords=35, MinWords=15",
         ).label("highlight_snippet")
 
-    if location:
-        query = query.where(Job.location.ilike(f"%{location.strip()}%"))
+    if location_text:
+        query = query.where(Job.location.ilike(f"%{location_text}%"))
 
     if is_remote is not None:
         query = query.where(Job.is_remote == is_remote)
@@ -377,19 +495,36 @@ def list_jobs(
                 )
             )
 
-    # Sorting
-    if sort_by == "salary":
-        query = query.order_by(
-            func.coalesce(Job.salary_max, Job.salary_min, 0).desc(),
-            Job.created_at.desc(),
+    # Sorting.  A country inferred from the free-text query is a priority
+    # prefix (not a hard filter), so its matches are fetched first even when
+    # the platform corpus is larger than the merge cap.
+    location_rank = None
+    if soft_hint is not None:
+        location_rank = case(
+            (
+                or_(
+                    *[
+                        Job.location.ilike(f"%{term}%")
+                        for term in soft_hint.match_terms
+                    ]
+                ),
+                0,
+            ),
+            else_=1,
         )
+
+    if sort_by == "salary":
+        order = [func.coalesce(Job.salary_max, Job.salary_min, 0).desc(), Job.created_at.desc()]
     elif sort_by == "date":
-        query = query.order_by(Job.created_at.desc())
+        order = [Job.created_at.desc()]
     else:  # relevance
-        if query_text and rank_column is not None:
-            query = query.order_by(rank_column.desc(), Job.created_at.desc())
+        if search_text and rank_column is not None:
+            order = [rank_column.desc(), Job.created_at.desc()]
         else:
-            query = query.order_by(Job.created_at.desc())
+            order = [Job.created_at.desc()]
+    if location_rank is not None:
+        order.insert(0, location_rank)
+    query = query.order_by(*order)
 
     offset = (page - 1) * page_size
 
@@ -400,7 +535,7 @@ def list_jobs(
     # so letting it through would silently ignore precise filters.
     has_filters = any(
         [
-            location,
+            location_text,
             is_remote is not None,
             work_mode is not None,
             employment_type is not None,
@@ -414,7 +549,7 @@ def list_jobs(
             min_salary,
         ]
     )
-    live_query = query_text or (None if has_filters else _DEFAULT_BROWSE_QUERY)
+    live_query = search_text or (None if has_filters else _DEFAULT_BROWSE_QUERY)
 
     if live_query:
         if rank_column is not None and snippet_column is not None:
@@ -435,7 +570,9 @@ def list_jobs(
         items, total = _paginate_merged(
             platform_items,
             live_query=live_query,
-            live_location=location,
+            live_location=_live_where(hint, effective_location),
+            live_country=hint.country_code if hint is not None else None,
+            location_priority=soft_hint,
             sort_by=sort_by,
             offset=offset,
             page_size=page_size,
@@ -449,6 +586,7 @@ def list_jobs(
         items = [_format_job_response(j) for j in jobs]
 
     total_pages = max(1, math.ceil(total / page_size))
+    _annotate_gaps(items, db, current_user)
     return JobListResponse(
         items=items,
         total=total,
@@ -464,6 +602,7 @@ def nl_search_jobs(
     q: Annotated[str, Query(min_length=1, max_length=300)],
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
+    current_user: Annotated[User | None, Depends(get_optional_user)] = None,
 ) -> JobNlResponse:
     """NL job search (plan §15/§17): P7 → whitelist → same query builder.
 
@@ -476,7 +615,33 @@ def nl_search_jobs(
     """
     filters, mode = nl_search.parse_query(q)
     filters = nl_search.canonicalize_skills(db, filters)
-    query, rank_column = nl_search.build_filtered_query(db, filters)
+
+    # Deterministic country/city extraction.  The LLM may miss a location the
+    # user typed in free text (the FTS fallback never extracts one), so
+    # "software engineer jobs in Germany" used to rank USA/Mexico first.
+    # A detected place is always a soft priority here: NL input is free text,
+    # not the structured location filter, so other countries stay below it.
+    hint = location_hint.detect_location(filters.location or "") or location_hint.detect_location(q)
+    soft_hint: location_hint.LocationHint | None = hint
+    query_filters = filters
+    if hint is not None:
+        stripped = location_hint.strip_location(filters.keywords or q, hint)
+        if not nl_search.content_tokens(stripped):
+            stripped = _DEFAULT_BROWSE_QUERY
+        query_filters = filters.model_copy(
+            update={
+                "keywords": stripped,
+                "location": None,
+            }
+        )
+
+    effective_location = (
+        hint.label
+        if hint is not None
+        else (filters.location.strip() if filters.location else None)
+    )
+
+    query, rank_column = nl_search.build_filtered_query(db, query_filters)
 
     if rank_column is not None:
         query = query.order_by(
@@ -486,15 +651,24 @@ def nl_search_jobs(
         query = query.order_by(Job.created_at.desc(), Job.id.asc())
 
     candidates = list(db.scalars(query.limit(nl_search.CANDIDATE_CAP)).all())
-    ranked = nl_search.hybrid_rank(db, candidates, filters)
+    ranked = nl_search.hybrid_rank(db, candidates, query_filters)
     platform_items = [_format_job_response(job) for job in ranked]
+
+    # Keep the country-first intent even before pagination: hybrid_rank only
+    # knows text/skills, so partition its output by the detected location.
+    if soft_hint is not None:
+        platform_items.sort(
+            key=lambda item: 0
+            if location_hint.location_matches(item.location, soft_hint)
+            else 1
+        )
 
     # Live leg: the parsed keywords/skills become the Adzuna `what` query, so
     # NL search also sees real-time listings (provider failure → platform only).
     live_query = (
         " ".join(
             part
-            for part in [filters.keywords or "", *list(filters.skills)[:4]]
+            for part in [query_filters.keywords or "", *list(query_filters.skills)[:4]]
             if part and part.strip()
         ).strip()
         or q.strip()
@@ -504,7 +678,9 @@ def nl_search_jobs(
         items, total = _paginate_merged(
             platform_items,
             live_query=live_query,
-            live_location=filters.location,
+            live_location=_live_where(hint, effective_location),
+            live_country=hint.country_code if hint is not None else None,
+            location_priority=soft_hint,
             sort_by="relevance",
             offset=offset,
             page_size=page_size,
@@ -513,11 +689,15 @@ def nl_search_jobs(
         total = len(platform_items)
         items = platform_items[offset : offset + page_size]
 
+    _annotate_gaps(items, db, current_user)
+    echo_filters = filters
+    if soft_hint is not None:
+        echo_filters = query_filters.model_copy(update={"location": soft_hint.label})
     return JobNlResponse(
         items=items,
         total=total,
         mode=mode,
-        parsed_filters=nl_search.parsed_filters_dict(filters),
+        parsed_filters=nl_search.parsed_filters_dict(echo_filters),
         q=q,
     )
 
@@ -526,6 +706,7 @@ def nl_search_jobs(
 def get_job_detail(
     job_id: str,
     db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User | None, Depends(get_optional_user)] = None,
 ) -> JobDetailResponse:
     """Retrieve detailed view of a single job.
 
@@ -566,7 +747,9 @@ def get_job_detail(
         select(func.count(Application.id)).where(Application.job_id == job_uuid)
     ) or 0
 
-    return _format_job_response(job, applicant_count=applicant_count)
+    response = _format_job_response(job, applicant_count=applicant_count)
+    _annotate_gaps([response], db, current_user)
+    return response
 
 
 @router.put("/jobs/{job_id}", response_model=JobDetailResponse)

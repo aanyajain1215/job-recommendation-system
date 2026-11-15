@@ -4,9 +4,16 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { getPreferences, resetPreferences } from "@/lib/api";
-import { PreferenceState } from "@/lib/types";
-import { History, Info, RotateCcw, Settings2, Sparkles } from "lucide-react";
+import {
+  clearAlertHistory,
+  getAlertSettings,
+  getPreferences,
+  previewAlertMatches,
+  resetPreferences,
+  updateAlertSettings,
+} from "@/lib/api";
+import { AlertPreview, AlertSettings, PreferenceState } from "@/lib/types";
+import { BellRing, History, Info, Mail, RotateCcw, Settings2, Sparkles } from "lucide-react";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -15,18 +22,78 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [resetting, setResetting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [alerts, setAlerts] = useState<AlertSettings | null>(null);
+  const [alertsSaving, setAlertsSaving] = useState(false);
+  const [alertsNote, setAlertsNote] = useState<string | null>(null);
+  const [preview, setPreview] = useState<AlertPreview | null>(null);
+  const [previewing, setPreviewing] = useState(false);
 
   const load = useCallback(async () => {
     if (!token) return;
     try {
       setError(null);
       setPrefs(await getPreferences(token));
+      try {
+        setAlerts(await getAlertSettings(token));
+      } catch {
+        setAlerts(null);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load preferences");
     } finally {
       setLoading(false);
     }
   }, [token]);
+
+  const saveAlerts = async () => {
+    if (!token || !alerts) return;
+    setAlertsSaving(true);
+    setAlertsNote(null);
+    try {
+      const saved = await updateAlertSettings(
+        {
+          enabled: alerts.enabled,
+          email_enabled: alerts.email_enabled,
+          digest_frequency: alerts.digest_frequency as "daily" | "weekly" | "off",
+          min_score: alerts.min_score,
+          max_items: alerts.max_items,
+        },
+        token,
+      );
+      setAlerts(saved);
+      setAlertsNote("Saved");
+      setPreview(null);
+    } catch (err) {
+      setAlertsNote(err instanceof Error ? err.message : "Failed to save alert settings");
+    } finally {
+      setAlertsSaving(false);
+    }
+  };
+
+  const runPreview = async () => {
+    if (!token || !alerts) return;
+    setPreviewing(true);
+    setAlertsNote(null);
+    try {
+      setPreview(await previewAlertMatches(token, { minScore: alerts.min_score }));
+    } catch (err) {
+      setAlertsNote(err instanceof Error ? err.message : "Failed to preview matches");
+    } finally {
+      setPreviewing(false);
+    }
+  };
+
+  const clearHistory = async () => {
+    if (!token) return;
+    if (!confirm("Forget already-alerted jobs? Future runs may alert them again.")) return;
+    try {
+      await clearAlertHistory(token);
+      setAlertsNote("Alert history cleared");
+      setPreview(null);
+    } catch (err) {
+      setAlertsNote(err instanceof Error ? err.message : "Failed to clear history");
+    }
+  };
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -163,6 +230,130 @@ export default function SettingsPage() {
                 </div>
               ))}
             </div>
+          </div>
+
+          <div className="mt-6 rounded-2xl border border-zinc-800/80 bg-zinc-900/40 p-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-zinc-400">
+                <BellRing className="h-4 w-4 text-teal-400" />
+                Job alerts from your saved jobs
+              </h2>
+              <Link href="/notifications" className="text-xs font-medium text-teal-400 hover:text-teal-300">
+                View notifications →
+              </Link>
+            </div>
+            {alerts === null ? (
+              <p className="mt-4 text-xs text-zinc-500">
+                Alerts need a profile. Complete your profile, save a few jobs, then come back.
+              </p>
+            ) : (
+              <>
+                <p className="mt-2 text-xs leading-relaxed text-zinc-500">
+                  We compare newly posted jobs with the jobs you saved and notify you when similar roles go live.
+                  In-app alerts are always available; email is optional.
+                </p>
+                <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2">
+                  <label className="flex items-start gap-3 rounded-xl border border-zinc-800/70 bg-zinc-950/40 p-3">
+                    <input
+                      type="checkbox"
+                      checked={alerts.enabled}
+                      onChange={(e) => setAlerts({ ...alerts, enabled: e.target.checked })}
+                      className="mt-0.5 h-4 w-4 accent-teal-500"
+                    />
+                    <span>
+                      <span className="block text-xs font-semibold text-zinc-200">Enable job alerts</span>
+                      <span className="block text-[11px] text-zinc-500">Pause anytime without losing history.</span>
+                    </span>
+                  </label>
+                  <label className="flex items-start gap-3 rounded-xl border border-zinc-800/70 bg-zinc-950/40 p-3">
+                    <input
+                      type="checkbox"
+                      checked={alerts.email_enabled}
+                      onChange={(e) => setAlerts({ ...alerts, email_enabled: e.target.checked })}
+                      className="mt-0.5 h-4 w-4 accent-teal-500"
+                    />
+                    <span>
+                      <span className="flex items-center gap-1.5 text-xs font-semibold text-zinc-200">
+                        <Mail className="h-3.5 w-3.5 text-zinc-400" /> Email me a digest
+                      </span>
+                      <span className="block text-[11px] text-zinc-500">Requires SMTP configuration.</span>
+                    </span>
+                  </label>
+                  <label className="block">
+                    <span className="mb-1.5 block text-[11px] font-medium uppercase tracking-wider text-zinc-400">Frequency</span>
+                    <select
+                      value={alerts.digest_frequency}
+                      onChange={(e) => setAlerts({ ...alerts, digest_frequency: e.target.value })}
+                      className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-zinc-200"
+                    >
+                      <option value="daily">Daily</option>
+                      <option value="weekly">Weekly</option>
+                      <option value="off">Off</option>
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="mb-1.5 block text-[11px] font-medium uppercase tracking-wider text-zinc-400">Max jobs per digest</span>
+                    <select
+                      value={alerts.max_items}
+                      onChange={(e) => setAlerts({ ...alerts, max_items: Number(e.target.value) })}
+                      className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-zinc-200"
+                    >
+                      {[3, 5, 8, 10, 15].map((n) => <option key={n} value={n}>{n}</option>)}
+                    </select>
+                  </label>
+                  <label className="block sm:col-span-2">
+                    <span className="mb-1.5 flex items-center justify-between text-[11px] font-medium uppercase tracking-wider text-zinc-400">
+                      <span>Minimum match score</span>
+                      <span className="font-mono text-teal-300">{alerts.min_score.toFixed(0)}</span>
+                    </span>
+                    <input
+                      type="range"
+                      min={30}
+                      max={90}
+                      step={5}
+                      value={alerts.min_score}
+                      onChange={(e) => setAlerts({ ...alerts, min_score: Number(e.target.value) })}
+                      className="w-full accent-teal-500"
+                    />
+                  </label>
+                </div>
+                <div className="mt-5 flex flex-wrap items-center gap-2">
+                  <button type="button" onClick={saveAlerts} disabled={alertsSaving} className="rounded-lg bg-teal-500 px-4 py-2 text-xs font-semibold text-zinc-950 disabled:opacity-50">
+                    {alertsSaving ? "Saving…" : "Save alert settings"}
+                  </button>
+                  <button type="button" onClick={runPreview} disabled={previewing} className="rounded-lg border border-zinc-700 px-4 py-2 text-xs font-medium text-zinc-200 disabled:opacity-50">
+                    {previewing ? "Scanning…" : "Preview matches"}
+                  </button>
+                  <button type="button" onClick={clearHistory} className="ml-auto text-[11px] font-medium text-zinc-500 hover:text-rose-400">
+                    Clear alert history
+                  </button>
+                  {alertsNote && <span className="w-full text-[11px] text-teal-300/90">{alertsNote}</span>}
+                </div>
+                {preview && (
+                  <div className="mt-4 rounded-xl border border-zinc-800/70 bg-zinc-950/40 p-4">
+                    <p className="text-[11px] text-zinc-400">
+                      {preview.items.length === 0
+                        ? "No new matches right now — nothing to alert."
+                        : `${preview.items.length} match${preview.items.length === 1 ? "" : "es"} from ${preview.seeds_used} saved job${preview.seeds_used === 1 ? "" : "s"}.`}
+                    </p>
+                    {preview.items.length > 0 && (
+                      <ul className="mt-3 space-y-2">
+                        {preview.items.map((match) => (
+                          <li key={match.job.id} className="flex items-start justify-between gap-3">
+                            <Link href={`/jobs/${match.job.id}`} className="min-w-0 flex-1 text-xs text-zinc-200 hover:text-teal-300">
+                              <span className="font-semibold">{match.job.title}</span>
+                              {match.job.company_name && <span className="text-zinc-500"> · {match.job.company_name}</span>}
+                              <span className="mt-0.5 block truncate text-[11px] text-zinc-500">{match.reason}</span>
+                            </Link>
+                            <span className="font-mono text-[10px] text-teal-300">{match.score.toFixed(0)}%</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
           {/* Recent learned changes */}

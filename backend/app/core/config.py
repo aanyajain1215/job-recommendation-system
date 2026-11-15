@@ -77,6 +77,24 @@ class Settings(BaseSettings):
     llm_cache_max_entries: int = 256
     llm_max_repair_turns: int = 1
 
+    # ---- Saved-job alerts ----
+    alerts_enabled: bool = True
+    alert_interval_seconds: int = 86400
+    alert_first_run_lookback_hours: int = 24
+    alert_default_min_score: float = 60.0
+    alert_default_max_items: int = 5
+    alert_max_seed_jobs: int = 20
+    alert_max_new_jobs: int = 500
+    alert_title_weight: float = 0.15
+    email_alerts_enabled: bool = False
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_use_tls: bool = True
+    email_from: str = "JobRec <no-reply@jobrec.local>"
+    frontend_public_url: str = "http://localhost:3000"
+
     # ---- Trained model suite M1–M3 (plan §6/§17/§21) ----
     # M1: skill2vec cosine fallback inside transfer detection — opt-in so the
     # seeded-edge behaviour stays byte-identical until the corpus is large.

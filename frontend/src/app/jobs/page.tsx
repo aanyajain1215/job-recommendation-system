@@ -3,13 +3,17 @@
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { getJobs, searchJobsNL } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 import { JobDetail, JobNlResponse } from "@/lib/types";
 import { formatSalary } from "@/lib/format";
 import {
+  AlertCircle,
+  ArrowRightLeft,
   ArrowUpDown,
   Briefcase,
   Building2,
   Calendar,
+  CheckCircle2,
   Compass,
   DollarSign,
   ExternalLink,
@@ -24,6 +28,7 @@ import {
 const isLiveJob = (job: JobDetail) => job.source === "adzuna" || job.id.startsWith("adzuna-");
 
 export default function JobsPage() {
+  const { token } = useAuth();
   const [jobs, setJobs] = useState<JobDetail[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -57,7 +62,7 @@ export default function JobsPage() {
         skill: skillFilter.trim() || undefined,
         sort_by: sortBy,
         page,
-      });
+      }, token);
       setJobs(data.items);
       setTotal(data.total);
     } catch {
@@ -66,7 +71,7 @@ export default function JobsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [q, location, isRemote, employmentType, experienceLevel, skillFilter, sortBy, page]);
+  }, [q, location, isRemote, employmentType, experienceLevel, skillFilter, sortBy, page, token]);
 
   useEffect(() => {
     loadJobs();
@@ -105,7 +110,7 @@ export default function JobsPage() {
     setNlLoading(true);
     setNlError(null);
     try {
-      const resp = await searchJobsNL(query);
+      const resp = await searchJobsNL(query, token);
       setNlResult(resp);
       setJobs(resp.items);
       setTotal(resp.total);
@@ -493,21 +498,20 @@ export default function JobsPage() {
       ) : (
         <div className="mt-6 space-y-4">
           {jobs.map((job) => {
-            // Live listings open on Adzuna (no detail page); platform jobs route in-app.
             const live = isLiveJob(job);
-            const Wrapper: React.ElementType = live ? "a" : Link;
-            const wrapperProps = live
-              ? {
-                  href: job.external_url || "#",
-                  target: "_blank",
-                  rel: "noopener noreferrer",
-                  title: "Opens the live posting on Adzuna in a new tab",
-                }
-              : { href: `/jobs/${job.id}` };
+            const matched = job.matched_skills ?? [];
+            const missing = job.missing_skills ?? [];
+            const transferable = job.transferable_skills ?? [];
+            const hasGap = matched.length + missing.length + transferable.length > 0;
             return (
-            <Wrapper
+            <Link
               key={job.id}
-              {...wrapperProps}
+              href={`/jobs/${job.id}`}
+              onClick={() => {
+                if (live && typeof window !== "undefined") {
+                  window.sessionStorage.setItem(`jobrec:live-job:${job.id}`, JSON.stringify(job));
+                }
+              }}
               className="group block rounded-2xl border border-zinc-800/80 bg-zinc-900/40 p-6 backdrop-blur hover:border-zinc-700 hover:bg-zinc-900/70 transition-all shadow-md"
             >
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
@@ -582,34 +586,112 @@ export default function JobsPage() {
                 </div>
               </div>
 
-              {/* Skills Chips */}
+              {/* Skills + skill-gap preview (§8) */}
               {job.skills && job.skills.length > 0 && (
-                <div className="mt-4 flex flex-wrap items-center gap-2 pt-4 border-t border-zinc-800/60">
-                  <span className="text-[11px] uppercase tracking-wider text-zinc-500">
-                    Required:
-                  </span>
-                  {job.skills.map((sk, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setSkillFilter(sk.skill_name);
-                        setPage(1);
-                      }}
-                      className="inline-flex items-center gap-1 rounded bg-zinc-800/80 px-2 py-0.5 text-xs text-zinc-300 hover:bg-teal-500/20 hover:text-zinc-100 transition-colors"
-                    >
-                      <Sparkles className="h-2.5 w-2.5 text-teal-400" />
-                      {sk.skill_name}
-                    </button>
-                  ))}
-                  <div className="ml-auto flex items-center gap-1 text-[11px] text-zinc-500">
-                    <Calendar className="h-3 w-3" />
-                    <span>{new Date(job.created_at).toLocaleDateString()}</span>
+                <div className="mt-4 space-y-3 border-t border-zinc-800/60 pt-4">
+                  {hasGap && (
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+                          Your skill fit
+                        </span>
+                        {typeof job.skill_match_score === "number" && (
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                              job.skill_match_score >= 70
+                                ? "bg-emerald-500/10 text-emerald-300"
+                                : job.skill_match_score >= 40
+                                  ? "bg-amber-500/10 text-amber-300"
+                                  : "bg-rose-500/10 text-rose-300"
+                            }`}
+                          >
+                            {Math.round(job.skill_match_score)}% skill match
+                          </span>
+                        )}
+                        {missing.length > 0 && (
+                          <span className="text-[11px] text-amber-400/90">
+                            {missing.length} must-have gap{missing.length === 1 ? "" : "s"}
+                          </span>
+                        )}
+                      </div>
+
+                      {matched.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="mr-1 inline-flex items-center gap-1 text-[11px] font-medium text-emerald-400">
+                            <CheckCircle2 className="h-3 w-3" /> Matched
+                          </span>
+                          {matched.map((skill) => (
+                            <span
+                              key={`matched:${skill}`}
+                              className="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-300"
+                            >
+                              {skill}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {transferable.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="mr-1 inline-flex items-center gap-1 text-[11px] font-medium text-sky-400">
+                            <ArrowRightLeft className="h-3 w-3" /> Transferable
+                          </span>
+                          {transferable.map((skill) => (
+                            <span
+                              key={`transfer:${skill}`}
+                              className="rounded-md border border-sky-500/20 bg-sky-500/10 px-2 py-0.5 text-[11px] font-medium text-sky-300"
+                            >
+                              {skill}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {missing.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="mr-1 inline-flex items-center gap-1 text-[11px] font-medium text-amber-400">
+                            <AlertCircle className="h-3 w-3" /> Missing must-have
+                          </span>
+                          {missing.map((skill) => (
+                            <span
+                              key={`missing:${skill}`}
+                              className="rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-300"
+                            >
+                              {skill}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[11px] uppercase tracking-wider text-zinc-500">
+                      Required:
+                    </span>
+                    {job.skills.map((sk, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setSkillFilter(sk.skill_name);
+                          setPage(1);
+                        }}
+                        className="inline-flex items-center gap-1 rounded bg-zinc-800/80 px-2 py-0.5 text-xs text-zinc-300 hover:bg-teal-500/20 hover:text-zinc-100 transition-colors"
+                      >
+                        <Sparkles className="h-2.5 w-2.5 text-teal-400" />
+                        {sk.skill_name}
+                      </button>
+                    ))}
+                    <div className="ml-auto flex items-center gap-1 text-[11px] text-zinc-500">
+                      <Calendar className="h-3 w-3" />
+                      <span>{new Date(job.created_at).toLocaleDateString()}</span>
+                    </div>
                   </div>
                 </div>
               )}
-            </Wrapper>
+            </Link>
             );
           })}
         </div>

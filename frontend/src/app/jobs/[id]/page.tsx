@@ -10,12 +10,15 @@ import { api, getJobDetail, getMyApplications, saveJob } from "@/lib/api";
 import { JobDetail } from "@/lib/types";
 import { formatSalary } from "@/lib/format";
 import {
+  AlertCircle,
   ArrowLeft,
+  ArrowRightLeft,
   Bookmark,
   Briefcase,
   Building2,
   Calendar,
   CheckCircle,
+  CheckCircle2,
   DollarSign,
   ExternalLink,
   Globe,
@@ -36,24 +39,38 @@ export default function JobDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasApplied, setHasApplied] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
 
   useEffect(() => {
     if (jobId) {
-      getJobDetail(jobId)
+      getJobDetail(jobId, token)
         .then((data) => setJob(data))
-        .catch((err) => setError(err.message))
+        .catch((err) => {
+          if (jobId.startsWith("adzuna-") && typeof window !== "undefined") {
+            const cached = window.sessionStorage.getItem(`jobrec:live-job:${jobId}`);
+            if (cached) {
+              try {
+                setJob(JSON.parse(cached) as JobDetail);
+                return;
+              } catch {
+                window.sessionStorage.removeItem(`jobrec:live-job:${jobId}`);
+              }
+            }
+          }
+          setError(err.message);
+        })
         .finally(() => setIsLoading(false));
     }
-  }, [jobId]);
+  }, [jobId, token]);
 
   // Check if candidate has already applied on load
   useEffect(() => {
     if (user && token && jobId) {
       getMyApplications(token)
         .then((apps) => {
-          if (apps.some((a) => a.job_id === jobId)) {
-            setHasApplied(true);
-          }
+          const application = apps.find((a) => a.job_id === jobId);
+          setHasApplied(Boolean(application && application.status !== "saved"));
+          setIsSaved(application?.status === "saved");
         })
         .catch(() => {});
     }
@@ -84,6 +101,9 @@ export default function JobDetailPage() {
       router.push("/login");
       return;
     }
+    if (job?.external_url) {
+      return;
+    }
     // Send the seeker to the REAL posting in a new tab.  We use a plain
     // <a target="_blank"> (href set in JSX) so this runs as a genuine user
     // gesture — window.open() after an awaited fetch gets popup-blocked.
@@ -94,7 +114,6 @@ export default function JobDetailPage() {
 
   // Save-for-later (wires the previously dead saveJob() helper so the
   // /saved page's "Save roles from a job page" instruction is real).
-  const [isSaved, setIsSaved] = useState(false);
   const { mutate: save, isPending: isSaving } = useMutation({
     mutationFn: () => saveJob(jobId, token!),
     onSuccess: () => {
@@ -116,6 +135,10 @@ export default function JobDetailPage() {
   const handleSave = () => {
     if (!user) {
       router.push("/login");
+      return;
+    }
+    if (job?.source === "adzuna" || job?.id.startsWith("adzuna-")) {
+      toast.info("Live listings cannot be saved. Save a job posted on this platform instead.");
       return;
     }
     save();
@@ -268,10 +291,21 @@ export default function JobDetailPage() {
                     type="button"
                     onClick={handleSave}
                     disabled={isSaving}
+                    title={
+                      job.source === "adzuna" || job.id.startsWith("adzuna-")
+                        ? "Live listings cannot be saved"
+                        : undefined
+                    }
                     className="inline-flex items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-900/60 px-5 py-3 text-sm font-semibold text-zinc-200 hover:bg-zinc-800 active:scale-[0.98] transition-all disabled:opacity-60"
                   >
                     <Bookmark className="h-4 w-4" />
-                    {isSaving ? "Saving..." : isSaved ? "Saved ✓" : "Save Job"}
+                    {isSaving
+                      ? "Saving..."
+                      : isSaved
+                        ? "Saved ✓"
+                        : job.source === "adzuna" || job.id.startsWith("adzuna-")
+                          ? "Save unavailable"
+                          : "Save Job"}
                   </button>
                 </div>
               )}
@@ -311,6 +345,81 @@ export default function JobDetailPage() {
             <p className="mt-1 text-xs text-zinc-500">
               Evaluated for ANN candidate matching and ranking scores.
             </p>
+
+            {/* §8 skill-gap preview: same engine/classes as the feed cards. */}
+            {(job.matched_skills?.length ?? 0) +
+              (job.missing_skills?.length ?? 0) +
+              (job.transferable_skills?.length ?? 0) >
+              0 && (
+              <div className="mt-4 space-y-2 rounded-lg border border-zinc-800 bg-zinc-950/60 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+                    Your skill fit
+                  </span>
+                  {typeof job.skill_match_score === "number" && (
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                        job.skill_match_score >= 70
+                          ? "bg-emerald-500/10 text-emerald-300"
+                          : job.skill_match_score >= 40
+                            ? "bg-amber-500/10 text-amber-300"
+                            : "bg-rose-500/10 text-rose-300"
+                      }`}
+                    >
+                      {Math.round(job.skill_match_score)}% skill match
+                    </span>
+                  )}
+                </div>
+
+                {(job.matched_skills?.length ?? 0) > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="mr-1 inline-flex items-center gap-1 text-[11px] font-medium text-emerald-400">
+                      <CheckCircle2 className="h-3 w-3" /> Matched
+                    </span>
+                    {job.matched_skills!.map((skill) => (
+                      <span
+                        key={`m:${skill}`}
+                        className="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-300"
+                      >
+                        {skill}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {(job.transferable_skills?.length ?? 0) > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="mr-1 inline-flex items-center gap-1 text-[11px] font-medium text-sky-400">
+                      <ArrowRightLeft className="h-3 w-3" /> Transferable
+                    </span>
+                    {job.transferable_skills!.map((skill) => (
+                      <span
+                        key={`t:${skill}`}
+                        className="rounded-md border border-sky-500/20 bg-sky-500/10 px-2 py-0.5 text-[11px] font-medium text-sky-300"
+                      >
+                        {skill}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {(job.missing_skills?.length ?? 0) > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="mr-1 inline-flex items-center gap-1 text-[11px] font-medium text-amber-400">
+                      <AlertCircle className="h-3 w-3" /> Missing must-have
+                    </span>
+                    {job.missing_skills!.map((skill) => (
+                      <span
+                        key={`x:${skill}`}
+                        className="rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-300"
+                      >
+                        {skill}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="mt-4 space-y-2.5">
               {job.skills && job.skills.length > 0 ? (

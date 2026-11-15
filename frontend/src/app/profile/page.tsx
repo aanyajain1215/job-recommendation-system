@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import {
+  getCareerFamilies,
   getMyProfile,
   getSkills,
   reparseResume,
@@ -20,15 +21,18 @@ import {
 import {
   Briefcase,
   CheckCircle2,
+  Compass,
   FileCheck,
   GraduationCap,
   Plus,
   RefreshCw,
   Save,
   Sparkles,
+  Target,
   Trash2,
   Upload,
   User as UserIcon,
+  X,
 } from "lucide-react";
 
 /** Server-side limits from ProfileUpdateRequest, enforced client-side so an
@@ -82,6 +86,14 @@ export default function ProfilePage() {
   const [skillSearch, setSkillSearch] = useState("");
   const [suggestedSkills, setSuggestedSkills] = useState<Skill[]>([]);
 
+  // Career direction — extra skills + target roles/domains for switchers
+  const [targetFamily, setTargetFamily] = useState("");
+  const [familyOptions, setFamilyOptions] = useState<string[]>([]);
+  const [careerInterests, setCareerInterests] = useState<string[]>([]);
+  const [careerInterestInput, setCareerInterestInput] = useState("");
+  const [extraSkillSearch, setExtraSkillSearch] = useState("");
+  const [extraSkillSuggestions, setExtraSkillSuggestions] = useState<Skill[]>([]);
+
   // Education & Experience
   const [education, setEducation] = useState<EducationItem[]>([]);
   const [experience, setExperience] = useState<ExperienceItem[]>([]);
@@ -104,6 +116,8 @@ export default function ProfilePage() {
           setPhone(data.phone || "");
           setYearsOfExp(data.years_of_experience ?? "");
           setSkills(data.skills || []);
+          setTargetFamily(data.target_family || "");
+          setCareerInterests(data.career_interests || []);
           setEducation(data.education || []);
           setExperience(data.work_experience || []);
         })
@@ -122,6 +136,22 @@ export default function ProfilePage() {
       setSuggestedSkills([]);
     }
   }, [skillSearch]);
+
+  // Career-direction form: family options + extra-skill autocomplete.
+  useEffect(() => {
+    if (!token) return;
+    getCareerFamilies(token)
+      .then(setFamilyOptions)
+      .catch(() => setFamilyOptions([]));
+  }, [token]);
+
+  useEffect(() => {
+    if (extraSkillSearch.trim().length > 1) {
+      getSkills(extraSkillSearch.trim()).then((items) => setExtraSkillSuggestions(items));
+    } else {
+      setExtraSkillSuggestions([]);
+    }
+  }, [extraSkillSearch]);
 
   const handleAddSkill = (skillName: string, category?: string | null) => {
     const trimmed = skillName.trim();
@@ -158,6 +188,28 @@ export default function ProfilePage() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     updated[index] = { ...updated[index], [field]: value as any };
     setSkills(updated);
+  };
+
+  // Career-direction handlers (requirement 2): roles/domains + extra skills.
+  const handleAddCareerInterest = () => {
+    const trimmed = careerInterestInput.trim();
+    if (!trimmed) return;
+    if (careerInterests.some((i) => i.toLowerCase() === trimmed.toLowerCase())) {
+      setCareerInterestInput("");
+      return;
+    }
+    setCareerInterests([...careerInterests, trimmed]);
+    setCareerInterestInput("");
+  };
+
+  const handleRemoveCareerInterest = (indexToRemove: number) => {
+    setCareerInterests(careerInterests.filter((_, idx) => idx !== indexToRemove));
+  };
+
+  const handleAddExtraSkill = (name: string, category?: string | null) => {
+    handleAddSkill(name, category);
+    setExtraSkillSearch("");
+    setExtraSkillSuggestions([]);
   };
 
   const handleAddEducation = () => {
@@ -329,10 +381,15 @@ export default function ProfilePage() {
           skills,
           education,
           work_experience: experience,
+          // Career switchers: explicit target direction, independent of resume.
+          target_family: targetFamily,
+          career_interests: careerInterests,
         },
         token
       );
       setProfile(res);
+      setTargetFamily(res.target_family || "");
+      setCareerInterests(res.career_interests || []);
       setMessage({ type: "success", text: "Profile updated successfully!" });
     } catch (err: unknown) {
       if (err instanceof Error) {
@@ -700,6 +757,151 @@ export default function ProfilePage() {
                 </div>
               </div>
             ))}
+          </div>
+        </section>
+
+        {/* Career Direction & Extra Skills — role/domain switchers (requirement 2) */}
+        <section className="rounded-xl border border-teal-500/20 bg-teal-500/[0.03] p-6 backdrop-blur">
+          <div className="flex items-start gap-3">
+            <Compass className="mt-0.5 h-5 w-5 shrink-0 text-teal-400" />
+            <div>
+              <h2 className="text-lg font-semibold text-zinc-100">
+                Career Direction & Extra Skills
+              </h2>
+              <p className="mt-1 text-xs text-zinc-400">
+                Switching roles or domains? Tell the recommender where you want to go — this is
+                separate from your resume and can point the feed at a new direction.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2">
+            {/* Target family */}
+            <div>
+              <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                <Target className="h-3.5 w-3.5 text-teal-400" />
+                Target role family
+              </label>
+              <select
+                value={targetFamily}
+                onChange={(e) => setTargetFamily(e.target.value)}
+                className="mt-2 w-full rounded-lg border border-zinc-800 bg-zinc-950/70 px-3 py-2.5 text-sm text-zinc-200 focus:border-teal-500 focus:outline-none"
+              >
+                <option value="">No preference — let the feed decide</option>
+                {familyOptions.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-2 text-[11px] text-zinc-500">
+                Powers the career-interest component of your recommendations.
+              </p>
+            </div>
+
+            {/* Target roles / domains */}
+            <div>
+              <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                <Sparkles className="h-3.5 w-3.5 text-teal-400" />
+                Target roles / domains
+              </label>
+              <div className="mt-2 flex gap-2">
+                <input
+                  type="text"
+                  value={careerInterestInput}
+                  onChange={(e) => setCareerInterestInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleAddCareerInterest();
+                    }
+                  }}
+                  placeholder="e.g. Data Science, Fintech, Product"
+                  className="block flex-1 rounded-lg border border-zinc-800 bg-zinc-950/70 py-2 px-3 text-sm text-zinc-100 placeholder-zinc-500 focus:border-teal-500 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddCareerInterest}
+                  className="rounded-lg bg-zinc-800 px-3 py-2 text-sm font-medium text-zinc-200 hover:bg-zinc-700 transition-colors"
+                >
+                  Add
+                </button>
+              </div>
+              {careerInterests.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {careerInterests.map((interest, idx) => (
+                    <span
+                      key={`${interest}:${idx}`}
+                      className="inline-flex items-center gap-1 rounded-full border border-teal-500/20 bg-teal-500/10 px-2.5 py-1 text-xs text-teal-300"
+                    >
+                      {interest}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveCareerInterest(idx)}
+                        className="text-teal-400/70 hover:text-rose-400 transition-colors"
+                        aria-label={`Remove ${interest}`}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Extra skills beyond the resume */}
+          <div className="mt-5">
+            <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-400">
+              <Plus className="h-3.5 w-3.5 text-teal-400" />
+              Extra skills not on your resume
+            </label>
+            <p className="mt-1 text-[11px] text-zinc-500">
+              Courses, side projects, self-taught tools — added to Skills &amp; Proficiencies above.
+            </p>
+            <div className="relative mt-2">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={extraSkillSearch}
+                  onChange={(e) => setExtraSkillSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleAddExtraSkill(extraSkillSearch);
+                    }
+                  }}
+                  placeholder="e.g. Kubernetes, Figma, SQL..."
+                  className="block flex-1 rounded-lg border border-zinc-800 bg-zinc-950/70 py-2 px-3 text-sm text-zinc-100 placeholder-zinc-500 focus:border-teal-500 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleAddExtraSkill(extraSkillSearch)}
+                  className="rounded-lg bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-200 hover:bg-zinc-700 transition-colors"
+                >
+                  Add skill
+                </button>
+              </div>
+
+              {extraSkillSuggestions.length > 0 && (
+                <div className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-900 shadow-xl">
+                  {extraSkillSuggestions.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => handleAddExtraSkill(s.name, s.category)}
+                      className="flex w-full items-center justify-between px-3 py-2 text-left text-sm text-zinc-200 hover:bg-teal-500/20 hover:text-zinc-100"
+                    >
+                      <span>{s.name}</span>
+                      <span className="text-xs text-zinc-500 uppercase">{s.category}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <p className="mt-2 text-[11px] text-zinc-500">
+              {skills.length} skill{skills.length === 1 ? "" : "s"} currently on your profile.
+            </p>
           </div>
         </section>
 

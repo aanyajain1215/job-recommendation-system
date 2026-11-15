@@ -1,7 +1,11 @@
 # JobRec — Complete Project State, Architecture & Inventory
 
-> One-file reference. Snapshot date: **2026-09-26**, commit `6afd53f`, branch `main` (19 commits, **all unpushed**).
+> One-file reference. Snapshot date: **2026-11-11**, branch `main`.
 > Everything below was re-verified against the running stack, not from memory.
+>
+> **Working tree is dirty.** Two workstreams are implemented but not yet committed:
+> saved-job alerts / notifications (`0013_job_alerts`) and admin trust & moderation
+> (`0014_admin_trust`), plus per-listing skill-gap previews on search cards.
 
 ---
 
@@ -33,21 +37,27 @@ docker compose up -d --force-recreate backend
 
 | Table | Rows | Notes |
 |---|---|---|
-| `users` | 208 | 205 JOB_SEEKER, 3 EMPLOYER, **0 ADMIN** (promote yourself to see `/admin`) |
-| `profiles` | 205 | one per seeker |
-| `jobs` | 319 | **313 adzuna** (272 on 09-24, 41 on 09-25) + 6 native |
-| `companies` | 233 | employer upserts |
-| `interactions` | 1,203 | clicks/applies/saves — feed M4 personalization |
-| `recommendations` | 1,258 | served feed rows, each with propensity + strategy |
-| `feedback` | 349 | explicit thumbs feedback |
-| `applications` | 5 | tracker |
-| `resumes` | 3 | parsed resumes (strict mode can hold failures) |
-| `simulations` | 5 | career simulator runs |
-| `skills` / `job_skills` / `skill_edges` | 120 / 650 / — | skill graph |
+| `users` | 8 | local dev DB after test cleanup; roles include JOB_SEEKER / EMPLOYER / ADMIN |
+| `profiles` | — | one per seeker |
+| `jobs` | 172 | **all `source='jobicy'`** in this local DB — no `native`/`adzuna` rows |
+| `companies` | 80 | employer upserts |
+| `interactions` | — | clicks/applies/saves — feed M4 personalization |
+| `recommendations` | — | served feed rows, each with propensity + strategy |
+| `feedback` | — | explicit thumbs feedback |
+| `applications` | 0 | tracker |
+| `resumes` | — | parsed resumes (strict mode can hold failures) |
+| `simulations` | — | career simulator runs |
+| `skills` / `job_skills` / `skill_edges` | — | skill graph |
 | `job_families` | 8 | family caps in MMR |
+| `job_alerts`, `notifications` | — | saved-job alert engine + in-app notification feed |
 | `llm_usage`, `model_registry`, `system_config` | — | ops/observability |
 
-**Job corpus reality check:** ingest lands ~95 rows/query (75 Adzuna + 20 Jobicy) but today every cycle ended `new_jobs: 0` — Adzuna repeats itself across cycles, Jobicy descriptions come back empty (`jobDesc` len 0 → all fail the `description_too_short` gate), Arbeitnow returns non-JSON, Remotive returns 0 results for the current query set. **Adzuna is the only provider actually contributing.**
+**Local-corpus caveat:** this dev database is sparse (172 Jobicy rows, no seeded
+`aanya.seeker@example.com`, no jobs with a `family_id`). Several integration
+tests are data-dependent and fail until the seed corpus is restored — see §1.4.
+The production/canonical corpus is described by the ingest pipeline in §2.2:
+ingest lands ~95 rows/query (75 Adzuna + 20 Jobicy), but Adzuna repeats across
+cycles and the keyless providers are unreliable.
 
 ### 1.3 Model / ML state
 
@@ -64,16 +74,28 @@ Last eval `backend/ml/reports/eval-2026-09-24.json` — **all gates green**: NDC
 
 ### 1.4 Test & type state
 
-- **257/257 backend tests green** (incl. 11 new autofill tests).
+- **Targeted backend batches green** (run inside the container):
   ```powershell
-  cd backend
-  $env:DATABASE_URL='postgresql+psycopg://jobrec:change_me_in_production@localhost:55432/jobrec'
-  $env:EMBEDDING_BACKEND='minilm'
-  python -m pytest tests/ -q
+  docker compose exec -T backend python -m pytest tests/<file> -q
   ```
+  - `test_admin` + `test_employer` + `test_alerts` + `test_ingest` + `test_mmr`
+    + `test_normalizer` + `test_strict` + `test_llm_validators` +
+    `test_explanation_polish` → **129 passed**.
+  - `test_gap_engine` + `test_recommender` + `test_nl_search` + `test_fts` +
+    `test_explanation` + `test_scoring` → **44 passed**, 2 data-dependent
+    integration tests fail (no seeded seeker / live server).
+  - `test_job_gap_preview` → **7 passed** (new: gap chips on platform, live,
+    NL and detail responses; anonymous + empty-profile no-ops).
+  - `test_career_direction` → **5 passed** (new: family selector list +
+    target-family / career-interest round-trip and clear).
+- Data-dependent suites (`test_simulator`, `test_discovery`,
+  `test_api_phase2` gap/roadmap, parts of `test_live_search`) fail **only**
+  because the local DB lacks the seed corpus (`aanya.seeker@example.com`,
+  native/adzuna rows, jobs with `family_id`). They are not regressions.
+- Running the *whole* suite in one process can OOM (MiniLM/torch) — use batches.
 - `npx tsc --noEmit` clean.
-- OpenAPI: **58 paths**.
-- Alembic head: **`0012_adzuna_currency_backfill`** (README still says `0011_ops` — stale).
+- OpenAPI: **87 paths**.
+- Alembic head: **`0014_admin_trust`** (README now matches).
 
 ### 1.5 LLM state
 
@@ -84,22 +106,31 @@ Last eval `backend/ml/reports/eval-2026-09-24.json` — **all gates green**: NDC
 
 ### 1.6 Git state
 
-- 19 commits, all local/unpushed. Latest `6afd53f`.
-- **Blocker:** no `gh` CLI, no stored credentials, no SSH keys → cannot push yet. Fix: `winget install GitHub.cli` → `gh auth login`, then create repo `job-recommendation-system` on `aanyajain1215`.
-- ⚠️ Working tree is **not** fully clean: `docs/DESIGN.md` has a 1-line edit (status line now says "LLM = Gemini (default)" instead of OpenAI). Commit or revert before pushing.
+- All work is local; nothing pushed yet.
+- **Uncommitted workstreams in the working tree:** saved-job alerts / email
+  digests (`backend/app/api/alerts.py`, `services/job_alerts.py`,
+  `models/alerts.py`, migration `0013_job_alerts`, `/notifications` page),
+  admin trust & moderation (`api/admin_moderation.py`,
+  `services/moderation.py`, `models/moderation.py`, migration `0014_admin_trust`),
+  and per-listing skill-gap previews (`services/gap_preview.py` + card/detail UI).
+- **Blocker:** no `gh` CLI, no stored credentials, no SSH keys → cannot push yet.
+  Fix: `winget install GitHub.cli` → `gh auth login`, then create repo
+  `job-recommendation-system` on `aanyajain1215`.
 
 ### 1.7 Known gaps / not-yet-built
 
 1. No `POST /api/v1/jobs/fetch` — no "fetch fresh jobs now" button; only the 6h timer + CLI.
 2. Hardcoded `localhost:8000` in `frontend/src/app/profile/page.tsx:483` (resume download link).
 3. Dashboard "environment" card shows placeholder/fake values.
-4. README says migration head `0011_ops`, actual is `0012`.
-5. No OCR — image/PDF-scanned resumes yield no text (parse fails, strict mode shows Re-parse).
-6. M2 ranklet idle behind `RECOMMENDER_STRATEGY`.
-7. Prompts P3/P4/P5/P8/P10 defined but **unwired**.
-8. The `ingest` container command lacks `--llm` (P2 keyword-scan instead of LLM structuring).
-9. No rate limiting, no CI, no DB backups.
-10. 0 admin users → `/admin` UI unusable until promoted.
+4. No OCR — image/PDF-scanned resumes yield no text (parse fails, strict mode shows Re-parse).
+5. M2 ranklet idle behind `RECOMMENDER_STRATEGY`.
+6. Prompts P3/P4/P5/P8/P10 defined but **unwired**.
+7. The `ingest` container command lacks `--llm` (P2 keyword-scan instead of LLM structuring).
+8. No rate limiting, no CI, no DB backups.
+9. **Career-direction UI (requirement 2) is now in place** — profile page card
+   for target family, target roles/domains and extra skills. Future work:
+   surface the same inputs during onboarding and use `career_interests` in
+   ranking beyond the existing family match.
 
 ---
 
@@ -111,7 +142,7 @@ Last eval `backend/ml/reports/eval-2026-09-24.json` — **all gates green**: NDC
 ┌─────────────────────┐    browser     ┌──────────────────────┐
 │  jobrec-frontend    │ ─────────────► │   jobrec-backend     │
 │  Next.js 16 / React │   HTTP :3000   │   FastAPI :8000      │
-│  19 pages, RQ cache │ ◄───────────── │   auth·score·LLM·ML  │
+│  30 pages, RQ cache │ ◄───────────── │   auth·score·LLM·ML  │
 └─────────────────────┘                └──────────┬───────────┘
                                                   │ SQLAlchemy
                                        ┌──────────▼───────────┐
@@ -252,6 +283,46 @@ roles: JOB_SEEKER | EMPLOYER | ADMIN
   admin: /admin/* (skills merge, duplicates, llm-usage, parse-failures, config, models)
 ```
 
+### 2.6 Per-listing skill-gap preview
+
+Every search / AI-search / recommendation card highlights disparities, including
+transient live (Adzuna) rows that have no DB row and therefore no `/gap/{id}` page.
+
+```
+GET /jobs | /jobs/nl | /jobs/{id}          (optional bearer token)
+   │
+   ├─ anonymous / no token → unchanged public response
+   ├─ signed in → load Profile.skills (selectinload)
+   │     └─ no skills → skip (would mark everything "missing" — noise)
+   └─ services/gap_preview.annotate_skill_gaps()
+         ├─ build scorer inputs: seeker skills + job job_skills + transfer sims
+         ├─ call scoring.skill_match()        ← same rules as feed/gap page
+         └─ attach: matched_skills · missing_skills (required-only)
+                    transferable_skills · skill_match_score
+```
+
+Best-effort by design: a profile/graph failure logs and ships cards without chips
+rather than failing the catalog. `gap_preview` never touches embeddings, salary FX
+or the database beyond the profile load, so annotating a page of cards stays cheap.
+
+### 2.7 Career-direction form (requirement 2)
+
+Switchers can steer the recommender without rewriting their resume:
+
+```
+/profile  ── "Career Direction & Extra Skills" card
+   ├─ Target role family      select   ─► GET /careers/families  (all canonical families)
+   │                                     PUT /profiles/me {target_family}
+   ├─ Target roles / domains  tag list ─► PUT /profiles/me {career_interests: [...]}
+   └─ Extra skills            add      ─► PUT /profiles/me {skills: [...]}  (same list
+                                          as Skills & Proficiencies; feeds skill_match)
+```
+
+`""` / `[]` explicitly clear the direction. Unknown family names are rejected
+(400) rather than silently stored. The family list is a dedicated read endpoint
+so the selector shows **all** families, not only the above-threshold suggestions
+returned by `/careers/discover`.
+
 ---
 
 ## 3. User Flow Diagrams
@@ -284,7 +355,11 @@ roles: JOB_SEEKER | EMPLOYER | ADMIN
             │        └─ each card shows: score, contribution breakdown, band
             ├─► /jobs              FTS search + filters (location, remote,
             │        │              salary, skills[], family)
+            │        ├─ signed-in seeker cards show skill-gap chips
+            │        │  (matched · transferable · missing must-haves + skill-fit %)
             │        └─ or NL search bar ──► /jobs?q=… (mode: llm|fts)
+            │                 └─ same chips on AI-search cards, including live Adzuna
+            ├─► /jobs/[id]          detail + per-job skill-fit panel
             ├─► /gap/[jobId]       "why don't I match" — same skill_match()
             │        └─► /roadmap  ordered skills + hours + resources
             │                 └─► mark complete → gap re-scores live
@@ -395,29 +470,29 @@ jobrec-ingest container, every 6h:
 
 | Tech | Version | Where used |
 |---|---|---|
-| Next.js | 16.3.4 | `frontend/` — App Router, 19 pages (`src/app/**/page.tsx`) |
+| Next.js | 16.3.4 | `frontend/` — App Router, 30 pages (`src/app/**/page.tsx`) |
 | React | 19.2.8 | client components, `"use client"` pages |
 | Tailwind CSS | 4.x | all styling, `frontend/src/app/globals.css` |
 | TanStack React Query | — | data fetching/caching: `frontend/src/lib/api.ts` + hooks |
 | lucide-react | — | icons across all pages |
 | auth-context | custom | `frontend/src/lib/auth-context.tsx` — JWT storage, role gating |
 
-**Pages:** `/`, `/login`, `/register`, `/onboarding`, `/dashboard`, `/recommendations`, `/jobs`, `/jobs/[id]`, `/jobs/new`, `/gap/[jobId]`, `/roadmap`, `/careers`, `/simulator`, `/resume-optimize`, `/profile`, `/saved`, `/tracker`, `/settings`, `/admin`.
+**Pages:** `/`, `/login`, `/register`, `/onboarding`, `/dashboard`, `/recommendations`, `/jobs`, `/jobs/[id]`, `/jobs/new`, `/gap/[jobId]`, `/roadmap`, `/careers`, `/simulator`, `/resume-optimize`, `/profile`, `/saved`, `/tracker`, `/settings`, `/notifications`, `/admin`, and the employer suite `/hiring`, `/hiring/company`, `/hiring/postings`, `/hiring/postings/[id]` (+ `/applicants`, `/edit`, `/insights`, `/performance`, `/talent`, `/whatif`).
 
 ### 4.2 Backend core
 
 | Tech | Version | Where used |
 |---|---|---|
-| FastAPI | 0.128 | `backend/app/main.py`, 22 routers in `app/api/` |
-| SQLAlchemy | 2.0.46 | `backend/app/models/` (18 model files) |
-| Alembic | — | 12 migrations, head `0012_adzuna_currency_backfill` |
+| FastAPI | 0.128 | `backend/app/main.py`, 22 API modules (24 router objects) in `app/api/` |
+| SQLAlchemy | 2.0.46 | `backend/app/models/` (19 model files) |
+| Alembic | — | 14 migrations, head `0014_admin_trust` |
 | Pydantic v2 | — | schemas, and the **whitelist wall** for LLM output |
 | psycopg | — | Postgres driver, `DATABASE_URL` |
 | pgvector | — | `vector(384)` + HNSW index on `jobs.embedding` |
 | PostgreSQL FTS | — | `search_vector` GIN + `websearch_to_tsquery` + `ts_rank_cd` |
 | JWT (HS256) | — | `app/core/security.py`, roles in `deps.py` |
 
-**API routers:** `auth, profiles, jobs, search, recommendations, interactions, gap, roadmap, careers, project_mapping, simulate, preferences, onboarding, applications, feedback, resume_optimize, skills, admin, health` → **58 OpenAPI paths**.
+**API routers:** `auth, profiles, jobs, search, recommendations, interactions, gap, roadmap, careers, project_mapping, simulate, preferences, onboarding, applications, feedback, resume_optimize, skills, admin, admin_moderation, alerts, notifications, employer, health` → **87 OpenAPI paths**.
 
 ### 4.3 ML / math stack
 
@@ -442,7 +517,7 @@ jobrec-ingest container, every 6h:
 | Remotive | secondary, keyless | ⚠️ 0 results for current queries |
 | Jobicy | secondary, keyless | ❌ `jobDesc` empty → fails length gate |
 
-Config: `.env` lines 27–31 (`ADZUNA_APP_ID=e719038b`, `ADZUNA_COUNTRY=in`, `INGEST_HTTP_TIMEOUT=20`, `INGEST_DELAY_SECONDS=0.5`), `INGEST_INTERVAL_SECONDS=21600`.
+Config: `.env` lines 27–31 (`ADZUNA_APP_ID=<redacted>`, `ADZUNA_COUNTRY=in`, `INGEST_HTTP_TIMEOUT=20`, `INGEST_DELAY_SECONDS=0.5`), `INGEST_INTERVAL_SECONDS=21600`. `.env.example` keeps both Adzuna values blank.
 
 ### 4.5 LLM layer
 
@@ -602,12 +677,32 @@ Config: `.env` lines 27–31 (`ADZUNA_APP_ID=e719038b`, `ADZUNA_COUNTRY=in`, `IN
 | Failure mode | n/a | degrades to FTS |
 | LLM required | no | yes (but degrades gracefully) |
 
+### Country-aware search (`app/services/location_hint.py`)
+
+A country typed into the free-text box ("software engineer jobs in Germany")
+is detected deterministically, independently of the LLM:
+
+- A **structured `location` param** stays a hard SQL filter (`/jobs?location=Germany`
+  returns only Germany rows).
+- A country/city **typed inside `q`** becomes a soft priority: platform matches
+  are partitioned first, live matches next, then the rest — other countries stay
+  reachable, just below the requested one. The phrase is stripped from the
+  keyword/live `what` query, and the echoed chip shows `location: Germany`.
+- Live Adzuna search routes to the matching marketplace (`de`, `us`, `gb`, …)
+  instead of always using `ADZUNA_COUNTRY`, so salary currency and detail links
+  match the index. Country-level `where` is omitted (the index already scopes
+  it; `where=Germany` matches nothing on the German index), while city queries
+  pass `where=Berlin`.
+
 ---
 
 ## 7. Where things stand — next actions
 
-1. **You:** try the autofill at http://localhost:3000/profile (free tier can be slow → use Re-parse).
-2. **GitHub:** install `gh` + `gh auth login` → create `job-recommendation-system` on `aanyajain1215` → push the 19 commits (after resolving the `docs/DESIGN.md` one-liner).
-3. **P1 leftovers on your go-ahead:** `POST /api/v1/jobs/fetch` + "Fetch jobs" UI, hardcoded `localhost:8000` in `profile/page.tsx:483`, fake dashboard env card, README migration head.
-4. **Data growth:** widen the 4-query ingest rotation; fix Jobicy (`jobDesc` empty → try `jobExcerpt`) and investigate Arbeitnow's non-JSON response.
-5. **Backlog:** faculty brief, M0 stretch (rate limiting, dup auto-merge, online metrics), wire P3/P4/P5/P8/P10, `--llm` in the ingest container.
+1. **You:** smoke-test the new gap chips at http://localhost:3000/jobs (signed in, with profile skills), AI search, and a live Adzuna detail page.
+2. **GitHub:** install `gh` + `gh auth login` → create `job-recommendation-system` on `aanyajain1215` → push (after committing the alerts/moderation/gap workstreams and resolving the `docs/DESIGN.md` one-liner).
+3. **P1 leftovers on your go-ahead:** `POST /api/v1/jobs/fetch` + "Fetch jobs" UI, hardcoded `localhost:8000` in `profile/page.tsx:483`, fake dashboard env card.
+4. **Requirement 2 (done):** profile "Career Direction & Extra Skills" card —
+   target family selector (`GET /careers/families`), target roles/domains
+   (`career_interests`), and extra skills beyond the resume (same skills list).
+5. **Data growth:** widen the 4-query ingest rotation; fix Jobicy (`jobDesc` empty → try `jobExcerpt`) and investigate Arbeitnow's non-JSON response.
+6. **Backlog:** faculty brief, M0 stretch (rate limiting, dup auto-merge, online metrics), wire P3/P4/P5/P8/P10, `--llm` in the ingest container.

@@ -30,6 +30,36 @@ USER_AGENT = "JobRecIngest/1.0 (+https://localhost; career-intelligence-demo)"
 
 PROVIDERS = ("adzuna", "arbeitnow", "remotive", "jobicy")
 
+# Adzuna's public detail pages live on country-specific hosts (the API index
+# code is not always the host suffix, e.g. `gb` → adzuna.co.uk).
+_ADZUNA_DETAIL_HOSTS = {
+    "at": "www.adzuna.at",
+    "au": "www.adzuna.com.au",
+    "be": "www.adzuna.be",
+    "br": "www.adzuna.com.br",
+    "ca": "www.adzuna.ca",
+    "ch": "www.adzuna.ch",
+    "de": "www.adzuna.de",
+    "es": "www.adzuna.es",
+    "fr": "www.adzuna.fr",
+    "gb": "www.adzuna.co.uk",
+    "in": "www.adzuna.in",
+    "it": "www.adzuna.it",
+    "mx": "www.adzuna.com.mx",
+    "nl": "www.adzuna.nl",
+    "nz": "www.adzuna.co.nz",
+    "pl": "www.adzuna.pl",
+    "pt": "www.adzuna.pt",
+    "sg": "www.adzuna.sg",
+    "us": "www.adzuna.com",
+    "za": "www.adzuna.co.za",
+}
+
+
+def _adzuna_detail_host(country: str) -> str:
+    return _ADZUNA_DETAIL_HOSTS.get(country, f"www.adzuna.{country}")
+
+
 
 def provider_names() -> tuple[str, ...]:
     return PROVIDERS
@@ -55,6 +85,7 @@ def fetch_adzuna_search(
     where: str | None = None,
     sort_by: str | None = None,
     full_time: int | None = None,
+    country: str | None = None,
     timeout: float | None = None,
 ) -> tuple[list[dict], int]:
     """Live Adzuna search → (raw postings, total match count).
@@ -62,13 +93,15 @@ def fetch_adzuna_search(
     Used by the query-time live search (`app.services.live_jobs`): `where` is
     Adzuna's location filter, `sort_by` its own ordering ("date" | "salary" |
     None = best match), `full_time` restricts to permanent roles when set.
+    `country` overrides the configured Adzuna index so a request for Germany
+    queries the German marketplace instead of always querying ADZUNA_COUNTRY.
     Raises on transport/provider errors — callers degrade to platform-only.
     """
     settings = get_settings()
     if not (settings.adzuna_app_id and settings.adzuna_app_key):
         raise RuntimeError("ADZUNA_APP_ID/ADZUNA_APP_KEY not configured")
-    country = settings.adzuna_country or "in"
-    url = f"https://api.adzuna.com/v1/api/jobs/{country}/search/{page}"
+    country_code = (country or settings.adzuna_country or "in").lower()
+    url = f"https://api.adzuna.com/v1/api/jobs/{country_code}/search/{page}"
     params: dict = {
         "app_id": settings.adzuna_app_id,
         "app_key": settings.adzuna_app_key,
@@ -105,7 +138,7 @@ def fetch_adzuna_search(
                 # Stable details page, NOT redirect_url: the API's redirect_url is
                 # an /land/ad/ link carrying a signed `se=` token (session/IP-bound,
                 # rots to 403 in a different browser). /details/<id> is permalink-stable.
-                "url": f"https://www.adzuna.in/details/{row.get('id')}",
+                "url": f"https://{_adzuna_detail_host(country_code)}/details/{row.get('id')}",
                 "posted_at": row.get("created") or "",
                 "is_remote": "remote" in ((row.get("title") or "") + (location.get("display_name") or "")).lower(),
             }

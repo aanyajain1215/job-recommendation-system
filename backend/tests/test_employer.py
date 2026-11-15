@@ -281,6 +281,7 @@ class TestPostingPipeline:
             "interview": 0,
             "rejected": 0,
             "offer": 0,
+            "hired": 0,
             "saved": 0,
         }
         assert body["recent_7d"] == 0

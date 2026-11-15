@@ -18,6 +18,7 @@ import {
   RecommendationItem,
 } from "@/lib/types";
 import {
+  AlertCircle,
   ArrowRight,
   Briefcase,
   Building2,
@@ -54,6 +55,13 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!isAuthLoading && !user) {
       router.push("/login");
+      return;
+    }
+
+    // The dashboard is the seeker/employer workspace. Admins belong in the
+    // monitoring console, not in a tenant surface that can post jobs.
+    if (!isAuthLoading && user?.role === "admin") {
+      router.replace("/admin");
       return;
     }
 
@@ -375,6 +383,27 @@ export default function DashboardPage() {
                               {item.matched_skills.length > 2 && (
                                 <span className="text-[10px] text-zinc-500 self-center">
                                   +{item.matched_skills.length - 2} more
+                                </span>
+                              )}
+                            </div>
+                          )}
+
+                          {item.missing_skills.length > 0 && (
+                            <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                              <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-amber-400/90">
+                                <AlertCircle className="h-2.5 w-2.5" /> Missing
+                              </span>
+                              {item.missing_skills.slice(0, 2).map((s) => (
+                                <span
+                                  key={s}
+                                  className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-300 font-medium"
+                                >
+                                  {s}
+                                </span>
+                              ))}
+                              {item.missing_skills.length > 2 && (
+                                <span className="text-[10px] text-zinc-500 self-center">
+                                  +{item.missing_skills.length - 2} more
                                 </span>
                               )}
                             </div>

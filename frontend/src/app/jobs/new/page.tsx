@@ -46,7 +46,17 @@ export default function NewJobPage() {
   const [suggestedSkills, setSuggestedSkills] = useState<Skill[]>([]);
 
   useEffect(() => {
-    if (!isAuthLoading && (!user || (user.role !== "employer" && user.role !== "admin"))) {
+    if (isAuthLoading) return;
+    if (!user) {
+      router.push("/login");
+      return;
+    }
+    // Posting jobs is an employer action; admins operate the console instead.
+    if (user.role === "admin") {
+      router.replace("/admin");
+      return;
+    }
+    if (user.role !== "employer") {
       router.push("/dashboard");
     }
   }, [user, isAuthLoading, router]);

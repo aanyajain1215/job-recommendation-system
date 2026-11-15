@@ -28,19 +28,23 @@ ALIASES_YAML = BACKEND / "ml" / "data" / "skill_aliases.yaml"
 
 _ADZUNA_CURRENCY = {
     "in": "INR", "gb": "GBP", "us": "USD", "ca": "CAD", "au": "AUD",
-    "at": "EUR", "be": "EUR", "ch": "CHF", "de": "EUR", "es": "EUR",
-    "fr": "EUR", "it": "EUR", "mx": "MXN", "nl": "EUR", "nz": "NZD",
-    "pl": "PLN", "pt": "EUR", "sg": "SGD",
+    "at": "EUR", "be": "EUR", "br": "BRL", "ch": "CHF", "de": "EUR",
+    "es": "EUR", "fr": "EUR", "it": "EUR", "mx": "MXN", "nl": "EUR",
+    "nz": "NZD", "pl": "PLN", "pt": "EUR", "sg": "SGD", "za": "ZAR",
 }
 
 
-def resolve_currency(source: str) -> str:
-    """Provider+country implied currency when the API response omits one."""
+def resolve_currency(source: str, country: str | None = None) -> str:
+    """Provider+country implied currency when the API response omits one.
+
+    `country` overrides the configured Adzuna index for query-time live
+    searches (a German query returns EUR even when ADZUNA_COUNTRY=in).
+    """
     if source == "adzuna":
         from app.core.config import get_settings
 
-        country = (get_settings().adzuna_country or "in").lower()
-        return _ADZUNA_CURRENCY.get(country, "INR")
+        code = (country or get_settings().adzuna_country or "in").lower()
+        return _ADZUNA_CURRENCY.get(code, "INR")
     return "USD"
 
 

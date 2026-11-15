@@ -153,6 +153,29 @@ def test_long_query_retries_once_with_first_three_words(monkeypatch):
     assert [p["external_id"] for p in postings] == ["555666777"]
 
 
+def test_long_natural_language_query_retries_meaningful_terms(monkeypatch):
+    seen: list[str] = []
+
+    def _fetch(query, page=1, **kwargs):
+        seen.append(query)
+        if query == "backend IT":
+            return [_raw_row("777888999", "Backend IT Engineer")], 1
+        return [], 0
+
+    monkeypatch.setattr(live_jobs, "fetch_adzuna_search", _fetch)
+    postings, total = live_jobs.search_postings(
+        "Fresher backend IT jobs in India"
+    )
+
+    assert seen == [
+        "Fresher backend IT jobs in India",
+        "Fresher backend IT",
+        "backend IT",
+    ]
+    assert total == 1
+    assert [p["external_id"] for p in postings] == ["777888999"]
+
+
 # --- recommendation feed ----------------------------------------------------
 
 

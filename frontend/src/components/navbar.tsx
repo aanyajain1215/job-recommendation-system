@@ -2,12 +2,36 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { Briefcase, Bookmark, Building2, Compass, FileText, GitBranch, LayoutDashboard, ListChecks, LogOut, PlusCircle, Route, Settings as SettingsIcon, ShieldCheck, Sparkles, User as UserIcon } from "lucide-react";
+import { getUnreadNotificationCount } from "@/lib/api";
+import { Bell, Briefcase, Bookmark, Building2, Compass, FileText, GitBranch, LayoutDashboard, ListChecks, LogOut, PlusCircle, Route, Settings as SettingsIcon, ShieldCheck, Sparkles, User as UserIcon } from "lucide-react";
 
 export function Navbar() {
   const pathname = usePathname();
-  const { user, logout, isLoading } = useAuth();
+  const { user, token, logout, isLoading } = useAuth();
+  const [unread, setUnread] = useState(0);
+
+  useEffect(() => {
+    if (!token || user?.role !== "job_seeker") return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const count = await getUnreadNotificationCount(token);
+        if (!cancelled) setUnread(count);
+      } catch {
+        if (!cancelled) setUnread(0);
+      }
+    };
+    void load();
+    const timer = window.setInterval(load, 60_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [token, user?.role, pathname]);
+
+  const unreadBadge = user?.role === "job_seeker" ? unread : 0;
 
   const getRoleBadge = (role: string) => {
     switch (role) {
@@ -226,6 +250,25 @@ export function Navbar() {
             <div className="h-8 w-24 animate-pulse rounded-md bg-zinc-800" />
           ) : user ? (
             <div className="flex items-center gap-3">
+              {user.role === "job_seeker" && (
+                <Link
+                  href="/notifications"
+                  title="Job alerts"
+                  aria-label={unreadBadge > 0 ? `Notifications (${unreadBadge} unread)` : "Notifications"}
+                  className={`relative flex h-8 w-8 items-center justify-center rounded-lg border transition-colors ${
+                    pathname === "/notifications"
+                      ? "border-teal-500/40 bg-teal-500/10 text-teal-300"
+                      : "border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:bg-zinc-900 hover:text-zinc-200"
+                  }`}
+                >
+                  <Bell className="h-4 w-4" />
+                  {unreadBadge > 0 && (
+                    <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-teal-500 px-1 text-[10px] font-bold text-zinc-950">
+                      {unreadBadge > 9 ? "9+" : unreadBadge}
+                    </span>
+                  )}
+                </Link>
+              )}
               {getRoleBadge(user.role)}
 
               <Link

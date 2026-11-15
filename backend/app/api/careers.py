@@ -44,6 +44,24 @@ class DiscoverResponse(BaseModel):
     explored: int
 
 
+class FamiliesResponse(BaseModel):
+    families: list[str]
+
+
+@router.get("/families", response_model=FamiliesResponse)
+def list_families(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session, Depends(get_db)],
+) -> FamiliesResponse:
+    """All canonical job families — the target selector for career switchers.
+
+    Read-only and deliberately separate from ``/discover``: a switcher needs the
+    full list, not just families above the affinity threshold.
+    """
+    names = list(db.scalars(select(JobFamily.name).order_by(JobFamily.name)).all())
+    return FamiliesResponse(families=names)
+
+
 @router.get("/discover", response_model=DiscoverResponse)
 def discover_careers(
     current_user: Annotated[User, Depends(get_current_user)],

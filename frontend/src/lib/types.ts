@@ -62,6 +62,11 @@ export interface ProfileDetail {
   work_experience?: ExperienceItem[] | null;
   skills: ProfileSkillItem[];
   resumes?: ResumeParseRow[];
+  // ---- career-direction fields (backend ProfileDetailResponse) ----
+  career_interests?: string[] | null;
+  target_family?: string | null;
+  preferred_locations?: string[] | null;
+  preferred_work_mode?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -77,6 +82,10 @@ export interface ProfileUpdatePayload {
   skills?: ProfileSkillItem[];
   education?: EducationItem[];
   work_experience?: ExperienceItem[];
+  // ---- career-direction (requirement 2: role/domain switchers) ----
+  career_interests?: string[];
+  /** Canonical family name; "" clears the current target. */
+  target_family?: string;
 }
 
 export interface CompanySummary {
@@ -225,6 +234,15 @@ export interface JobDetail {
   /** §14 "Powered by: <project> — <band>" (only surfaced at Moderate+). */
   project_relevance?: string | null;
   /**
+   * Per-listing skill-gap preview (signed-in seekers with profile skills).
+   * `missing_skills` is required-only, matching the recommendation feed.
+   */
+  matched_skills?: string[];
+  missing_skills?: string[];
+  transferable_skills?: string[];
+  /** None when no preview applies (anonymous, empty profile, no job skills). */
+  skill_match_score?: number | null;
+  /**
    * Live external posting (Adzuna /details/<id> or the employer's page).
    * Absent/null for native in-app postings → Apply stays internal.
    */
@@ -290,6 +308,7 @@ export type ApplicationStatus =
   | "interview"
   | "rejected"
   | "offer"
+  | "hired"
   | "saved";
 
 export interface ApplicationStats {
@@ -300,6 +319,8 @@ export interface ApplicationStats {
   interview: number;
   rejected: number;
   offer: number;
+  /** Phase 5: terminal success stage — the seeker was actually hired. */
+  hired?: number;
   /** Phase 4: saved-later count (plan §19 /saved). */
   saved?: number;
   /** Phase 4: required skills across successful applications (§18). */
@@ -357,6 +378,8 @@ export interface PipelineCounts {
   interview: number;
   rejected: number;
   offer: number;
+  /** Terminal success stage (Phase 5). */
+  hired?: number;
   saved: number;
 }
 
@@ -814,7 +837,290 @@ export interface ProjectBenefitsResponse {
   items: ProjectBenefitItem[];
 }
 
+// ---------------- Saved-job alerts + notifications ---------------- //
+
+export type DigestFrequency = "daily" | "weekly" | "off";
+
+export interface AlertSettings {
+  enabled: boolean;
+  email_enabled: boolean;
+  digest_frequency: DigestFrequency | string;
+  min_score: number;
+  max_items: number;
+  last_digest_at: string | null;
+  updated_at: string | null;
+}
+
+export interface AlertSettingsUpdate {
+  enabled?: boolean;
+  email_enabled?: boolean;
+  digest_frequency?: DigestFrequency;
+  min_score?: number;
+  max_items?: number;
+}
+
+export interface AlertJobSummary {
+  id: string;
+  title: string;
+  company_name: string | null;
+  location: string | null;
+  is_remote: boolean;
+  employment_type: string | null;
+  experience_level: string | null;
+  salary_min: number | null;
+  salary_max: number | null;
+  salary_currency: string;
+  created_at: string | null;
+}
+
+export interface AlertMatch {
+  job: AlertJobSummary;
+  score: number;
+  seed_job_id: string;
+  seed_job_title: string;
+  reason: string;
+  matched_skills: string[];
+}
+
+export interface AlertPreview {
+  items: AlertMatch[];
+  seeds_used: number;
+  candidates_scanned: number;
+  min_score: number;
+  generated_at: string;
+}
+
+export interface NotificationItem {
+  id: string;
+  type: string;
+  title: string;
+  body: string | null;
+  link: string | null;
+  read_at: string | null;
+  created_at: string;
+}
+
+export interface NotificationList {
+  items: NotificationItem[];
+  total: number;
+  unread: number;
+}
+
 // ---------------- Phase 5: Admin · M5 Onboarding ---------------- //
+
+export interface AdminOverview {
+  generated_at: string;
+  users: {
+    total: number;
+    active: number;
+    job_seekers: number;
+    employers: number;
+    admins: number;
+    new_last_7d: number;
+    deactivated: number;
+    /** Live usage: refreshed on authenticated requests. */
+    online_now: number;
+    active_today: number;
+    active_week: number;
+    active_month: number;
+  };
+  profiles: { total: number; with_resume: number };
+  companies: {
+    total: number;
+    verified: number;
+    unverified: number;
+    active_owners: number;
+    with_published_jobs: number;
+    new_last_7d: number;
+  };
+  jobs: {
+    total: number;
+    published: number;
+    draft: number;
+    closed: number;
+    archived: number;
+    new_last_7d: number;
+  };
+  applications: {
+    total: number;
+    last_7d: number;
+    by_status: Record<string, number>;
+    hires: number;
+    job_seekers_hired: number;
+    offers: number;
+    hires_last_30d: number;
+    applicants: number;
+    employers_with_hires: number;
+    hire_rate: number;
+  };
+  moderation: {
+    open_flags: number;
+    high_severity_flags: number;
+    flagged_jobs: number;
+    flagged_companies: number;
+    flagged_users: number;
+    resolved_last_7d: number;
+  };
+  skills: { total: number; embedded: number };
+  llm: {
+    calls: number;
+    prompt_tokens: number;
+    completion_tokens: number;
+    flagged: number;
+    last_7d: number;
+  };
+  parse_failures: { failed: number; stuck: number };
+}
+
+export interface AdminUserProfile {
+  first_name: string;
+  last_name: string;
+  headline?: string | null;
+  location?: string | null;
+  years_of_experience?: number | null;
+}
+
+export interface AdminUserItem {
+  id: string;
+  email: string;
+  role: UserRole;
+  is_active: boolean;
+  is_verified: boolean;
+  created_at: string | null;
+  last_active_at?: string | null;
+  profile?: AdminUserProfile | null;
+  companies: number;
+  applications: number;
+  /** Applications that reached the terminal HIRED stage. */
+  hired: number;
+  /** Open flags against this account, its companies or its postings. */
+  open_flags: number;
+}
+
+export interface AdminUsersResponse {
+  items: AdminUserItem[];
+  total: number;
+  page: number;
+  limit: number;
+  total_pages: number;
+}
+
+export interface AdminJobItem {
+  id: string;
+  title: string;
+  company_name: string;
+  location: string;
+  is_remote: boolean;
+  employment_type: EmploymentType;
+  experience_level: ExperienceLevel;
+  status: JobStatus;
+  source: string;
+  applicants: number;
+  created_at: string | null;
+}
+
+export interface AdminJobsResponse {
+  items: AdminJobItem[];
+  total: number;
+  page: number;
+  limit: number;
+  total_pages: number;
+}
+
+// ---------------- Phase 5: Admin · employer oversight + trust & safety ---------------- //
+
+export type FlagTargetType = "job" | "company" | "user";
+export type FlagSeverity = "low" | "medium" | "high";
+export type FlagStatus = "open" | "resolved" | "dismissed";
+
+export interface AdminEmployerOwner {
+  id: string;
+  email: string;
+  is_active: boolean;
+  is_verified: boolean;
+  last_active_at: string | null;
+}
+
+export interface AdminEmployerItem {
+  id: string;
+  name: string;
+  slug: string;
+  industry?: string | null;
+  location?: string | null;
+  website?: string | null;
+  is_verified: boolean;
+  created_at: string | null;
+  owner: AdminEmployerOwner;
+  postings: { total: number; published: number; last_7d: number };
+  applications: number;
+  hires: number;
+  open_flags: number;
+  flagged_jobs: number;
+  risk_score: number;
+  risk_reasons: string[];
+}
+
+export interface AdminEmployersResponse {
+  items: AdminEmployerItem[];
+  total: number;
+  page: number;
+  limit: number;
+  total_pages: number;
+}
+
+export interface AdminFlagItem {
+  id: string;
+  target_type: FlagTargetType;
+  target_id: string;
+  target_label: string | null;
+  reason: string;
+  details: string | null;
+  severity: FlagSeverity;
+  status: FlagStatus;
+  created_at: string | null;
+  resolved_at: string | null;
+  resolution_note: string | null;
+  created_by: string | null;
+  resolved_by: string | null;
+}
+
+export interface AdminFlagsResponse {
+  items: AdminFlagItem[];
+  counts: Record<string, number>;
+  total: number;
+}
+
+export interface AdminSuspiciousJob {
+  id: string;
+  title: string;
+  status: JobStatus;
+  source: string;
+  location: string;
+  is_remote: boolean;
+  salary_min?: number | null;
+  salary_max?: number | null;
+  salary_currency?: string | null;
+  created_at: string | null;
+  applicants: number;
+  skills: number;
+  open_flags: number;
+  company: { id: string; name: string; is_verified: boolean };
+  owner: { id: string; email: string; is_active: boolean };
+  risk_score: number;
+  risk_reasons: string[];
+}
+
+export interface AdminSuspiciousJobsResponse {
+  threshold: number;
+  scanned: number;
+  items: AdminSuspiciousJob[];
+}
+
+export interface AdminSuspiciousEmployersResponse {
+  threshold: number;
+  scanned: number;
+  items: AdminEmployerItem[];
+}
 
 export interface AdminSkillItem {
   id: string;

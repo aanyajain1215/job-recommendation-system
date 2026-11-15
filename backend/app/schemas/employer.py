@@ -60,6 +60,7 @@ class PipelineCounts(BaseModel):
     interview: int = 0
     rejected: int = 0
     offer: int = 0
+    hired: int = 0
     saved: int = 0
 
 

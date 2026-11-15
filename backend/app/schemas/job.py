@@ -94,6 +94,15 @@ class JobDetailResponse(BaseModel):
     # "native" = posted on this platform (apply in-app, tracked);
     # "adzuna"   = live result fetched at search time (external link only).
     source: str = "native"
+    # ---- per-listing skill gap (only for signed-in seekers with skills) ----
+    # Same contract as the recommendation feed: matched = held (strong or
+    # partial), missing = required-only gaps.  Works for transient live rows,
+    # which have no /gap/{id} page.
+    matched_skills: list[str] = []
+    missing_skills: list[str] = []
+    transferable_skills: list[str] = []
+    # None = no profile skills (or the posting lists no skills) — no preview.
+    skill_match_score: float | None = None
 
 
 class JobListResponse(BaseModel):

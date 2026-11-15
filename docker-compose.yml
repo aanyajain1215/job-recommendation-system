@@ -67,7 +67,30 @@ services:
     volumes:
       - ./frontend:/app
       - frontend_node_modules:/app/node_modules
+      # Keep the Turbopack/dev build cache inside the Linux VM. On Windows the
+      # bind mount is slow enough that a cold route compile takes 30-45s.
+      - frontend_next:/app/.next
     depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  alerts:
+    image: jobrec-backend:latest
+    container_name: jobrec-alerts
+    volumes:
+      - ./backend:/app
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      ALERTS_ENABLED: ${ALERTS_ENABLED:-true}
+      ALERT_INTERVAL_SECONDS: ${ALERT_INTERVAL_SECONDS:-86400}
+      EMAIL_ALERTS_ENABLED: ${EMAIL_ALERTS_ENABLED:-false}
+    command: ["python", "scripts/send_job_alerts.py", "--loop"]
+    depends_on:
+      postgres:
+        condition: service_healthy
       backend:
         condition: service_healthy
     restart: unless-stopped
@@ -80,3 +103,4 @@ services:
 volumes:
   postgres_data:
   frontend_node_modules:
+  frontend_next:
