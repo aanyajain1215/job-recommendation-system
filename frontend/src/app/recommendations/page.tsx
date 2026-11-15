@@ -6,8 +6,10 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { getRecommendations, submitFeedback, recordRecommendationEvent } from "@/lib/api";
 import { formatSalary } from "@/lib/format";
+import JobDetailModal from "@/components/job-detail-modal";
 import {
   FeedbackReason,
+  JobDetail,
   RecommendationFeedResponse,
   RecommendationItem,
 } from "@/lib/types";
@@ -57,6 +59,7 @@ export default function RecommendationsPage() {
   const [feedbackMenu, setFeedbackMenu] = useState<string | null>(null);
   const [sendingFeedbackId, setSendingFeedbackId] = useState<string | null>(null);
   const [feedbackNotes, setFeedbackNotes] = useState<Record<string, string>>({});
+  const [selectedJob, setSelectedJob] = useState<JobDetail | null>(null);
 
   const fetchFeed = async () => {
     if (!token) return;
@@ -374,15 +377,14 @@ export default function RecommendationsPage() {
 
                       {/* Title */}
                       {live ? (
-                        <a
-                          href={item.job.external_url || "#"}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title="Opens the live posting on Adzuna in a new tab"
-                          className="text-xl font-bold text-zinc-100 group-hover:text-teal-400 transition-colors inline-block"
+                        <button
+                          type="button"
+                          onClick={() => setSelectedJob(item.job)}
+                          title="View job details"
+                          className="text-left text-xl font-bold text-zinc-100 group-hover:text-teal-400 transition-colors inline-block"
                         >
                           {item.job.title}
-                        </a>
+                        </button>
                       ) : (
                         <Link
                           href={`/jobs/${item.job.id}`}
@@ -416,7 +418,7 @@ export default function RecommendationsPage() {
                         {(item.job.salary_min || item.job.salary_max) && (
                           <span className="flex items-center gap-1 text-zinc-300 font-medium">
                             <DollarSign className="h-3.5 w-3.5 text-emerald-400" />
-                            {formatSalary(item.job.salary_min, item.job.salary_max, item.job.salary_currency)}
+                            {formatSalary(item.job.salary_min, item.job.salary_max, item.job.salary_currency, item.job.location)}
                           </span>
                         )}
                       </div>
@@ -562,16 +564,15 @@ export default function RecommendationsPage() {
                       )}
 
                       {live ? (
-                        <a
-                          href={item.job.external_url || "#"}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title="Opens the live posting on Adzuna in a new tab"
+                        <button
+                          type="button"
+                          onClick={() => setSelectedJob(item.job)}
+                          title="View job details"
                           className="inline-flex items-center gap-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-zinc-950 font-semibold px-4 py-2.5 text-sm transition-all shadow-md shadow-teal-500/20"
                         >
-                          View on Adzuna
-                          <ExternalLink className="h-4 w-4" />
-                        </a>
+                          View Details
+                          <ChevronRight className="h-4 w-4" />
+                        </button>
                       ) : (
                         <Link
                           href={`/jobs/${item.job.id}`}
@@ -596,6 +597,12 @@ export default function RecommendationsPage() {
             })}
           </div>
         )}
+
+        <JobDetailModal
+          job={selectedJob}
+          open={!!selectedJob}
+          onClose={() => setSelectedJob(null)}
+        />
       </div>
     </div>
   );

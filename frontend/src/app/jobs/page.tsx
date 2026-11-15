@@ -5,6 +5,7 @@ import Link from "next/link";
 import { getJobs, searchJobsNL } from "@/lib/api";
 import { JobDetail, JobNlResponse } from "@/lib/types";
 import { formatSalary } from "@/lib/format";
+import JobDetailModal from "@/components/job-detail-modal";
 import {
   ArrowUpDown,
   Briefcase,
@@ -43,6 +44,7 @@ export default function JobsPage() {
   const [nlResult, setNlResult] = useState<JobNlResponse | null>(null);
   const [nlLoading, setNlLoading] = useState(false);
   const [nlError, setNlError] = useState<string | null>(null);
+  const [selectedJob, setSelectedJob] = useState<JobDetail | null>(null);
 
   const loadJobs = useCallback(async () => {
     setNlResult(null); // editing standard filters exits NL mode (§17)
@@ -489,22 +491,28 @@ export default function JobsPage() {
       ) : (
         <div className="mt-6 space-y-4">
           {jobs.map((job) => {
-            // Live listings open on Adzuna (no detail page); platform jobs route in-app.
+            // Live listings have no in-app detail route; show details in a popup, then apply on Adzuna.
             const live = isLiveJob(job);
-            const Wrapper: React.ElementType = live ? "a" : Link;
+            const Wrapper: React.ElementType = live ? "div" : Link;
             const wrapperProps = live
               ? {
-                  href: job.external_url || "#",
-                  target: "_blank",
-                  rel: "noopener noreferrer",
-                  title: "Opens the live posting on Adzuna in a new tab",
+                  role: "button" as const,
+                  tabIndex: 0,
+                  onClick: () => setSelectedJob(job),
+                  onKeyDown: (e: React.KeyboardEvent<HTMLDivElement>) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setSelectedJob(job);
+                    }
+                  },
+                  title: "View job details",
                 }
               : { href: `/jobs/${job.id}` };
             return (
             <Wrapper
               key={job.id}
-              {...wrapperProps}
-              className="group block rounded-2xl border border-zinc-800/80 bg-zinc-900/40 p-6 backdrop-blur hover:border-zinc-700 hover:bg-zinc-900/70 transition-all shadow-md"
+              {...(wrapperProps as any)}
+              className={`group block w-full rounded-2xl border border-zinc-800/80 bg-zinc-900/40 p-6 text-left backdrop-blur hover:border-zinc-700 hover:bg-zinc-900/70 transition-all shadow-md ${live ? "cursor-pointer" : ""}`}
             >
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                 <div>
@@ -565,7 +573,7 @@ export default function JobsPage() {
                     <div className="flex items-center gap-1 text-base font-bold text-zinc-100 sm:justify-end">
                       <DollarSign className="h-4 w-4 text-emerald-400" />
                       <span>
-                        {formatSalary(job.salary_min, job.salary_max, job.salary_currency)}
+                        {formatSalary(job.salary_min, job.salary_max, job.salary_currency, job.location)}
                       </span>
                     </div>
                   ) : (
@@ -590,6 +598,7 @@ export default function JobsPage() {
                       type="button"
                       onClick={(e) => {
                         e.preventDefault();
+                        e.stopPropagation();
                         setSkillFilter(sk.skill_name);
                         setPage(1);
                       }}
@@ -610,6 +619,12 @@ export default function JobsPage() {
           })}
         </div>
       )}
+
+      <JobDetailModal
+        job={selectedJob}
+        open={!!selectedJob}
+        onClose={() => setSelectedJob(null)}
+      />
     </div>
   );
 }

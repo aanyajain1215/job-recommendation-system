@@ -244,7 +244,7 @@ export default function HiringOverviewPage() {
                     </span>
                     {job.salary_min || job.salary_max ? (
                       <span>
-                        {formatSalary(job.salary_min, job.salary_max, job.salary_currency)}
+                        {formatSalary(job.salary_min, job.salary_max, job.salary_currency, job.location)}
                       </span>
                     ) : null}
                     <span>

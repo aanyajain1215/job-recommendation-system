@@ -12,12 +12,10 @@ import {
   FileText,
   GitBranch,
   LayoutDashboard,
-  ListChecks,
   LogOut,
   Menu,
   PlusCircle,
   Route,
-  Settings as SettingsIcon,
   ShieldCheck,
   Sparkles,
   User as UserIcon,
@@ -125,10 +123,6 @@ export function Navbar() {
             <GitBranch className="h-3.5 w-3.5 shrink-0" />
             What-If
           </Link>
-          <Link href="/tracker" className={`${navLinkClass(pathname === "/tracker")}${linkExtra}`}>
-            <ListChecks className="h-3.5 w-3.5 shrink-0" />
-            Tracker
-          </Link>
           <Link href="/saved" className={`${navLinkClass(pathname === "/saved")}${linkExtra}`}>
             <Bookmark className="h-3.5 w-3.5 shrink-0" />
             Saved
@@ -136,10 +130,6 @@ export function Navbar() {
           <Link href="/profile" className={`${navLinkClass(pathname === "/profile")}${linkExtra}`}>
             <UserIcon className="h-3.5 w-3.5 shrink-0" />
             Profile
-          </Link>
-          <Link href="/settings" className={`${navLinkClass(pathname === "/settings")}${linkExtra}`}>
-            <SettingsIcon className="h-3.5 w-3.5 shrink-0" />
-            Settings
           </Link>
         </>
       );

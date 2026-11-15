@@ -175,7 +175,7 @@ def generate_candidates(db: Session, profile: Profile, limit: int) -> list[Job]:
             legs.append([row[0] for row in rows])
 
     if not legs:
-        raise RuntimeError("AI candidate generation failed: no retrieval legs produced results (embeddings/FTS/skills required)")
+        return []
     ordered_ids = _rrf(legs)[:pool_cap]
 
     if not ordered_ids:

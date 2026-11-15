@@ -1,9 +1,8 @@
 /**
  * Currency-aware salary formatting.
  *
- * The job cards used to hardcode `$…k` regardless of `salary_currency`,
- * which rendered Indian salaries (e.g. ₹300,000–1,200,000) as "$300k–$1200k".
- * Adzuna /in/ postings are stored as INR after the ingest currency fix.
+ * Uses provided currency when available. If missing/ambiguous, infers from
+ * location (e.g. Indian locations -> INR/₹). Shows appropriate symbols per currency.
  */
 
 const SYMBOLS: Record<string, string> = {
@@ -13,7 +12,55 @@ const SYMBOLS: Record<string, string> = {
   JPY: "¥",
   AUD: "A$",
   CAD: "C$",
+  INR: "₹",
+  AED: "AED ",
+  SGD: "S$",
+  CHF: "CHF ",
 };
+
+const INDIA_HINTS = [
+  "india",
+  "bangalore",
+  "bengaluru",
+  "mumbai",
+  "delhi",
+  "new delhi",
+  "gurgaon",
+  "gurugram",
+  "noida",
+  "hyderabad",
+  "pune",
+  "chennai",
+  "kolkata",
+  "ahmedabad",
+  "jaipur",
+  "kochi",
+  "coimbatore",
+  "indore",
+  "chandigarh",
+  "telangana",
+  "karnataka",
+  "maharashtra",
+  "tamil nadu",
+  "uttar pradesh",
+  "haryana",
+  "gujarat",
+  "west bengal",
+  "kerala",
+  "rajasthan",
+];
+
+function inferCurrency(currency?: string | null, location?: string | null): string {
+  const cur = (currency || "").trim().toUpperCase();
+  const loc = (location || "").toLowerCase();
+  const isIndia = INDIA_HINTS.some((h) => loc.includes(h));
+
+  if (cur === "INR") return "INR";
+  if (cur && cur !== "USD") return cur; // trust explicit non-USD currency
+  if (isIndia) return "INR"; // Indian location/company context -> rupees
+  if (cur === "USD") return "USD";
+  return "USD";
+}
 
 /** Compact number: 1500000 -> "1.5", 300000 -> "3" (trailing .0 dropped). */
 function compact(value: number): string {
@@ -40,10 +87,11 @@ function formatPart(value: number, currency: string): string {
 export function formatSalary(
   min?: number | null,
   max?: number | null,
-  currency?: string | null
+  currency?: string | null,
+  location?: string | null
 ): string | null {
   if (min == null && max == null) return null;
-  const cur = (currency || "USD").toUpperCase();
+  const cur = inferCurrency(currency, location);
 
   if (min != null && max != null && min !== max) {
     return `${formatPart(min, cur)} – ${formatPart(max, cur)}`;

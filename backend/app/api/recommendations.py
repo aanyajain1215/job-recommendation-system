@@ -75,6 +75,12 @@ def get_recommendation_feed(
     if live_candidates:
         candidates = list(candidates) + live_candidates
 
+    if not candidates:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="No recommendation candidates available (no platform or live job results).",
+        )
+
     # 3. Score → rerank → diversify → explain (M4 weights/affinities, §16)
     weights, m4_note, _shrink = personalization.effective_weights(
         db, profile.user_id

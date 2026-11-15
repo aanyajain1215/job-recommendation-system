@@ -1,8 +1,9 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f7f2ea;
-  --foreground: #2b2017;
+  --background: #eef4ff;
+  --foreground: #0b1b3a;
+  color-scheme: light;
 }
 
 @theme inline {
@@ -13,182 +14,197 @@
 }
 
 /*
- * ────────────────────────────────────────────────────────────────────────
- * NEUTRAL ELEGANCE — light, gallery-warm theme
- *
- * Swatches: #FFDBBB (peach) · #CCBEB1 (taupe) · #997E67 (mid brown)
- *           #664930 (espresso)
- *
- * The whole app expresses its contrast structure through Tailwind's
- * `zinc` (surfaces/text) + accent scales, so this single @theme block
- * re-tones every page, card, badge and button at once. The ramps are
- * re-semantized for a light product:
- *
- *   zinc  950 = cream page · 900 = white card · 800 = taupe border/surface
- *         100–300 = dark inks (heading → body) · 400–600 = muted warm meta
- *         (text levels run dark→light as the number grows, exactly like
- *         the old dark theme's visual hierarchy)
- *   teal  (primary accent) 500 = espresso CTA · 400/300 = accent text
- *         200/950 = peach (selection, gradient washes)
- *   emerald = warm olive (match/positive) · amber = ochre (warning)
- *   rose/red = terracotta (danger) · indigo/violet/purple = walnut (employer)
- *   cyan = caramel stat accents · sky = pale clay (live/info)
- * ────────────────────────────────────────────────────────────────────────
+ * Yellow + Blue theme (light, high visibility)
+ * Keeps existing utility semantics:
+ * - zinc-950: page background, zinc-900: surfaces/cards, zinc-800: borders
+ * - zinc-100..300: primary dark text, zinc-400..600: secondary text
+ * - teal: primary blue actions/accents
+ * - amber/cyan: yellow accents/highlights
  */
 @theme {
-  /* Warm neutrals (surfaces run light, ink runs dark) */
-  --color-zinc-50: #fffdf9;
-  --color-zinc-100: #2b2017;
-  --color-zinc-200: #453527;
-  --color-zinc-300: #664930;
-  --color-zinc-400: #7e6552;
-  --color-zinc-500: #997e67;
-  --color-zinc-600: #8a7161;
-  --color-zinc-700: #b5a493;
-  --color-zinc-800: #ccbeb1;
-  --color-zinc-900: #ffffff;
-  --color-zinc-950: #f7f2ea;
+  /* Surfaces & text */
+  --color-zinc-50: #ffffff;
+  --color-zinc-100: #0b1b3a; /* headings */
+  --color-zinc-200: #16325c; /* primary text */
+  --color-zinc-300: #27476e; /* body text */
+  --color-zinc-400: #4b647d; /* secondary */
+  --color-zinc-500: #6b7f95; /* muted */
+  --color-zinc-600: #7f93a8;
+  --color-zinc-700: #a7bdd6;
+  --color-zinc-800: #cfe0f5; /* borders */
+  --color-zinc-900: #ffffff; /* cards */
+  --color-zinc-950: #eef4ff; /* page bg */
 
-  /* Primary accent: espresso solids, warm accent text, peach lights */
-  --color-teal-50: #fff7f0;
-  --color-teal-100: #ffeee1;
-  --color-teal-200: #ffdbbb;
-  --color-teal-300: #8f6a49;
-  --color-teal-400: #7a593b;
-  --color-teal-500: #664930;
-  --color-teal-600: #573d25;
-  --color-teal-700: #4a331f;
-  --color-teal-800: #3d2a19;
-  --color-teal-900: #2f2114;
-  /* teal-950 intentionally breaks the ramp: peach wash for hero gradients
-     (from-teal-950/30) and light-on-espresso text (text-teal-950) */
-  --color-teal-950: #ffdbbb;
+  /* Primary blue */
+  --color-teal-50: #eaf2ff;
+  --color-teal-100: #d7e6ff;
+  --color-teal-200: #b9d2ff;
+  --color-teal-300: #1d4ed8; /* links/accent text */
+  --color-teal-400: #1e40af;
+  --color-teal-500: #2563eb; /* primary buttons */
+  --color-teal-600: #1d4ed8;
+  --color-teal-700: #1e40af;
+  --color-teal-800: #1e3a8a;
+  --color-teal-900: #172554;
+  --color-teal-950: #dbeafe;
 
-  /* Positive / match — warm olive */
-  --color-emerald-50: #f5f7f0;
-  --color-emerald-100: #ebefe3;
-  --color-emerald-200: #d8e0c8;
-  --color-emerald-300: #5f6b4e;
-  --color-emerald-400: #4f5b3e;
-  --color-emerald-500: #6e7c5a;
-  --color-emerald-600: #45513a;
-  --color-emerald-700: #3a4430;
-  --color-emerald-800: #2f3727;
-  --color-emerald-900: #252b1f;
-  --color-emerald-950: #1d2118;
+  /* Yellow accents */
+  --color-amber-50: #fffbea;
+  --color-amber-100: #fff3bf;
+  --color-amber-200: #ffe58f;
+  --color-amber-300: #8a5b00; /* readable text on light */
+  --color-amber-400: #a16207;
+  --color-amber-500: #facc15; /* bright yellow */
+  --color-amber-600: #eab308;
+  --color-amber-700: #ca8a04;
+  --color-amber-800: #a16207;
+  --color-amber-900: #713f12;
+  --color-amber-950: #422006;
 
-  /* Warning / draft — ochre gold */
-  --color-amber-50: #fff9f0;
-  --color-amber-100: #fff1df;
-  --color-amber-200: #92652d;
-  --color-amber-300: #8a5e2b;
-  --color-amber-400: #7e5622;
-  --color-amber-500: #c9974f;
-  --color-amber-600: #a87b3a;
-  --color-amber-700: #8c652f;
-  --color-amber-800: #715126;
-  --color-amber-900: #573f1e;
-  --color-amber-950: #3e2c14;
+  --color-cyan-50: #fffde7;
+  --color-cyan-100: #fff9c4;
+  --color-cyan-200: #fff59d;
+  --color-cyan-300: #854d0e;
+  --color-cyan-400: #a16207;
+  --color-cyan-500: #fde047;
+  --color-cyan-600: #facc15;
+  --color-cyan-700: #eab308;
+  --color-cyan-800: #ca8a04;
+  --color-cyan-900: #a16207;
+  --color-cyan-950: #713f12;
 
-  /* Danger — terracotta clay */
-  --color-rose-50: #fdf3f0;
-  --color-rose-100: #fae6e0;
-  --color-rose-200: #bc6552;
-  --color-rose-300: #b05744;
-  --color-rose-400: #a34e3b;
-  --color-rose-500: #96452f;
-  --color-rose-600: #7e3a28;
-  --color-rose-700: #68301f;
-  --color-rose-800: #54271a;
-  --color-rose-900: #421f14;
-  --color-rose-950: #33170f;
+  /* Supporting semantic colors */
+  --color-emerald-50: #ecfdf5;
+  --color-emerald-100: #d1fae5;
+  --color-emerald-200: #a7f3d0;
+  --color-emerald-300: #047857;
+  --color-emerald-400: #065f46;
+  --color-emerald-500: #10b981;
+  --color-emerald-600: #059669;
+  --color-emerald-700: #047857;
+  --color-emerald-800: #065f46;
+  --color-emerald-900: #064e3b;
+  --color-emerald-950: #022c22;
 
-  --color-red-50: #fdf3f0;
-  --color-red-100: #fae6e0;
-  --color-red-200: #bc6552;
-  --color-red-300: #b05744;
-  --color-red-400: #a34e3b;
-  --color-red-500: #96452f;
-  --color-red-600: #7e3a28;
-  --color-red-700: #68301f;
-  --color-red-800: #54271a;
-  --color-red-900: #421f14;
-  --color-red-950: #4e2a20;
+  --color-sky-50: #eaf4ff;
+  --color-sky-100: #d6e8ff;
+  --color-sky-200: #bcd8ff;
+  --color-sky-300: #1d4ed8;
+  --color-sky-400: #1e40af;
+  --color-sky-500: #3b82f6;
+  --color-sky-600: #2563eb;
+  --color-sky-700: #1d4ed8;
+  --color-sky-800: #1e40af;
+  --color-sky-900: #1e3a8a;
+  --color-sky-950: #172554;
 
-  /* Employer surfaces — walnut */
-  --color-indigo-50: #faf5f0;
-  --color-indigo-100: #f3e9df;
-  --color-indigo-200: #e7d5c3;
-  --color-indigo-300: #8a6547;
-  --color-indigo-400: #7a5639;
-  --color-indigo-500: #6b4831;
-  --color-indigo-600: #573b27;
-  --color-indigo-700: #472f1f;
-  --color-indigo-800: #38251a;
-  --color-indigo-900: #2b1c14;
-  --color-indigo-950: #20130e;
+  --color-rose-50: #fff1f2;
+  --color-rose-100: #ffe4e6;
+  --color-rose-200: #fecdd3;
+  --color-rose-300: #be123c;
+  --color-rose-400: #9f1239;
+  --color-rose-500: #e11d48;
+  --color-rose-600: #be123c;
+  --color-rose-700: #9f1239;
+  --color-rose-800: #881337;
+  --color-rose-900: #4c0519;
+  --color-rose-950: #4c0519;
 
-  --color-violet-50: #faf5f0;
-  --color-violet-100: #f3e9df;
-  --color-violet-200: #e7d5c3;
-  --color-violet-300: #8a6547;
-  --color-violet-400: #7a5639;
-  --color-violet-500: #6b4831;
-  --color-violet-600: #573b27;
-  --color-violet-700: #472f1f;
-  --color-violet-800: #38251a;
-  --color-violet-900: #2b1c14;
-  --color-violet-950: #20130e;
+  --color-red-50: #fef2f2;
+  --color-red-100: #fee2e2;
+  --color-red-200: #fecaca;
+  --color-red-300: #b91c1c;
+  --color-red-400: #991b1b;
+  --color-red-500: #ef4444;
+  --color-red-600: #dc2626;
+  --color-red-700: #b91c1c;
+  --color-red-800: #991b1b;
+  --color-red-900: #7f1d1d;
+  --color-red-950: #450a0a;
 
-  --color-purple-50: #faf5f0;
-  --color-purple-100: #f3e9df;
-  --color-purple-200: #e7d5c3;
-  --color-purple-300: #8a6547;
-  --color-purple-400: #7a5639;
-  --color-purple-500: #6b4831;
-  --color-purple-600: #573b27;
-  --color-purple-700: #472f1f;
-  --color-purple-800: #38251a;
-  --color-purple-900: #2b1c14;
-  --color-purple-950: #20130e;
+  --color-indigo-50: #eaf2ff;
+  --color-indigo-100: #d7e6ff;
+  --color-indigo-200: #b9d2ff;
+  --color-indigo-300: #1d4ed8;
+  --color-indigo-400: #1e40af;
+  --color-indigo-500: #2563eb;
+  --color-indigo-600: #1d4ed8;
+  --color-indigo-700: #1e40af;
+  --color-indigo-800: #1e3a8a;
+  --color-indigo-900: #172554;
+  --color-indigo-950: #172554;
 
-  /* Stat highlights — caramel */
-  --color-cyan-50: #faf6f1;
-  --color-cyan-100: #f3ebe1;
-  --color-cyan-200: #e5d5c2;
-  --color-cyan-300: #8a6b45;
-  --color-cyan-400: #a5835f;
-  --color-cyan-500: #b99873;
-  --color-cyan-600: #6b5544;
-  --color-cyan-700: #574537;
-  --color-cyan-800: #453629;
-  --color-cyan-900: #35291f;
-  --color-cyan-950: #271d15;
+  --color-violet-50: #eef2ff;
+  --color-violet-100: #e0e7ff;
+  --color-violet-200: #c7d2fe;
+  --color-violet-300: #4338ca;
+  --color-violet-400: #3730a3;
+  --color-violet-500: #4f46e5;
+  --color-violet-600: #4338ca;
+  --color-violet-700: #3730a3;
+  --color-violet-800: #312e81;
+  --color-violet-900: #1e1b4b;
+  --color-violet-950: #1e1b4b;
 
-  /* Live / info — pale clay */
-  --color-sky-50: #fff8f3;
-  --color-sky-100: #fff0e5;
-  --color-sky-200: #ffdfc9;
-  --color-sky-300: #8a6547;
-  --color-sky-400: #d9a983;
-  --color-sky-500: #c9916b;
-  --color-sky-600: #a87350;
-  --color-sky-700: #8a5d41;
-  --color-sky-800: #6d4934;
-  --color-sky-900: #533728;
-  --color-sky-950: #3b271d;
+  --color-purple-50: #eef2ff;
+  --color-purple-100: #e0e7ff;
+  --color-purple-200: #c7d2fe;
+  --color-purple-300: #4338ca;
+  --color-purple-400: #3730a3;
+  --color-purple-500: #4f46e5;
+  --color-purple-600: #4338ca;
+  --color-purple-700: #3730a3;
+  --color-purple-800: #312e81;
+  --color-purple-900: #1e1b4b;
+  --color-purple-950: #1e1b4b;
+}
+
+html {
+  font-size: 17px;
+  background: var(--background);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--background) !important;
+  color: var(--foreground) !important;
   font-family: var(--font-sans), system-ui, sans-serif;
+  font-weight: 500;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-mark {
-  background-color: rgba(255, 219, 187, 0.7);
-  color: #4a331f;
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #0b1b3a;
+}
+
+button, a {
   font-weight: 600;
-  padding: 0.05rem 0.25rem;
+}
+
+/* Improve visibility on existing utility-heavy components */
+.bg-zinc-950 { background-color: #eef4ff !important; }
+.bg-zinc-900 { background-color: #ffffff !important; }
+.bg-zinc-900\/40 { background-color: rgba(255, 255, 255, 0.92) !important; }
+.bg-zinc-900\/50 { background-color: rgba(255, 255, 255, 0.95) !important; }
+.bg-zinc-900\/60 { background-color: rgba(255, 255, 255, 0.96) !important; }
+.bg-zinc-900\/70 { background-color: rgba(255, 255, 255, 0.97) !important; }
+.bg-zinc-950\/40 { background-color: rgba(234, 242, 255, 0.7) !important; }
+.bg-zinc-950\/50 { background-color: rgba(234, 242, 255, 0.8) !important; }
+.bg-zinc-950\/60 { background-color: rgba(234, 242, 255, 0.85) !important; }
+.border-zinc-800, .border-zinc-800\/80, .border-zinc-800\/90, .border-zinc-800\/60 { border-color: #cfe0f5 !important; }
+.text-zinc-100 { color: #0b1b3a !important; }
+.text-zinc-200 { color: #16325c !important; }
+.text-zinc-300 { color: #27476e !important; }
+.text-zinc-400 { color: #4b647d !important; }
+.text-zinc-500 { color: #6b7f95 !important; }
+
+mark {
+  background-color: #fde68a;
+  color: #1e3a8a;
+  font-weight: 700;
+  padding: 0.05rem 0.3rem;
   border-radius: 0.25rem;
 }

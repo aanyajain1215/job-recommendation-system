@@ -217,7 +217,7 @@ export default function JobDetailPage() {
               <div className="text-xl font-bold text-zinc-100 flex items-center lg:justify-end gap-1">
                 <DollarSign className="h-5 w-5 text-emerald-400" />
                 <span>
-                  {formatSalary(job.salary_min, job.salary_max, job.salary_currency)}
+                  {formatSalary(job.salary_min, job.salary_max, job.salary_currency, job.location)}
                 </span>
                 <span className="text-xs text-zinc-400 font-normal">/ year</span>
               </div>

@@ -17,6 +17,7 @@ import {
   ProfileDetail,
   RecommendationItem,
 } from "@/lib/types";
+import JobDetailModal from "@/components/job-detail-modal";
 import {
   ArrowRight,
   Briefcase,
@@ -50,6 +51,7 @@ export default function DashboardPage() {
   const [topRecommendations, setTopRecommendations] = useState<RecommendationItem[]>([]);
   const [appStats, setAppStats] = useState<ApplicationStats | null>(null);
   const [isDataLoading, setIsDataLoading] = useState(true);
+  const [selectedJob, setSelectedJob] = useState<JobDetail | null>(null);
 
   useEffect(() => {
     if (!isAuthLoading && !user) {
@@ -343,15 +345,14 @@ export default function DashboardPage() {
                             )}
                           </div>
                           {isLiveJob(item.job) ? (
-                            <a
-                              href={item.job.external_url || "#"}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              title="Opens the live posting on Adzuna in a new tab"
-                              className="font-semibold text-sm text-zinc-100 group-hover:text-teal-400 line-clamp-1"
+                            <button
+                              type="button"
+                              onClick={() => setSelectedJob(item.job)}
+                              title="View job details"
+                              className="text-left font-semibold text-sm text-zinc-100 group-hover:text-teal-400 line-clamp-1"
                             >
                               {item.job.title}
-                            </a>
+                            </button>
                           ) : (
                             <Link
                               href={`/jobs/${item.job.id}`}
@@ -382,16 +383,15 @@ export default function DashboardPage() {
                         </div>
 
                         {isLiveJob(item.job) ? (
-                          <a
-                            href={item.job.external_url || "#"}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title="Opens the live posting on Adzuna in a new tab"
-                            className="mt-4 inline-flex items-center justify-between text-xs font-medium text-teal-400 group-hover:text-teal-300 pt-2 border-t border-zinc-800/60"
+                          <button
+                            type="button"
+                            onClick={() => setSelectedJob(item.job)}
+                            title="View job details"
+                            className="mt-4 inline-flex w-full items-center justify-between text-xs font-medium text-teal-400 group-hover:text-teal-300 pt-2 border-t border-zinc-800/60 text-left"
                           >
-                            <span>View on Adzuna</span>
-                            <ExternalLink className="h-3 w-3" />
-                          </a>
+                            <span>View Details</span>
+                            <ArrowRight className="h-3 w-3" />
+                          </button>
                         ) : (
                           <Link
                             href={`/jobs/${item.job.id}`}
@@ -568,10 +568,10 @@ export default function DashboardPage() {
                     Manage Profile & Skills
                   </Link>
                   <Link
-                    href="/tracker"
+                    href="/saved"
                     className="block rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-3 text-xs text-zinc-300 hover:border-zinc-700 hover:text-zinc-100 transition-colors"
                   >
-                    Application Tracker
+                    Saved Jobs
                   </Link>
                   <Link
                     href="/saved"
@@ -586,10 +586,10 @@ export default function DashboardPage() {
                     Resume Optimizer
                   </Link>
                   <Link
-                    href="/settings"
+                    href="/profile"
                     className="block rounded-lg border border-zinc-800/80 bg-zinc-950/40 p-3 text-xs text-zinc-300 hover:border-zinc-700 hover:text-zinc-100 transition-colors"
                   >
-                    Personalization Settings
+                    Profile
                   </Link>
                 </>
               ) : (
@@ -612,6 +612,12 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      <JobDetailModal
+        job={selectedJob}
+        open={!!selectedJob}
+        onClose={() => setSelectedJob(null)}
+      />
     </div>
   );
 }

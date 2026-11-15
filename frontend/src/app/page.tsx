@@ -30,7 +30,7 @@ export default function Home() {
 
           <p className="mx-auto mt-6 max-w-2xl text-base sm:text-lg leading-relaxed text-zinc-400">
             Upload your resume or list your skills to get personalized AI job recommendations,
-            clear skill-gap breakdowns, and an organized application tracker.
+            clear skill-gap breakdowns, and an organized saved jobs list.
           </p>
 
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3.5">

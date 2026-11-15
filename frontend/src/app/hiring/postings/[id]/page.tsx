@@ -250,7 +250,7 @@ export default function PostingDetailPage() {
             </div>
             <div className="mt-1 text-sm font-medium text-zinc-200">
               {job.salary_min || job.salary_max
-                ? formatSalary(job.salary_min, job.salary_max, job.salary_currency)
+                ? formatSalary(job.salary_min, job.salary_max, job.salary_currency, job.location)
                 : "Not specified"}
             </div>
           </div>
