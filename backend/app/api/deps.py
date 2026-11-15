@@ -1,4 +1,6 @@
+import logging
 from collections.abc import Callable
+from datetime import datetime, timedelta, timezone
 from typing import Annotated
 from uuid import UUID
 
@@ -14,6 +16,10 @@ from app.models.enums import UserRole
 from app.models.user import User
 
 security_scheme = HTTPBearer(auto_error=True)
+log = logging.getLogger(__name__)
+
+# One write per user per window is enough for DAU/WAU/MAU reporting.
+ACTIVITY_WRITE_INTERVAL = timedelta(minutes=2)
 
 
 def get_current_user(
@@ -80,6 +86,20 @@ def get_current_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User account is deactivated.",
         )
+
+    # Live-usage signal for the admin console. Throttled so hot read paths do
+    # not turn every request into an UPDATE.
+    now = datetime.now(timezone.utc)
+    last_seen = user.last_active_at
+    if last_seen is not None and last_seen.tzinfo is None:
+        last_seen = last_seen.replace(tzinfo=timezone.utc)
+    if last_seen is None or last_seen < now - ACTIVITY_WRITE_INTERVAL:
+        try:
+            user.last_active_at = now
+            db.commit()
+        except Exception:  # pragma: no cover - telemetry must never block auth
+            db.rollback()
+            log.exception("Failed to refresh last_active_at for user %s", user.id)
 
     return user
 

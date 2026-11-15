@@ -62,6 +62,13 @@ class User(Base):
         server_default=func.now(),
         server_onupdate=func.now(),
     )
+    # Refreshed (throttled) on authenticated requests so the admin console can
+    # report live usage instead of only signup counts.
+    last_active_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        index=True,
+    )
 
     # Relationships
     profile: Mapped["Profile"] = relationship(

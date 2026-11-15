@@ -44,6 +44,7 @@ class ApplicationStatus(str, Enum):
     INTERVIEW = "interview"
     REJECTED = "rejected"
     OFFER = "offer"
+    HIRED = "hired"
     SAVED = "saved"
 
 
@@ -55,6 +56,24 @@ class RecommendationEventType(str, Enum):
     DISMISSED = "dismissed"
     SAVED = "saved"
     APPLIED = "applied"
+
+
+class FlagTargetType(str, Enum):
+    JOB = "job"
+    COMPANY = "company"
+    USER = "user"
+
+
+class FlagSeverity(str, Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+class FlagStatus(str, Enum):
+    OPEN = "open"
+    RESOLVED = "resolved"
+    DISMISSED = "dismissed"
 
 
 class InteractionType(str, Enum):

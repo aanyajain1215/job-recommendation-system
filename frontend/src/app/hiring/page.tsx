@@ -111,13 +111,15 @@ export default function HiringOverviewPage() {
             <FileText className="h-4 w-4" />
             Manage postings
           </Link>
-          <Link
-            href="/jobs/new"
-            className="inline-flex items-center gap-2 rounded-xl bg-teal-500 px-4 py-2.5 text-sm font-semibold text-zinc-950 shadow-lg shadow-teal-500/25 hover:bg-teal-400 active:scale-[0.98] transition-all"
-          >
-            <PlusCircle className="h-4 w-4" />
-            Post a job
-          </Link>
+          {user?.role !== "admin" && (
+            <Link
+              href="/jobs/new"
+              className="inline-flex items-center gap-2 rounded-xl bg-teal-500 px-4 py-2.5 text-sm font-semibold text-zinc-950 shadow-lg shadow-teal-500/25 hover:bg-teal-400 active:scale-[0.98] transition-all"
+            >
+              <PlusCircle className="h-4 w-4" />
+              Post a job
+            </Link>
+          )}
         </div>
       </div>
 
@@ -213,13 +215,15 @@ export default function HiringOverviewPage() {
             <p className="mt-1 text-xs text-zinc-500">
               Publish your first role to start receiving applicants.
             </p>
-            <Link
-              href="/jobs/new"
-              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-teal-500 px-4 py-2 text-xs font-semibold text-zinc-950 hover:bg-teal-400"
-            >
-              <PlusCircle className="h-3.5 w-3.5" />
-              Post your first job
-            </Link>
+            {user?.role !== "admin" && (
+              <Link
+                href="/jobs/new"
+                className="mt-4 inline-flex items-center gap-2 rounded-lg bg-teal-500 px-4 py-2 text-xs font-semibold text-zinc-950 hover:bg-teal-400"
+              >
+                <PlusCircle className="h-3.5 w-3.5" />
+                Post your first job
+              </Link>
+            )}
           </div>
         ) : (
           <div className="mt-4 divide-y divide-zinc-800/60 overflow-hidden rounded-xl border border-zinc-800/80 bg-zinc-900/40">

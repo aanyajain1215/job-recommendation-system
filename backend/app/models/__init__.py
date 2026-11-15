@@ -6,6 +6,9 @@ from app.models.enums import (
     EmploymentType,
     ExperienceLevel,
     FeedbackReason,
+    FlagSeverity,
+    FlagStatus,
+    FlagTargetType,
     InteractionType,
     JobStatus,
     PathStatus,
@@ -22,6 +25,7 @@ from app.models.heartbeat import SystemHeartbeat
 from app.models.interaction import Interaction
 from app.models.job import Job
 from app.models.job_family import JobFamily
+from app.models.moderation import ModerationFlag
 from app.models.ops import LlmUsage, ModelRegistry, SystemConfig
 from app.models.profile import Profile
 from app.models.profile_entities import (
@@ -51,6 +55,9 @@ __all__ = [
     "ExperienceLevel",
     "Feedback",
     "FeedbackReason",
+    "FlagSeverity",
+    "FlagStatus",
+    "FlagTargetType",
     "Interaction",
     "InteractionType",
     "Job",
@@ -60,6 +67,7 @@ __all__ = [
     "LearningResource",
     "LlmUsage",
     "ModelRegistry",
+    "ModerationFlag",
     "PathStatus",
     "PathStepKind",
     "ProficiencyLevel",

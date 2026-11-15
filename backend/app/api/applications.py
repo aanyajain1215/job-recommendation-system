@@ -281,6 +281,7 @@ def _successful_skill_observation(db: Session, user_id) -> tuple[list[str], str]
         ApplicationStatus.SHORTLISTED,
         ApplicationStatus.INTERVIEW,
         ApplicationStatus.OFFER,
+        ApplicationStatus.HIRED,
     )
     rows = db.execute(
         select(Skill.name, func.count(Skill.id))
@@ -337,6 +338,7 @@ def get_my_application_stats(
         interview=counts.get(ApplicationStatus.INTERVIEW, 0),
         rejected=counts.get(ApplicationStatus.REJECTED, 0),
         offer=counts.get(ApplicationStatus.OFFER, 0),
+        hired=counts.get(ApplicationStatus.HIRED, 0),
         saved=counts.get(ApplicationStatus.SAVED, 0),
         successful_skills=successful,
         observation_note=note,
