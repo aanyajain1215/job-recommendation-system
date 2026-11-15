@@ -117,8 +117,8 @@ def extract_skills(
     return [(canonical, required) for canonical, required in out.values()]
 
 
-def assign_family(title: str, families: list[dict]) -> str | None:
-    """Deepest-family-first keyword match on the title (seed_canonical order)."""
+def assign_family(title: str, families: list[dict], *, use_llm: bool = False) -> str | None:
+    """Deepest-family-first keyword match on the title; optional LLM fallback (P4)."""
     def depth(fam: dict) -> int:
         d, seen = 0, set()
         parent = fam.get("parent")
@@ -139,6 +139,39 @@ def assign_family(title: str, families: list[dict]) -> str | None:
         hit = next((kw for kw in keywords if kw and kw in title_low), None)
         if hit:
             return fam.get("name")
+
+    if use_llm and title_low:
+        try:
+            from pydantic import BaseModel
+            from app.services.llm import get_provider, mark_flagged, prompts, validators
+
+            provider = get_provider()
+            if provider is not None:
+                allowed = [str(f.get("name")) for f in families if f.get("name")]
+                if "other" not in [a.lower() for a in allowed]:
+                    allowed = allowed + ["other"]
+
+                class _FamilyOut(BaseModel):
+                    family: str
+
+                out, usage = provider.complete_json(
+                    _FamilyOut,
+                    prompts.p4_title_to_family(str(title), allowed),
+                    system="Classify the job title into exactly one allowed family.",
+                    max_tokens=80,
+                    route="P4",
+                )
+                problems = validators.validate_family(out.family, allowed)
+                if problems:
+                    mark_flagged(usage, "; ".join(problems))
+                else:
+                    fam = str(out.family).strip()
+                    # return canonical-cased name from allowed list
+                    for a in allowed:
+                        if a.lower() == fam.lower():
+                            return None if a.lower() == "other" else a
+        except Exception:
+            pass
     return None
 
 

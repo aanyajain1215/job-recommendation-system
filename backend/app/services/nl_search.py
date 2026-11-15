@@ -85,68 +85,46 @@ def _coerce_int(value: Any) -> int | None:
 
 
 def parse_query(q: str) -> tuple[SearchFilters, str]:
-    """NL query -> (filters, mode). mode is "llm" or "fts" (fallback).
-
-    LLM_STRICT=true (temporary trial): any provider/LLM failure raises
-    LlmStrictError (→ HTTP 502) instead of degrading to FTS silently.
-    """
+    """NL query -> (filters, "llm"). AI-mandatory: LLM parsing required, no FTS fallback."""
     text = (q or "").strip()
     if not text:
-        return SearchFilters(), "fts"
+        raise RuntimeError("NL search requires a non-empty query (no fallback)")
 
-    from app.services.llm.strict import LlmStrictError, strict_bail
+    from app.services.llm.provider import get_provider, llm_available
 
-    try:
-        from app.services.llm.provider import get_provider, llm_available
-
-        provider = get_provider() if llm_available() else None
-    except LlmStrictError:
-        raise
-    except Exception:  # pragma: no cover - provider import/config issues
-        strict_bail("nl_search", "provider init failed (config/import issue)")
-        provider = None
-
+    if not llm_available():
+        raise RuntimeError("LLM provider required for NL search but unavailable (no FTS fallback)")
+    provider = get_provider()
     if provider is None:
-        # Graceful degrade (plan §15): treat as plain full-text query.
-        strict_bail("nl_search", "no LLM provider available")
-        return SearchFilters(keywords=text), "fts"
+        raise RuntimeError("LLM provider required for NL search but could not be initialized")
 
-    try:
-        result, _usage = provider.complete_json(
-            SearchFilters,
-            _p7_prompt(text),
-            route="nl_search",
-        )
-        filters = SearchFilters(**sanitize(result.model_dump()))
-        coerced = _coerce_int(filters.min_salary)
-        filters = filters.model_copy(
-            update={
-                "min_salary": coerced,
-                "keywords": (filters.keywords or text).strip() or None,
-                "skills": [s for s in (filters.skills or []) if str(s).strip()],
-            }
-        )
-        if not any(
-            [
-                filters.keywords,
-                filters.location,
-                filters.remote_only,
-                filters.employment_type,
-                filters.experience_level,
-                filters.min_salary is not None,
-                filters.skills,
-            ]
-        ):
-            # The model parsed nothing meaningful — fall back to FTS text.
-            strict_bail("nl_search", "LLM returned no usable filters")
-            return SearchFilters(keywords=text), "fts"
-        return filters, "llm"
-    except LlmStrictError:
-        raise
-    except Exception as exc:
-        strict_bail("nl_search", f"LLM parse failed: {exc}")
-        log.info("P7 NL parse failed; falling back to FTS for %r", text)
-        return SearchFilters(keywords=text), "fts"
+    result, _usage = provider.complete_json(
+        SearchFilters,
+        _p7_prompt(text),
+        route="nl_search",
+    )
+    filters = SearchFilters(**sanitize(result.model_dump()))
+    coerced = _coerce_int(filters.min_salary)
+    filters = filters.model_copy(
+        update={
+            "min_salary": coerced,
+            "keywords": (filters.keywords or text).strip() or None,
+            "skills": [s for s in (filters.skills or []) if str(s).strip()],
+        }
+    )
+    if not any(
+        [
+            filters.keywords,
+            filters.location,
+            filters.remote_only,
+            filters.employment_type,
+            filters.experience_level,
+            filters.min_salary is not None,
+            filters.skills,
+        ]
+    ):
+        raise RuntimeError("LLM NL parsing produced no usable filters (no FTS fallback)")
+    return filters, "llm"
 
 
 def _p7_prompt(text: str) -> str:

@@ -1,0 +1,7 @@
+{
+  "artifact": "C:\\Users\\aanya\\Documents\\SIH\\projects\\job recommendation system\\backend\\ml\\artifacts\\skill2vec_v6.joblib",
+  "version": "v6",
+  "vocab_size": 73,
+  "best_val_auc_roc": 0.9587361355908063,
+  "loss_curve_png": "C:\\Users\\aanya\\Documents\\SIH\\projects\\job recommendation system\\backend\\ml\\artifacts\\graphsage_loss_curve.png"
+}

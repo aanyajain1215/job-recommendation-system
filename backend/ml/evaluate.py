@@ -123,8 +123,48 @@ def extraction_report() -> dict:
     }
 
 
+def _auc_roc(y_true: list[int], scores: list[float]) -> float:
+    """AUC-ROC via rank statistic (no sklearn dependency required)."""
+    pos = [s for y, s in zip(y_true, scores) if y == 1]
+    neg = [s for y, s in zip(y_true, scores) if y == 0]
+    n_pos, n_neg = len(pos), len(neg)
+    if n_pos == 0 or n_neg == 0:
+        return 0.0
+    # rank all scores; average ranks for ties
+    order = sorted(range(len(scores)), key=lambda i: scores[i])
+    ranks = [0.0] * len(scores)
+    i = 0
+    r = 1
+    while i < len(order):
+        j = i
+        while j + 1 < len(order) and scores[order[j + 1]] == scores[order[i]]:
+            j += 1
+        avg_rank = (r + (r + (j - i))) / 2.0
+        for k in range(i, j + 1):
+            ranks[order[k]] = avg_rank
+        r += (j - i + 1)
+        i = j + 1
+    sum_pos_ranks = sum(rank for rank, y in zip(ranks, y_true) if y == 1)
+    auc = (sum_pos_ranks - n_pos * (n_pos + 1) / 2.0) / (n_pos * n_neg)
+    return float(max(0.0, min(1.0, auc)))
+
+
+def _cos_vec(a, b) -> float:
+    try:
+        import numpy as np  # noqa: PLC0415
+        av = np.asarray(a, dtype=np.float64)
+        bv = np.asarray(b, dtype=np.float64)
+        na = np.linalg.norm(av)
+        nb = np.linalg.norm(bv)
+        if na <= 0 or nb <= 0:
+            return 0.0
+        return float(np.dot(av, bv) / (na * nb))
+    except Exception:
+        return 0.0
+
+
 def transfer_metrics(vectors: dict | None = None) -> dict:
-    """P/R/F1 of the transfer classifier: seed graph edge ∪ cosine ≥ τ."""
+    """M1 transfer evaluation: 3 separate rows (YAML-only, Pure Embedding, Hybrid)."""
     from app.core.config import get_settings  # noqa: PLC0415
     from app.services.skill_graph import load_seed_graph, transfer_similarity  # noqa: PLC0415
     from ml.metrics import precision_recall_f1  # noqa: PLC0415
@@ -139,34 +179,95 @@ def transfer_metrics(vectors: dict | None = None) -> dict:
         payload = load_artifact()
         vectors = payload["vectors"] if payload else None
 
-    from ml.train_skill2vec import cosine  # noqa: PLC0415
+    import numpy as np  # noqa: PLC0415
 
     graph = load_seed_graph()
     tau = float(getattr(get_settings(), "transfer_similarity_threshold", 0.65))
 
-    y_true: list[bool] = []
-    y_pred: list[bool] = []
+    emb_map = None
+    if vectors:
+        emb_map = {}
+        for k, v in vectors.items():
+            try:
+                emb_map[str(k).lower().strip()] = np.asarray(v, dtype=np.float32)
+            except Exception:
+                continue
+
+    y_true: list[int] = []
+    modes = {
+        "yaml_only": {"pred": [], "score": []},
+        "pure_embedding": {"pred": [], "score": []},
+        "hybrid": {"pred": [], "score": []},
+    }
+
     for pair in pairs:
         a = str(pair["a"]).lower().strip()
         b = str(pair["b"]).lower().strip()
-        pred = False
-        if transfer_similarity(graph, {a}, b) is not None:
-            pred = True
-        elif vectors and a in vectors and b in vectors:
-            pred = cosine(vectors[a], vectors[b]) >= tau
-        y_true.append(bool(pair["transferable"]))
-        y_pred.append(pred)
+        label = 1 if bool(pair.get("transferable")) else 0
+        y_true.append(label)
 
-    precision, recall, f1 = precision_recall_f1(y_true, y_pred)
+        # (a) YAML Rules Only (no embeddings)
+        sim_yaml = transfer_similarity(graph, {a}, b, embeddings={})
+        score_yaml = float(sim_yaml) if sim_yaml is not None else 0.0
+        pred_yaml = score_yaml >= tau
+
+        # (b) Pure GraphSAGE/embedding similarity only (zero YAML edge lookup)
+        score_emb = 0.0
+        if vectors and a in vectors and b in vectors:
+            score_emb = float(_cos_vec(vectors[a], vectors[b]))
+        pred_emb = score_emb >= tau
+
+        # (c) Hybrid Graph + GraphSAGE (combined)
+        sim_hybrid = transfer_similarity(graph, {a}, b, embeddings=emb_map)
+        score_hybrid = float(sim_hybrid) if sim_hybrid is not None else 0.0
+        # fallback to pure embedding if graph path absent but vectors exist
+        if sim_hybrid is None and score_emb > 0.0:
+            score_hybrid = score_emb
+        pred_hybrid = score_hybrid >= tau
+
+        modes["yaml_only"]["pred"].append(pred_yaml)
+        modes["yaml_only"]["score"].append(score_yaml)
+        modes["pure_embedding"]["pred"].append(pred_emb)
+        modes["pure_embedding"]["score"].append(score_emb)
+        modes["hybrid"]["pred"].append(pred_hybrid)
+        modes["hybrid"]["score"].append(score_hybrid)
+
+    rows = []
+    name_map = {
+        "yaml_only": "YAML Rules Only (embeddings=None)",
+        "pure_embedding": "Pure GraphSAGE Embedding Similarity Only (no YAML edge lookup)",
+        "hybrid": "Hybrid Graph + GraphSAGE",
+    }
+    for key, display in name_map.items():
+        preds_bool = [bool(x) for x in modes[key]["pred"]]
+        y_bool = [bool(y) for y in y_true]
+        precision, recall, f1 = precision_recall_f1(y_bool, preds_bool)
+        auc = _auc_roc(y_true, modes[key]["score"])
+        row = {
+            "mode": key,
+            "name": display,
+            "precision": round(precision, 4),
+            "recall": round(recall, 4),
+            "f1": round(f1, 4),
+            "auc_roc": round(auc, 4),
+            "n_pairs": len(pairs),
+            "threshold": tau,
+        }
+        rows.append(row)
+
+    hybrid = next(r for r in rows if r["mode"] == "hybrid")
     result = {
-        "precision": round(precision, 4),
-        "recall": round(recall, 4),
-        "f1": round(f1, 4),
+        # backward-compatible summary uses hybrid
+        "precision": hybrid["precision"],
+        "recall": hybrid["recall"],
+        "f1": hybrid["f1"],
+        "auc_roc": hybrid["auc_roc"],
         "n_pairs": len(pairs),
         "threshold": tau,
         "vectors": vectors is not None,
+        "rows": rows,
     }
-    result["gate_pass"] = f1 >= TRANSFER_F1_MIN
+    result["gate_pass"] = hybrid["f1"] >= TRANSFER_F1_MIN
     return result
 
 
@@ -276,6 +377,7 @@ def collect_gates() -> dict:
         "threshold": TRANSFER_F1_MIN,
         "required": True,
         "passed": bool(transfer.get("gate_pass")),
+        "rows": transfer.get("rows"),
     }
 
     calibration = calibration_report()
@@ -346,6 +448,10 @@ def main(argv: list[str] | None = None) -> int:
             if not gate.get("required", True):
                 status = f"({status} advisory)"
             print(f"{name:40s} {value:>10s} {str(limit):>10s}  {status}")
+            if name == "transfer_f1" and gate.get("rows"):
+                print(f"  {'M1 mode':55s} {'P':>8s} {'R':>8s} {'F1':>8s} {'AUC':>8s}")
+                for r in gate["rows"]:
+                    print(f"  {r['name'][:55]:55s} {r['precision']:8.4f} {r['recall']:8.4f} {r['f1']:8.4f} {r['auc_roc']:8.4f}")
         else:
             print(f"{name:40s} {'-':>10s} {'-':>10s}  {gate.get('status', 'n/a')}")
     print(f"\nreport: {out}")

@@ -1,30 +1,26 @@
-"""Ranklet strategy dispatch + the M2 feature builder (plan §6/§17).
+"""M2 ranker (DCN-v2) + feature builder + strategy dispatch.
 
-Three strategies, selected by settings.recommender_strategy:
+- Heuristic/deterministic baseline remains `scoring.py` component weights (UI/pure).
+- `ltr_full` runs PyTorch Deep & Cross Network v2 (DCN-v2) inference.
+- `ltr_blend` keeps a learned-primary blend for compatibility, using DCN-v2 as model.
 
-- deterministic — pure component weights (default; always available)
-- ltr_blend     — 0.35·LightGBM LambdaRank (M2) + deterministic, Δ clamped ±15
-- ltr_full      — LightGBM score only
-
-The M2 model is optional: if the artifact, its feature manifest, or lightgbm
-is missing/mismatched, every strategy silently degrades to `deterministic`
-and reports the effective strategy so the API/UI never lies about what
-produced the ranking.  The LLM never participates — all numbers come from
-scoring.py or the trained artifact.
-
-`build_features` produces the 30-feature deterministic vector used for
-training *and* serving; every sub-signal is derived from explicit
-ComponentInputs or logged FeatureContext values (no lookups, no I/O), so
-train/serve skew is impossible by construction.
+`build_features` extracts continuous, un-clamped domain signals (no hardcoded penalty
+multipliers). Standardization is applied via a fitted StandardScaler stored inside the
+M2 DCN artifact (train/serve consistent). Legacy LightGBM ranklet loader/helpers are
+retained for baseline comparison and backward compatibility.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import math
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
+
+import numpy as np
 
 from app.core.config import get_settings
 from app.services.scoring import (
@@ -37,89 +33,65 @@ from app.services.scoring import (
 log = logging.getLogger(__name__)
 
 ARTIFACT_DIR = Path(__file__).resolve().parents[2] / "ml" / "artifacts"
-# plan §6/§17: ltr_blend uses α=0.35, contribution clamped to ±15 points
-LGBM_BLEND_WEIGHT = 0.35
-LGBM_MAX_DELTA = 15.0
+LGBM_BLEND_WEIGHT = 0.85
+LGBM_MAX_DELTA = 15.0  # legacy
 
-# The M2 feature vector (plan §6):8 component scores + sub-signals.
-# Order is pinned by the artifact manifest — a mismatch degrades to
-# deterministic rather than silently feeding the wrong columns.
+# Continuous, un-clamped domain signals for DCN-v2 (standardized by artifact scaler).
 FEATURE_ORDER = [
-    "semantic",
-    "skill",
-    "experience",
-    "education",
-    "project",
-    "location",
-    "salary",
-    "interest",
-    "required_coverage",
-    "preferred_coverage",
+    # semantic (M0 bi-encoder + CE raw outputs)
+    "raw_bi_encoder_cosine",
+    "cross_encoder_logit",
+    "cross_encoder_prob",
+    # skill graph / coverage
+    "required_coverage_ratio",
+    "preferred_coverage_ratio",
+    "transfer_sim_mean",
+    "transfer_sim_max",
     "missing_required_count",
-    "semantic_cosine_raw",
-    "experience_gap_years",
-    "education_rank_delta",
+    "transfer_credit_count",
+    # experience (signed deltas)
+    "experience_delta_min_years",   # seeker_years - req_min_years
+    "experience_delta_max_years",   # seeker_years - req_max_years
+    # education
+    "education_rank_delta_signed",  # seeker_rank - req_rank
+    "education_field_match",        # 1 exact/compatible, 0 mismatch, 0.5 unknown/no bar
+    # projects
+    "project_skill_overlap_ratio",  # overlap / job_skill_count in [0,1]
+    "project_overlap_count",
+    # location / remote indicators
+    "is_remote_job",
+    "location_exact_match",
+    "location_preferred_match",
+    "location_region_match",
+    "seeker_open_to_remote",
+    # salary
     "salary_iou",
-    "location_class",
-    "family_match",
+    "salary_gap_ratio",             # (req_min - seeker_max)/max(req_min,seeker_max) signed-like gap
+    "salary_disclosed",
+    # career graph
+    "career_family_exact_match",
+    "career_family_graph_distance",  # 0 same, 1 parent/near, else 2 unknown/far
+    # context signals (real, logged)
     "job_age_days",
     "applicant_count",
     "profile_completeness",
     "historical_apply_rate",
-    "exploration_flag",
-    "seeker_skill_count",
     "job_skill_count",
-    "transfer_credit_count",
-    "partial_credit_count",
-    "salary_disclosed",
-    "is_remote",
-    "experience_level_ordinal",
-    "project_overlap_count",
-]
-
-_LEVEL_ORDER = ["entry", "mid", "senior", "lead", "executive"]
-
-# Neutral fill for legacy callers that only have a ScoreResult (deterministic
-# defaults matching the plan §6 neutral priors).
-_NEUTRAL_TAIL = [
-    0.5,    # required_coverage
-    0.5,    # preferred_coverage
-    0.0,    # missing_required_count
-    0.0,    # semantic_cosine_raw
-    0.0,    # experience_gap_years
-    0.0,    # education_rank_delta
-    0.5,    # salary_iou (undisclosed prior)
-    1.0,    # location_class
-    0.0,    # family_match
-    0.0,    # job_age_days
-    0.0,    # applicant_count
-    0.0,    # profile_completeness
-    0.0,    # historical_apply_rate
-    0.0,    # exploration_flag
-    0.0,    # seeker_skill_count
-    0.0,    # job_skill_count
-    0.0,    # transfer_credit_count
-    0.0,    # partial_credit_count
-    0.0,    # salary_disclosed
-    0.0,    # is_remote
-    1.0,    # experience_level_ordinal (mid)
-    0.0,    # project_overlap_count
+    "seeker_skill_count",
 ]
 
 
 @dataclass
 class FeatureContext:
-    """Per-(profile, job) extras the pure scorer doesn't own (plan §6 M2).
-
-    Everything here is deterministic and logged; defaults keep the vector
-    well-formed when a caller has no context (legacy/direct tests).
-    """
+    """Per-(profile, job) extras (deterministic/logged)."""
 
     job_age_days: float = 0.0
     applicant_count: float = 0.0
     profile_completeness: float = 0.0
     historical_apply_rate: float = 0.0
     exploration_flag: float = 0.0
+    cross_encoder_logit: float = 0.0
+    cross_encoder_prob: float = 0.0
 
 
 @dataclass
@@ -127,9 +99,10 @@ class RankOutcome:
     """Final score + which strategy actually produced it."""
 
     final: float
-    strategy: str          # "deterministic" | "ltr_blend" | "ltr_full"
+    strategy: str
     model_version: str | None = None
-    delta_note: str | None = None  # present only when LTR moved the score
+    delta_note: str | None = None
+    attributions: list[dict[str, Any]] | None = None
 
     @property
     def used_ltr(self) -> bool:
@@ -137,237 +110,457 @@ class RankOutcome:
 
 
 # ---------------------------------------------------------------------------
-# Feature build (plan §6 M2 — identical at train and serve time)
+# Feature build (continuous, un-clamped; scaling done by M2 artifact scaler)
 # ---------------------------------------------------------------------------
+
+def _safe_ratio(num: float, den: float, default: float = 0.0) -> float:
+    if den <= 0:
+        return default
+    return float(num) / float(den)
+
 
 def build_features(
     inputs: ComponentInputs,
     result: ScoreResult,
     ctx: FeatureContext | None = None,
 ) -> list[float]:
-    """30-feature deterministic vector:8 components + logged sub-signals."""
     ctx = ctx or FeatureContext()
-    comp = result.components
-    possessed = inputs.seeker_skills
-    transfers = inputs.transfer_similarities
-    required = [r for r in inputs.job_skills if r.is_required]
-    preferred = [r for r in inputs.job_skills if not r.is_required]
+    possessed = inputs.seeker_skills or {}
+    transfers = inputs.transfer_similarities or {}
+    job_skills = inputs.job_skills or []
+    required = [r for r in job_skills if r.is_required]
+    preferred = [r for r in job_skills if not r.is_required]
+    job_names = {r.name.lower().strip() for r in job_skills}
+    seeker_proj = {s.lower().strip() for s in (inputs.seeker_project_skills or set())}
 
     def _coverage(reqs: list) -> float:
         if not reqs:
-            return 1.0          # neutral: job states no bar of this kind
+            return 1.0
         hit = 0
         for r in reqs:
             key = r.name.lower().strip()
             if key in possessed or key in transfers:
                 hit += 1
-        return round(hit / len(reqs), 4)
+        return _safe_ratio(hit, len(reqs), 1.0)
 
-    cosine = inputs.semantic_cosine if inputs.semantic_cosine is not None else 0.0
+    # transfer similarities (continuous, M1 GraphSAGE evidence for missing skills)
+    transfer_vals = [float(v) for v in transfers.values()] if transfers else []
+    transfer_sim_mean = float(sum(transfer_vals) / len(transfer_vals)) if transfer_vals else 0.0
+    transfer_sim_max = float(max(transfer_vals)) if transfer_vals else 0.0
+    transfer_credit_count = float(len(transfer_vals))
+
+    cosine = float(inputs.semantic_cosine) if inputs.semantic_cosine is not None else 0.0
 
     low, high = EXPERIENCE_LEVEL_RANGES.get(inputs.job_level, (0.0, 10.0))
     years = inputs.years_of_experience
     if years is None:
-        exp_gap = 0.0
-    elif years < low:
-        exp_gap = round(years - low, 2)
-    elif years > high:
-        exp_gap = round(years - high, 2)
+        exp_delta_min = 0.0
+        exp_delta_max = 0.0
     else:
-        exp_gap = 0.0
+        exp_delta_min = float(years) - float(low)
+        exp_delta_max = float(years) - float(high)
 
     rank_user = education_rank(inputs.seeker_degree)
     rank_req = education_rank(inputs.job_degree)
-    edu_delta = (
-        float(rank_user - rank_req)
-        if (rank_user is not None and rank_req is not None)
-        else 0.0
-    )
-
-    if None in (inputs.seeker_salary_min, inputs.job_salary_min):
-        salary_iou = 0.5        # undisclosed prior (plan §6)
+    if rank_user is not None and rank_req is not None:
+        edu_delta = float(rank_user - rank_req)
     else:
-        s_low = float(inputs.seeker_salary_min)
-        s_high = float(inputs.seeker_salary_max or inputs.seeker_salary_min)
-        j_low = float(inputs.job_salary_min)
-        j_high = float(inputs.job_salary_max or inputs.job_salary_min)
-        inter = max(0.0, min(s_high, j_high) - max(s_low, j_low))
-        union = max(s_high, j_high) - min(s_low, j_low)
-        salary_iou = round(inter / union, 4) if union > 0 else 1.0
-
-    if inputs.job_is_remote:
-        loc_class = 3.0
+        edu_delta = 0.0
+    if inputs.job_field and inputs.seeker_field:
+        jf = inputs.job_field.strip().lower()
+        sf = inputs.seeker_field.strip().lower()
+        edu_field_match = 1.0 if (jf == sf or jf in sf or sf in jf) else 0.0
+    elif inputs.job_field or inputs.seeker_field:
+        edu_field_match = 0.5
     else:
-        seeker = (inputs.seeker_location or "").strip().lower()
-        job = (inputs.job_location or "").strip().lower()
-        preferred_locs = {p.lower().strip() for p in inputs.seeker_preferred_locations}
-        if (seeker and job and seeker == job) or (job and job in preferred_locs):
-            loc_class = 2.0
-        elif (
-            seeker
-            and job
-            and seeker.split(",")[-1].strip()
-            == job.split(",")[-1].strip()
-        ):
-            loc_class = 1.0
-        elif inputs.seeker_open_to_remote:
-            loc_class = 0.5
-        else:
-            loc_class = 0.0
+        edu_field_match = 0.5  # unknown/no stated bar
 
-    family_match = 0.0
-    if inputs.seeker_target_family and inputs.job_family:
-        if inputs.seeker_target_family.strip().lower() == inputs.job_family.strip().lower():
-            family_match = 1.0
-        elif inputs.family_graph_distance is not None and inputs.family_graph_distance <= 1:
-            family_match = 0.5
+    overlap_count = float(len(seeker_proj & job_names))
+    project_overlap_ratio = _safe_ratio(overlap_count, len(job_names), 0.0 if job_names else 1.0)
 
-    job_names = {r.name.lower().strip() for r in inputs.job_skills}
-    project_overlap = float(
-        len({s.lower().strip() for s in inputs.seeker_project_skills} & job_names)
-    )
+    # location indicators
+    is_remote_job = 1.0 if inputs.job_is_remote else 0.0
+    seeker_loc = (inputs.seeker_location or "").strip().lower()
+    job_loc = (inputs.job_location or "").strip().lower()
+    preferred_locs = {p.lower().strip() for p in (inputs.seeker_preferred_locations or set()) if p}
+    location_exact_match = 1.0 if (seeker_loc and job_loc and seeker_loc == job_loc) else 0.0
+    location_preferred_match = 1.0 if (job_loc and job_loc in preferred_locs) else 0.0
+    seeker_region = seeker_loc.split(",")[-1].strip() if seeker_loc else ""
+    job_region = job_loc.split(",")[-1].strip() if job_loc else ""
+    location_region_match = 1.0 if (seeker_region and job_region and seeker_region == job_region) else 0.0
+    seeker_open_to_remote = 1.0 if inputs.seeker_open_to_remote else 0.0
+
+    # salary IOU and gap ratio
+    smin = inputs.seeker_salary_min
+    smax = inputs.seeker_salary_max or inputs.seeker_salary_min
+    jmin = inputs.job_salary_min
+    jmax = inputs.job_salary_max or inputs.job_salary_min
+    salary_disclosed = 1.0 if (smin is not None and jmin is not None) else 0.0
+    if smin is None or jmin is None:
+        salary_iou = 0.0
+        salary_gap_ratio = 0.0
+    else:
+        smin_f, smax_f, jmin_f, jmax_f = float(smin), float(smax), float(jmin), float(jmax)
+        inter = max(0.0, min(smax_f, jmax_f) - max(smin_f, jmin_f))
+        union = max(smax_f, jmax_f) - min(smin_f, jmin_f)
+        salary_iou = (inter / union) if union > 0 else 1.0
+        denom = max(abs(jmin_f), abs(smax_f), 1.0)
+        salary_gap_ratio = (jmin_f - smax_f) / denom  # >0 means job asks above seeker max
+
+    # career family / graph distance
+    seeker_fam = (inputs.seeker_target_family or "").strip().lower()
+    job_fam = (inputs.job_family or "").strip().lower()
+    career_family_exact_match = 1.0 if (seeker_fam and job_fam and seeker_fam == job_fam) else 0.0
+    if inputs.family_graph_distance is None:
+        career_family_graph_distance = 2.0 if (seeker_fam and job_fam and seeker_fam != job_fam) else 0.0
+    else:
+        career_family_graph_distance = float(inputs.family_graph_distance)
+
+    missing_required_count = 0.0
+    for r in required:
+        key = r.name.lower().strip()
+        if key not in possessed and key not in transfers:
+            missing_required_count += 1.0
 
     vector = [
-        float(comp.get("semantic", 0.0)),
-        float(comp.get("skill", 0.0)),
-        float(comp.get("experience", 0.0)),
-        float(comp.get("education", 0.0)),
-        float(comp.get("project", 0.0)),
-        float(comp.get("location", 0.0)),
-        float(comp.get("salary", 0.0)),
-        float(comp.get("interest", 0.0)),
+        cosine,
+        float(ctx.cross_encoder_logit),
+        float(ctx.cross_encoder_prob),
         _coverage(required),
         _coverage(preferred),
-        float(len(result.skill_detail.missing_required)),
-        round(float(cosine), 4),
-        exp_gap,
+        transfer_sim_mean,
+        transfer_sim_max,
+        missing_required_count,
+        transfer_credit_count,
+        exp_delta_min,
+        exp_delta_max,
         edu_delta,
-        salary_iou,
-        loc_class,
-        family_match,
-        float(ctx.job_age_days),
-        float(ctx.applicant_count),
-        float(ctx.profile_completeness),
-        float(ctx.historical_apply_rate),
-        float(ctx.exploration_flag),
+        edu_field_match,
+        project_overlap_ratio,
+        overlap_count,
+        is_remote_job,
+        location_exact_match,
+        location_preferred_match,
+        location_region_match,
+        seeker_open_to_remote,
+        float(salary_iou),
+        float(salary_gap_ratio),
+        float(salary_disclosed),
+        career_family_exact_match,
+        career_family_graph_distance,
+        # Cap context features to stable ranges to avoid OOD extrapolation at inference
+        # (training distribution centered on recent jobs/low applicant counts).
+        float(max(0.0, min(7.0, ctx.job_age_days))),
+        float(max(0.0, min(10.0, ctx.applicant_count))),
+        float(max(0.0, min(100.0, ctx.profile_completeness))),
+        float(max(0.0, min(1.0, ctx.historical_apply_rate))),
+        float(len(job_skills)),
         float(len(possessed)),
-        float(len(inputs.job_skills)),
-        float(len(result.skill_detail.transferable)),
-        float(len(result.skill_detail.partial)),
-        1.0 if inputs.job_salary_min is not None else 0.0,
-        1.0 if inputs.job_is_remote else 0.0,
-        float(_LEVEL_ORDER.index(inputs.job_level.value))
-        if inputs.job_level.value in _LEVEL_ORDER
-        else 1.0,
-        project_overlap,
     ]
-    assert len(vector) == len(FEATURE_ORDER), "feature vector drifted from manifest"
-    return vector
+    assert len(vector) == len(FEATURE_ORDER), (len(vector), len(FEATURE_ORDER))
+    cleaned = []
+    for v in vector:
+        try:
+            fv = float(v)
+        except Exception:
+            fv = 0.0
+        if not math.isfinite(fv):
+            fv = 0.0
+        cleaned.append(fv)
+    return cleaned
 
 
 def component_vector(result: ScoreResult) -> list[float]:
-    """Legacy path: components + neutral tail (deterministic, no context)."""
-    head = [float(result.components.get(name, 0.0)) for name in FEATURE_ORDER[:8]]
-    return head + list(_NEUTRAL_TAIL)
+    """Legacy/debug vector (component scores + zeros for tail)."""
+    comps = result.components or {}
+    if isinstance(comps, dict):
+        base = [
+            float(comps.get("semantic", 0.0)),
+            float(comps.get("skill", 0.0)),
+            float(comps.get("experience", 0.0)),
+            float(comps.get("education", 0.0)),
+            float(comps.get("project", 0.0)),
+            float(comps.get("location", 0.0)),
+            float(comps.get("salary", 0.0)),
+            float(comps.get("interest", 0.0)),
+        ]
+    else:
+        base = [
+            float(getattr(comps, "semantic", 0.0)),
+            float(getattr(comps, "skill", 0.0)),
+            float(getattr(comps, "experience", 0.0)),
+            float(getattr(comps, "education", 0.0)),
+            float(getattr(comps, "project", 0.0)),
+            float(getattr(comps, "location", 0.0)),
+            float(getattr(comps, "salary", 0.0)),
+            float(getattr(comps, "interest", 0.0)),
+        ]
+    if len(base) >= len(FEATURE_ORDER):
+        return base[: len(FEATURE_ORDER)]
+    return base + [0.0] * (len(FEATURE_ORDER) - len(base))
 
 
 # ---------------------------------------------------------------------------
-# Artifact loading (manifest-validated)
+# Legacy LightGBM ranklet loader (kept for comparison / backward compatibility)
 # ---------------------------------------------------------------------------
 
 @lru_cache
 def _load_lgbm():
-    """Load the active ranklet artifact.
-
-    Returns (booster, version, feature_order) — feature_order is None when no
-    manifest sidecar exists (pre-manifest artifacts).  Any load problem,
-    including a manifest/FEATURE_ORDER mismatch, yields (None, None, None) so
-    callers degrade to deterministic instead of feeding wrong columns.
-    """
     try:
         import lightgbm as lgb  # noqa: PLC0415
+    except Exception:  # pragma: no cover
+        return None, None, FEATURE_ORDER
 
-        candidates = sorted(ARTIFACT_DIR.glob("ranklet_*.txt"))
-        if not candidates:
-            candidates = sorted(ARTIFACT_DIR.glob("ranklet_*.model"))
-        if not candidates:
-            return None, None, None
-        path = candidates[-1]
-        version = path.stem.replace("ranklet_", "")
+    manifests = sorted(ARTIFACT_DIR.glob("ranklet_v*.manifest.json"))
+    if not manifests:
+        return None, None, FEATURE_ORDER
 
-        feature_order: list[str] | None = None
-        manifest_path = path.with_suffix(".manifest.json")
-        if not manifest_path.exists():
-            manifest_path = path.parent / f"{path.stem}.manifest.json"
-        if manifest_path.exists():
-            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            feature_order = list(manifest.get("feature_order", []))
-            if feature_order != FEATURE_ORDER:
-                log.warning(
-                    "ranklet %s manifest feature_order mismatch "
-                    "(%d vs %d expected); deterministic fallback",
-                    version, len(feature_order), len(FEATURE_ORDER),
-                )
-                return None, None, None
-
-        booster = lgb.Booster(model_file=str(path))
-        return booster, version, feature_order
-    except Exception as exc:
-        log.info("ranklet unavailable (%s); deterministic scoring only", exc)
-        return None, None, None
+    manifest_path = manifests[-1]
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        model_path = manifest_path.with_suffix("").with_suffix(".txt")
+        if not model_path.exists():
+            alt = manifest_path.with_name(manifest_path.name.replace(".manifest.json", ".lgb"))
+            if alt.exists():
+                model_path = alt
+        if not model_path.exists():
+            return None, None, FEATURE_ORDER
+        feature_order = manifest.get("feature_order") or FEATURE_ORDER
+        if not isinstance(feature_order, list) or not feature_order:
+            return None, None, FEATURE_ORDER
+        if feature_order != FEATURE_ORDER[: len(feature_order)]:
+            log.warning("lgbm manifest feature order mismatch with live prefix; skipping")
+            return None, None, FEATURE_ORDER
+        booster = lgb.Booster(model_file=str(model_path))
+        version = manifest.get("version") or manifest_path.stem.replace(".manifest", "")
+        return booster, str(version), list(feature_order)
+    except Exception as exc:  # pragma: no cover
+        log.warning("failed to load lgbm ranklet: %s", exc)
+        return None, None, FEATURE_ORDER
 
 
-def _lgbm_score(features: list[float]) -> float | None:
-    booster, _version, _order = _load_lgbm()
+def _lgbm_score(row: list[float]) -> float | None:
+    booster, _version, feature_order = _load_lgbm()
     if booster is None:
         return None
     try:
-        pred = booster.predict([features])
-        value = float(pred[0])
-        # LightGBM ranking scores are unbounded → squash to [0, 100]
-        return max(0.0, min(100.0, value))
-    except Exception:
-        log.exception("ranklet prediction failed; falling back to deterministic")
+        width = min(len(feature_order), len(row))
+        value = booster.predict([row[:width]])[0]
+        return float(value)
+    except Exception:  # pragma: no cover
         return None
 
 
-def rerank(result: ScoreResult, features: list[float] | None = None) -> RankOutcome:
-    """Apply the configured strategy to a completed deterministic ScoreResult.
+# ---------------------------------------------------------------------------
+# DCN-v2 ranker (PyTorch) - primary M2
+# ---------------------------------------------------------------------------
 
-    `features` is the M2 30-vector from `build_features`; when omitted the
-    neutral component-only vector is used (legacy callers).
+def _build_dcn_model(in_dim: int, cross_layers: int = 2, hidden=(128, 64), dropout: float = 0.2):
+    import torch
+    import torch.nn as nn
+
+    class CrossNetV2(nn.Module):
+        def __init__(self, d: int, layers: int):
+            super().__init__()
+            self.layers = layers
+            self.ws = nn.ModuleList([nn.Linear(d, d, bias=True) for _ in range(layers)])
+
+        def forward(self, x0, return_contrib: bool = False):
+            x = x0
+            contrib = []
+            for layer in self.ws:
+                # x_{l+1} = x0 * (W x_l + b) + x_l
+                delta = layer(x)
+                x = x0 * delta + x
+                if return_contrib:
+                    contrib.append(delta)
+            if return_contrib:
+                return x, contrib
+            return x
+
+    class DCNv2Ranker(nn.Module):
+        def __init__(self, d: int):
+            super().__init__()
+            self.cross = CrossNetV2(d, cross_layers)
+            mlp_layers = []
+            prev = d
+            for h in hidden:
+                mlp_layers += [nn.Linear(prev, h), nn.LayerNorm(h), nn.SiLU(), nn.Dropout(dropout)]
+                prev = h
+            self.mlp = nn.Sequential(*mlp_layers) if mlp_layers else nn.Identity()
+            self.out = nn.Linear(d + prev, 1)  # cross output + deep output
+
+        def forward(self, x, return_attrib: bool = False):
+            if return_attrib:
+                x_cross, cross_contrib = self.cross(x, return_contrib=True)
+            else:
+                x_cross = self.cross(x, return_contrib=False)
+                cross_contrib = None
+            x_deep = self.mlp(x)
+            h = torch.cat([x_cross, x_deep], dim=-1)
+            logit = self.out(h).squeeze(-1)
+            if return_attrib:
+                return logit, {"cross": x_cross, "deep": x_deep, "cross_contrib": cross_contrib, "head_weight": self.out.weight.detach()}
+            return logit
+
+    return DCNv2Ranker(in_dim)
+
+
+@lru_cache
+def _load_dcn() -> tuple[Any | None, dict | None, str | None]:
+    """Load newest DCN-v2 ranker artifact: (model, payload, version)."""
+    candidates = sorted(ARTIFACT_DIR.glob("dcn_ranker_v*.pt"))
+    if not candidates:
+        candidates = sorted(ARTIFACT_DIR.glob("dcn_ranker_v*.pth"))
+    if not candidates:
+        return None, None, None
+    path = candidates[-1]
+    try:
+        import torch  # noqa: PLC0415
+
+        payload = torch.load(path, map_location="cpu", weights_only=False)
+        if not isinstance(payload, dict):
+            return None, None, None
+        manifest = payload.get("manifest") or {}
+        feature_order = manifest.get("feature_order") or payload.get("feature_order") or FEATURE_ORDER
+        scaler = payload.get("scaler")
+        state = payload.get("state_dict") or payload.get("model_state_dict")
+        if state is None:
+            # allow raw state dict payload
+            state_keys = {"cross.ws.0.weight", "out.weight"}
+            if any(k in payload for k in state_keys):
+                state = payload
+            else:
+                return None, None, None
+        in_dim = len(feature_order)
+        model = _build_dcn_model(
+            in_dim,
+            cross_layers=int(payload.get("cross_layers", 2)),
+            hidden=tuple(payload.get("hidden", [128, 64])),
+            dropout=float(payload.get("dropout", 0.2)),
+        )
+        model.load_state_dict(state, strict=False)
+        model.eval()
+        meta = {
+            "feature_order": list(feature_order),
+            "scaler": scaler,  # {"mean": [...], "scale": [...]}
+            "version": payload.get("version") or path.stem.replace("dcn_ranker_", ""),
+            "manifest": manifest,
+        }
+        return model, meta, str(meta["version"])
+    except Exception as exc:
+        log.warning("failed to load DCN ranker %s: %s", path, exc)
+        return None, None, None
+
+
+def _scale_rows(rows: np.ndarray, scaler: dict | None) -> np.ndarray:
+    if not scaler:
+        return rows.astype(np.float32)
+    mean = np.asarray(scaler.get("mean", []), dtype=np.float32)
+    scale = np.asarray(scaler.get("scale", []), dtype=np.float32)
+    if mean.shape[0] != rows.shape[1] or scale.shape[0] != rows.shape[1]:
+        return rows.astype(np.float32)
+    scale = np.where(scale == 0, 1.0, scale)
+    return ((rows - mean) / scale).astype(np.float32)
+
+
+def _dcn_predict_batch(rows: list[list[float]], with_attrib: bool = False):
+    model, meta, version = _load_dcn()
+    if model is None or meta is None:
+        return None, version, None
+    import torch  # noqa: PLC0415
+
+    feat_order = meta.get("feature_order") or FEATURE_ORDER
+    width = len(feat_order)
+    arr = np.array([r[:width] + [0.0] * max(0, width - len(r[:width])) for r in rows], dtype=np.float32)
+    arr = _scale_rows(arr, meta.get("scaler"))
+    x = torch.tensor(arr, dtype=torch.float32)
+    with torch.no_grad():
+        if with_attrib:
+            logits, attrib = model(x, return_attrib=True)
+        else:
+            logits = model(x, return_attrib=False)
+            attrib = None
+    scores = logits.detach().cpu().numpy().astype(np.float64)
+    return scores, version, attrib
+
+
+def _dcn_score(row: list[float]) -> tuple[float | None, str | None, list[dict[str, Any]] | None]:
+    scores, version, attrib = _dcn_predict_batch([row], with_attrib=True)
+    if scores is None:
+        return None, version, None
+    logit = float(scores[0])
+    prob = 1.0 / (1.0 + math.exp(-max(-60.0, min(60.0, logit))))
+    score_100 = prob * 100.0
+    attributions = None
+    try:
+        if attrib is not None:
+            cross = attrib.get("cross")
+            deep = attrib.get("deep")
+            head_w = attrib.get("head_weight")
+            cross_norm = float(cross.abs().mean().item()) if cross is not None else 0.0
+            deep_norm = float(deep.abs().mean().item()) if deep is not None else 0.0
+            attributions = [{
+                "dcn_logit": round(logit, 6),
+                "dcn_prob": round(prob, 6),
+                "cross_path_mean_abs": round(cross_norm, 6),
+                "deep_path_mean_abs": round(deep_norm, 6),
+                "head_weight_norm": round(float(head_w.abs().mean().item()), 6) if head_w is not None else None,
+            }]
+    except Exception:
+        attributions = [{"dcn_logit": logit, "dcn_prob": prob}]
+    return score_100, version, attributions
+
+
+# ---------------------------------------------------------------------------
+# Dispatch
+# ---------------------------------------------------------------------------
+
+def rerank(result: ScoreResult, features: list[float] | None = None) -> RankOutcome:
+    """Apply the configured strategy.
+
+    AI-strict for learned strategies: requires a valid DCN-v2 artifact (no silent fallback).
     """
     requested = get_settings().recommender_strategy
+    row = features if features is not None else component_vector(result)
 
     if requested == "deterministic":
-        return RankOutcome(final=result.final, strategy="deterministic")
+        return RankOutcome(final=float(result.final), strategy="deterministic")
 
-    row = features if features is not None else component_vector(result)
-    lgbm_value = _lgbm_score(row)
-    if lgbm_value is None:
-        # model not trained yet / lightgbm not installed → honest fallback
-        return RankOutcome(final=result.final, strategy="deterministic")
+    dcn_value, version, attributions = _dcn_score(row)
+    if dcn_value is None or version is None:
+        raise RuntimeError(
+            f"DCN-v2 ranker artifact required for strategy '{requested}' but none loadable (expected dcn_ranker_v*.pt)"
+        )
 
-    _booster, version, _order = _load_lgbm()
+    try:
+        log.info(
+            "M2 DCN-v2 inference strategy=%s version=%s score=%.4f attributions=%s",
+            requested, version, float(dcn_value), json.dumps(attributions, default=str),
+        )
+    except Exception:
+        pass
+
     if requested == "ltr_full":
-        return RankOutcome(final=round(lgbm_value, 1), strategy="ltr_full", model_version=version)
+        return RankOutcome(
+            final=round(float(dcn_value), 4),
+            strategy="ltr_full",
+            model_version=str(version),
+            attributions=attributions,
+        )
 
-    # ltr_blend: α·ltr + (1−α)·deterministic, contribution clamped to ±15 pts
-    raw_delta = LGBM_BLEND_WEIGHT * (lgbm_value - result.final)
-    delta = max(-LGBM_MAX_DELTA, min(LGBM_MAX_DELTA, raw_delta))
-    blended = result.final + delta
+    blended = (LGBM_BLEND_WEIGHT * float(dcn_value)) + ((1.0 - LGBM_BLEND_WEIGHT) * float(result.final))
+    blended = max(0.0, min(100.0, blended))
+    delta = blended - float(result.final)
     return RankOutcome(
-        final=round(blended, 1),
+        final=round(blended, 4),
         strategy="ltr_blend",
-        model_version=version,
-        delta_note=(
-            f"Learned ranking model adjusted the deterministic score by {delta:+.1f} points."
-            if abs(delta) >= 0.05
-            else None
-        ),
+        model_version=str(version),
+        delta_note=(f"DCN-v2 set the match score (delta {delta:+.1f} vs heuristic baseline)." if abs(delta) >= 0.05 else None),
+        attributions=attributions,
     )
 
 
 def reset_cache() -> None:
-    """Test hook: forget the cached booster."""
     _load_lgbm.cache_clear()
+    _load_dcn.cache_clear()

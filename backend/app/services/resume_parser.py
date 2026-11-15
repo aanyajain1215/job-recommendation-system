@@ -85,27 +85,78 @@ class ParsedResume(BaseModel):
 # Text extraction helpers (PDF / DOCX / TXT)
 # ---------------------------------------------------------------------------
 
+def _ocr_pdf(file_bytes: bytes) -> str:
+    """Best-effort OCR for scanned/image PDFs. Returns "" if unavailable."""
+    # Try pypdfium2 + pytesseract (no external poppler dependency)
+    try:
+        import pypdfium2 as pdfium  # type: ignore[import-untyped]
+        import pytesseract  # type: ignore[import-untyped]
+
+        pdf = pdfium.PdfDocument(file_bytes)
+        texts: list[str] = []
+        for i in range(len(pdf)):
+            page = pdf[i]
+            bitmap = page.render(scale=2).to_pil()
+            texts.append(pytesseract.image_to_string(bitmap) or "")
+            page.close()
+        pdf.close()
+        return "\n".join(texts).strip()
+    except Exception:
+        pass
+    # Try pdf2image + pytesseract (requires poppler installed on system)
+    try:
+        from pdf2image import convert_from_bytes  # type: ignore[import-untyped]
+        import pytesseract  # type: ignore[import-untyped]
+
+        images = convert_from_bytes(file_bytes)
+        return "\n".join((pytesseract.image_to_string(img) or "") for img in images).strip()
+    except Exception:
+        return ""
+
+
 def _extract_text(file_bytes: bytes, extension: str) -> str:
     """Return plain text content from a resume file regardless of format."""
     ext = extension.lower().lstrip(".")
 
     if ext == "pdf":
+        text = ""
         try:
             from pypdf import PdfReader  # type: ignore[import-untyped]
+
             reader = PdfReader(BytesIO(file_bytes))
             pages = [page.extract_text() or "" for page in reader.pages]
-            return "\n".join(pages)
+            text = "\n".join(pages)
         except Exception as exc:
             logger.warning("PDF text extraction failed: %s", exc)
-            return ""
+            text = ""
+        # OCR fallback for scanned/image PDFs (no selectable text)
+        if len(text.strip()) < 40:
+            ocr_text = _ocr_pdf(file_bytes)
+            if len(ocr_text.strip()) > len(text.strip()):
+                logger.info("Used OCR fallback for PDF resume (%d chars)", len(ocr_text))
+                text = ocr_text
+        return text
 
     if ext == "docx":
         try:
             import docx  # type: ignore[import-untyped]  (python-docx)
+
             doc = docx.Document(BytesIO(file_bytes))
             return "\n".join(para.text for para in doc.paragraphs)
         except Exception as exc:
             logger.warning("DOCX text extraction failed: %s", exc)
+            return ""
+
+    # Image uploads (best-effort OCR)
+    if ext in {"png", "jpg", "jpeg", "tiff", "bmp", "webp"}:
+        try:
+            import pytesseract  # type: ignore[import-untyped]
+            from PIL import Image  # type: ignore[import-untyped]
+
+            img = Image.open(BytesIO(file_bytes))
+            return (pytesseract.image_to_string(img) or "").strip()
+        except Exception as exc:
+            logger.warning("Image OCR failed: %s", exc)
             return ""
 
     # Plain text — try UTF-8 then latin-1 fallback

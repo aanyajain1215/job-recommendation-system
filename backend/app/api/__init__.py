@@ -48,3 +48,13 @@ api_router.include_router(admin_router)
 api_router.include_router(onboarding_router)
 # ---- Phase E0 (employer experience): company profile + posting lifecycle ----
 api_router.include_router(employer_router)
+
+# ---- Ops/monitoring ----
+from app.api.monitoring import router as monitoring_router  # noqa: E402
+
+api_router.include_router(monitoring_router)
+
+# ---- Admin LLM curation (P3, P10) ----
+from app.api.llm_curation import router as llm_curation_router  # noqa: E402
+
+api_router.include_router(llm_curation_router)

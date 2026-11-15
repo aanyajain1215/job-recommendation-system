@@ -134,7 +134,7 @@ export default function LoginPage() {
             </button>
             <button
               type="button"
-              onClick={() => fillQuickCredentials("recruiter@technova.io", "SecurePassword456!")}
+              onClick={() => fillQuickCredentials("employer.qa@jobrec.io", "Password123!")}
               className="flex items-center justify-center gap-1.5 rounded border border-zinc-800 bg-zinc-950/40 p-2 text-zinc-300 hover:border-indigo-500/50 hover:bg-zinc-800/50 transition-colors"
             >
               <CheckCircle2 className="h-3 w-3 text-indigo-400" />

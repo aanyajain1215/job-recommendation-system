@@ -23,6 +23,7 @@ import urllib.request
 from pathlib import Path
 
 from app.core.config import get_settings
+from app.core.resilience import circuit_breaker, retry_call
 
 log = logging.getLogger(__name__)
 
@@ -38,9 +39,20 @@ def provider_names() -> tuple[str, ...]:
 def _get_json(url: str, params: dict | None = None, timeout: int = 20) -> dict:
     if params:
         url = f"{url}?{urllib.parse.urlencode(params)}"
-    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 - fixed API hosts
-        return json.loads(resp.read().decode("utf-8"))
+
+    def _do():
+        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 - fixed API hosts
+            return json.loads(resp.read().decode("utf-8"))
+
+    host = urllib.parse.urlparse(url).netloc or "external"
+    try:
+        return circuit_breaker.call(
+            f"http:{host}",
+            lambda: retry_call(_do, attempts=3, base_delay=0.4, max_delay=3.0, retry_exceptions=(Exception,)),
+        )
+    except Exception:
+        raise
 
 
 # ---------------------------------------------------------------------------
@@ -122,28 +134,50 @@ def fetch_adzuna(query: str, page: int = 1) -> list[dict]:
 
 def fetch_arbeitnow(query: str, page: int = 1) -> list[dict]:
     data = _get_json("https://www.arbeitnow.com/api/job-api", {"page": page})
+    rows = data.get("data") or data.get("jobs") or []
     out: list[dict] = []
-    for row in data.get("data", []):
+    q = (query or "").strip().lower()
+    tokens = [t for t in q.split() if len(t) > 2]
+    for row in rows:
         title = row.get("title") or ""
-        if query and query.split()[0].lower() not in f"{title} {row.get('description') or ''}".lower():
-            # keyless feeds have no server-side query — light client-side filter
+        description = row.get("description") or row.get("content") or ""
+        hay = f"{title} {description}".lower()
+        # soft filter: keep if any query token matches, but don't drop everything on miss
+        if tokens and not any(tok in hay for tok in tokens):
             continue
         out.append(
             {
                 "source": "arbeitnow",
                 "external_id": str(row.get("slug") or row.get("url") or title)[:120],
                 "title": title,
-                "description": row.get("description") or "",
-                "company": row.get("company_name") or "Unknown",
+                "description": description,
+                "company": row.get("company_name") or row.get("company") or "Unknown",
                 "location": row.get("location") or "",
                 "salary_min": None,
                 "salary_max": None,
                 "currency": None,
                 "url": row.get("url") or "",
-                "posted_at": str(row.get("posted_at_utc") or row.get("posted_at") or ""),
-                "is_remote": "remote" in (row.get("location") or "").lower(),
+                "posted_at": str(row.get("posted_at_utc") or row.get("posted_at") or row.get("created_at") or ""),
+                "is_remote": bool(row.get("remote")) or "remote" in (row.get("location") or "").lower(),
             }
         )
+    # if strict token filter removed all rows, return unfiltered normalized rows
+    if not out and rows and tokens:
+        for row in rows:
+            title = row.get("title") or ""
+            description = row.get("description") or row.get("content") or ""
+            out.append({
+                "source": "arbeitnow",
+                "external_id": str(row.get("slug") or row.get("url") or title)[:120],
+                "title": title,
+                "description": description,
+                "company": row.get("company_name") or row.get("company") or "Unknown",
+                "location": row.get("location") or "",
+                "salary_min": None, "salary_max": None, "currency": None,
+                "url": row.get("url") or "",
+                "posted_at": str(row.get("posted_at_utc") or row.get("posted_at") or ""),
+                "is_remote": bool(row.get("remote")) or "remote" in (row.get("location") or "").lower(),
+            })
     return out
 
 
@@ -182,12 +216,13 @@ def fetch_jobicy(query: str, page: int = 1) -> list[dict]:
     data = _get_json("https://jobicy.com/api/v2/remote-jobs", params)
     out: list[dict] = []
     for row in data.get("jobs", []):
+        description = row.get("jobDesc") or row.get("jobExcerpt") or row.get("job_description") or ""
         out.append(
             {
                 "source": "jobicy",
                 "external_id": str(row.get("id") or row.get("url") or ""),
                 "title": row.get("jobTitle") or "",
-                "description": row.get("jobDesc") or "",
+                "description": description,
                 "company": row.get("companyName") or "Unknown",
                 "location": row.get("jobGeo") or row.get("jobCity") or "Remote",
                 "salary_min": row.get("annualSalaryMin"),

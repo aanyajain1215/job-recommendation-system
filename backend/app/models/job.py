@@ -125,7 +125,7 @@ class Job(Base):
         index=True,
     )
     embedding: Mapped[list[float] | None] = mapped_column(
-        Vector(384),
+        Vector(768),
         nullable=True,
     )
     embedding_updated_at: Mapped[datetime | None] = mapped_column(

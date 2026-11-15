@@ -1,0 +1,48 @@
+{
+  "artifact": "C:\\Users\\aanya\\Documents\\SIH\\projects\\job recommendation system\\backend\\ml\\artifacts\\skill2vec_v5.joblib",
+  "version": "v5",
+  "vocab_size": 73,
+  "meta": {
+    "model": "heterogeneous_node2vec_gnn",
+    "method": "Node2Vec biased random walks (p,q) + skip-gram over directed heterogeneous Skill-Role-Project graph",
+    "graph": {
+      "node_types": [
+        "Skill",
+        "Role",
+        "Project"
+      ],
+      "edge_types": [
+        "prereq",
+        "transfer",
+        "supersedes",
+        "requires_skill",
+        "used_in_role",
+        "parent_role",
+        "child_role",
+        "uses_skill",
+        "demonstrated_in_project"
+      ],
+      "nodes": 191,
+      "skills": 74,
+      "roles": 17,
+      "projects": 100,
+      "edges": 6195
+    },
+    "node2vec": {
+      "dim": 64,
+      "walk_length": 30,
+      "num_walks": 20,
+      "p": 1.0,
+      "q": 0.5,
+      "window": 6,
+      "min_count": 1,
+      "epochs": 40,
+      "seed": 42,
+      "negative": 5
+    },
+    "vocab_size": 73,
+    "total_node_embeddings": 190,
+    "walks": 3780,
+    "trained_at": "2026-11-15T07:46:40.396017+00:00"
+  }
+}

@@ -1,0 +1,119 @@
+{
+  "created_at": "2026-11-15T10:18:59.987834+00:00",
+  "benchmark": {
+    "n_rounds": 1000,
+    "k_arms": 8,
+    "mean_reward": 0.452,
+    "mean_true_ctr": 0.4403888321096747,
+    "mean_best_ctr": 0.5669781447542954
+  },
+  "config": {
+    "eval_temp": 0.15,
+    "neural_ucb": {
+      "alpha": 0.4,
+      "temperature": 0.15,
+      "epochs": 15
+    },
+    "neural_greedy_baseline": {
+      "alpha": 0.0,
+      "same_reward_net_as_neural_ucb": true
+    },
+    "linucb": {
+      "alpha": 0.8
+    }
+  },
+  "heldout_eval": {
+    "n_rounds": 300,
+    "policies": {
+      "(a) Uniform Random": {
+        "policy": "uniform_random",
+        "n_rounds": 300,
+        "ips_estimated_reward": 0.407349,
+        "snips_estimated_reward": 0.422386,
+        "cumulative_expected_reward": 130.950224,
+        "cumulative_regret": 39.27067,
+        "oracle_rounds": 300,
+        "snips_ctr_reward_lift_vs_random": 0.0
+      },
+      "(b) Pure Greedy (alpha=0)": {
+        "policy": "pure_greedy",
+        "n_rounds": 300,
+        "ips_estimated_reward": 0.505921,
+        "snips_estimated_reward": 0.502785,
+        "cumulative_expected_reward": 161.246659,
+        "cumulative_regret": 8.974235,
+        "oracle_rounds": 300,
+        "snips_ctr_reward_lift_vs_random": 0.190345
+      },
+      "(c) Linear LinUCB": {
+        "policy": "linucb",
+        "n_rounds": 300,
+        "ips_estimated_reward": 0.511715,
+        "snips_estimated_reward": 0.516515,
+        "cumulative_expected_reward": 160.953023,
+        "cumulative_regret": 9.267871,
+        "oracle_rounds": 300,
+        "snips_ctr_reward_lift_vs_random": 0.222851
+      },
+      "(d) NeuralUCB (ours)": {
+        "policy": "neural_ucb",
+        "n_rounds": 300,
+        "ips_estimated_reward": 0.507185,
+        "snips_estimated_reward": 0.502712,
+        "cumulative_expected_reward": 161.071532,
+        "cumulative_regret": 9.149361,
+        "oracle_rounds": 300,
+        "snips_ctr_reward_lift_vs_random": 0.190172
+      }
+    }
+  },
+  "all_rounds": {
+    "n_rounds": 1000,
+    "policies": {
+      "(a) Uniform Random": {
+        "policy": "uniform_random",
+        "n_rounds": 1000,
+        "ips_estimated_reward": 0.398589,
+        "snips_estimated_reward": 0.406559,
+        "cumulative_expected_reward": 440.388832,
+        "cumulative_regret": 126.589313,
+        "oracle_rounds": 1000,
+        "snips_ctr_reward_lift_vs_random": 0.0
+      },
+      "(b) Pure Greedy (alpha=0)": {
+        "policy": "pure_greedy",
+        "n_rounds": 1000,
+        "ips_estimated_reward": 0.527725,
+        "snips_estimated_reward": 0.523349,
+        "cumulative_expected_reward": 538.231791,
+        "cumulative_regret": 28.746354,
+        "oracle_rounds": 1000,
+        "snips_ctr_reward_lift_vs_random": 0.287265
+      },
+      "(c) Linear LinUCB": {
+        "policy": "linucb",
+        "n_rounds": 1000,
+        "ips_estimated_reward": 0.534032,
+        "snips_estimated_reward": 0.528603,
+        "cumulative_expected_reward": 536.985232,
+        "cumulative_regret": 29.992913,
+        "oracle_rounds": 1000,
+        "snips_ctr_reward_lift_vs_random": 0.300188
+      },
+      "(d) NeuralUCB (ours)": {
+        "policy": "neural_ucb",
+        "n_rounds": 1000,
+        "ips_estimated_reward": 0.529982,
+        "snips_estimated_reward": 0.523549,
+        "cumulative_expected_reward": 537.603125,
+        "cumulative_regret": 29.37502,
+        "oracle_rounds": 1000,
+        "snips_ctr_reward_lift_vs_random": 0.287757
+      }
+    }
+  },
+  "artifacts": {
+    "report_json": "C:\\Users\\aanya\\Documents\\SIH\\projects\\job recommendation system\\backend\\ml\\artifacts\\bandit_ope_report.json",
+    "regret_curve_png": "C:\\Users\\aanya\\Documents\\SIH\\projects\\job recommendation system\\backend\\ml\\artifacts\\bandit_regret_curve.png"
+  }
+}

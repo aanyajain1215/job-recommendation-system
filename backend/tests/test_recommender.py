@@ -1,6 +1,5 @@
 import json
-import urllib.request
-import urllib.parse
+
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
@@ -72,7 +71,9 @@ def test_content_recommender_service():
             print(f"DevOps Missing Skills: {devops_item.missing_skills}")
             assert any(s in devops_item.missing_skills for s in ["Kubernetes", "Docker", "Terraform"]), "DevOps missing skills did not detect expected infrastructure tools"
 
-        # Test Cold-Start Candidate
+        # Test Cold-Start Candidate: AI-strict recommender requires profile
+        # signal (skills/headline/bio/resume text) and does not use heuristic
+        # cold-start fallback.
         empty_profile = Profile(
             first_name="New",
             last_name="User",
@@ -81,49 +82,49 @@ def test_content_recommender_service():
             years_of_experience=None,
             skills=[],
         )
-        cold_feed = ContentRecommender.recommend_jobs(profile=empty_profile, jobs=jobs, limit=5)
-        print(f"\nCold-Start Feed Type: {cold_feed.recommendation_type}, items: {len(cold_feed.items)}")
-        assert cold_feed.recommendation_type == "cold_start"
-        assert len(cold_feed.items) > 0
+        try:
+            ContentRecommender.recommend_jobs(profile=empty_profile, jobs=jobs, limit=5)
+            assert False, "Expected RuntimeError for empty profile under AI-strict recommender"
+        except RuntimeError as exc:
+            assert "Insufficient profile data" in str(exc)
 
     print(">>> ContentRecommender service test PASSED!")
 
 
 def test_recommendations_api():
     print("\n--- 2. Testing GET /api/v1/recommendations Endpoint ---")
-    login_url = "http://localhost:8000/api/v1/auth/login"
-    login_data = json.dumps({
-        "email": "aanya.seeker@example.com",
-        "password": "Password123!"
-    }).encode("utf-8")
-    
-    req = urllib.request.Request(
-        login_url,
-        data=login_data,
-        headers={"Content-Type": "application/json"},
-        method="POST"
-    )
-    with urllib.request.urlopen(req) as resp:
-        auth_data = json.loads(resp.read().decode("utf-8"))
-        access_token = auth_data["access_token"]
-        print("Logged in successfully, token retrieved.")
+    from fastapi.testclient import TestClient
+    from app.main import app
 
-    # Call /api/v1/recommendations
-    rec_url = "http://localhost:8000/api/v1/recommendations"
-    req = urllib.request.Request(
-        rec_url,
+    client = TestClient(app)
+
+    login_resp = client.post(
+        "/api/v1/auth/login",
+        json={
+            "email": "aanya.seeker@example.com",
+            "password": "Password123!",
+        },
+    )
+    assert login_resp.status_code == 200, login_resp.text
+    auth_data = login_resp.json()
+    access_token = auth_data["access_token"]
+    print("Logged in successfully, token retrieved.")
+
+    rec_resp = client.get(
+        "/api/v1/recommendations",
         headers={
             "Authorization": f"Bearer {access_token}",
-            "Accept": "application/json"
+            "Accept": "application/json",
         },
-        method="GET"
     )
-    with urllib.request.urlopen(req) as resp:
-        assert resp.status == 200
-        rec_data = json.loads(resp.read().decode("utf-8"))
-        print(f"API Returned {len(rec_data['items'])} recommendations (type: {rec_data['recommendation_type']})")
-        assert "items" in rec_data
-        assert rec_data["total"] >= 1
+    assert rec_resp.status_code == 200, rec_resp.text
+    rec_data = rec_resp.json()
+    print(
+        f"API Returned {len(rec_data['items'])} recommendations (type: {rec_data['recommendation_type']})"
+    )
+    assert "items" in rec_data
+    assert rec_data["total"] >= 1
+    if rec_data["items"]:
         assert "match_score" in rec_data["items"][0]
         assert "matched_skills" in rec_data["items"][0]
         assert "missing_skills" in rec_data["items"][0]

@@ -35,10 +35,16 @@ Thumbs.db
 
 # ML artifacts (later)
 mlruns/
-*.pt
 *.lgb
 *.onnx
+*.safetensors
+# Keep trained/published model artifacts & eval reports for reproducibility
+!backend/ml/artifacts/
+!backend/ml/artifacts/**
+!backend/ml/reports/
+!backend/ml/reports/master_project_evaluation.json
 
 # Ingestion run snapshots / reports (regenerated per run)
 backend/ml/data/raw/
-backend/ml/reports/
+backend/ml/reports/*
+!backend/ml/reports/master_project_evaluation.json

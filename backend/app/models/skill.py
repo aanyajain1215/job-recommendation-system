@@ -35,9 +35,9 @@ class Skill(Base):
         index=True,
         nullable=True,
     )
-    # 384-d skill2vec/MiniLM embedding — powers skill_graph transfer similarity
+    # 768-d BGE bi-encoder embedding — powers semantic/transfer similarity
     embedding: Mapped[list[float] | None] = mapped_column(
-        Vector(384),
+        Vector(768),
         nullable=True,
     )
     embedding_updated_at: Mapped[datetime | None] = mapped_column(

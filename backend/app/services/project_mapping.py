@@ -156,3 +156,53 @@ def family_benefits(
             }
         )
     return out
+
+
+
+def extract_project_skills(text: str, *, use_llm: bool = True) -> list[str]:
+    """P8: extract skills from project text (LLM with span validation, keyword fallback)."""
+    src = (text or "").strip()
+    if not src:
+        return []
+    baseline: list[str] = []
+    try:
+        from app.services.ingest import extract_skills as _extract, load_surface_pairs
+
+        pairs = load_surface_pairs()
+        baseline = [name for name, _req in _extract("", src, pairs)]
+    except Exception:
+        baseline = []
+    if not use_llm:
+        return sorted(set(baseline))
+
+    try:
+        from pydantic import BaseModel
+        from app.services.llm import get_provider, mark_flagged, prompts, validators
+
+        provider = get_provider()
+        if provider is None:
+            return sorted(set(baseline))
+
+        class _Out(BaseModel):
+            skills: list[str] = []
+            evidence: list[dict[str, object]] = []
+            blurb: str | None = None
+
+        out, usage = provider.complete_json(
+            _Out,
+            prompts.p8_project_skills(src),
+            system="Extract only skills evidenced in the project text.",
+            max_tokens=600,
+            route="P8",
+        )
+        problems = validators.validate_spans(out.evidence, src)
+        problems += validators.validate_skill_tokens(out.skills, src)
+        if problems:
+            mark_flagged(usage, "; ".join(problems[:3]))
+            src_l = src.lower()
+            safe = [s for s in out.skills if s and str(s).lower() in src_l]
+            return sorted(set(safe) | set(baseline))
+        merged = [str(s).strip() for s in out.skills if s and str(s).strip()] + baseline
+        return sorted(set(merged))
+    except Exception:
+        return sorted(set(baseline))

@@ -1,0 +1,85 @@
+{
+  "train": [
+    {
+      "step": 1,
+      "epoch": 0.3333333333333333,
+      "loss": 2.62642502784729,
+      "learning_rate": 0.0
+    },
+    {
+      "step": 2,
+      "epoch": 0.6666666666666666,
+      "loss": 2.5812723636627197,
+      "learning_rate": 2e-05
+    },
+    {
+      "step": 3,
+      "epoch": 1.0,
+      "loss": 1.177802324295044,
+      "learning_rate": 1.7500000000000002e-05
+    },
+    {
+      "step": 4,
+      "epoch": 1.3333333333333333,
+      "loss": 2.3229544162750244,
+      "learning_rate": 1.5000000000000002e-05
+    },
+    {
+      "step": 5,
+      "epoch": 1.6666666666666665,
+      "loss": 2.522738456726074,
+      "learning_rate": 1.25e-05
+    },
+    {
+      "step": 6,
+      "epoch": 2.0,
+      "loss": 1.0066554546356201,
+      "learning_rate": 1e-05
+    },
+    {
+      "step": 7,
+      "epoch": 2.3333333333333335,
+      "loss": 2.2065441608428955,
+      "learning_rate": 7.500000000000001e-06
+    },
+    {
+      "step": 8,
+      "epoch": 2.6666666666666665,
+      "loss": 2.1472363471984863,
+      "learning_rate": 5e-06
+    },
+    {
+      "step": 9,
+      "epoch": 3.0,
+      "loss": 1.6876920461654663,
+      "learning_rate": 2.5e-06
+    }
+  ],
+  "eval": [
+    {
+      "step": 3,
+      "epoch": 1.0,
+      "eval_loss": 1.6297109127044678
+    },
+    {
+      "step": 6,
+      "epoch": 2.0,
+      "eval_loss": 1.8325997591018677
+    },
+    {
+      "step": 9,
+      "epoch": 3.0,
+      "eval_loss": 1.9182251691818237
+    },
+    {
+      "step": 9,
+      "epoch": 3.0,
+      "eval_loss": 1.9182251691818237
+    }
+  ],
+  "meta": {
+    "metric_train": "loss",
+    "metric_eval": "eval_loss",
+    "split": "profile_id_80_20_zero_overlap"
+  }
+}

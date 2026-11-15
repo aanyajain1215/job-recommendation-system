@@ -1,0 +1,128 @@
+{
+  "model": "m0_biencoder",
+  "base_model": "BAAI/bge-base-en-v1.5",
+  "finetuned_path": "ml\\artifacts\\biencoder_finetuned",
+  "method": "MultipleNegativesRankingLoss (InfoNCE-style, in-batch negatives) via SentenceTransformerTrainer",
+  "pairs_total": 516,
+  "pairs_positive_total": 45,
+  "train_pairs": 37,
+  "val_pairs": 8,
+  "train_profiles": 30,
+  "val_profiles": 8,
+  "profile_split": {
+    "train_ratio": 0.8,
+    "seed": 42,
+    "zero_user_overlap": true
+  },
+  "config": {
+    "base_model": "BAAI/bge-base-en-v1.5",
+    "epochs": 3,
+    "batch_size": 16,
+    "lr": 2e-05,
+    "warmup_ratio": 0.1,
+    "max_seq_length": 256,
+    "seed": 42,
+    "eval_steps": 0,
+    "logging_steps": 1,
+    "use_amp": true,
+    "train_ratio": 0.8
+  },
+  "metrics": {
+    "train_runtime": 175.3164,
+    "train_samples_per_second": 0.633,
+    "train_steps_per_second": 0.051,
+    "total_flos": 0.0,
+    "train_loss": 2.031035621960958,
+    "epoch": 3.0,
+    "final_eval_loss": 1.9182251691818237,
+    "final_eval_runtime": 3.1467,
+    "final_eval_samples_per_second": 2.542,
+    "final_eval_steps_per_second": 0.318
+  },
+  "loss_history": {
+    "train": [
+      {
+        "step": 1,
+        "epoch": 0.3333333333333333,
+        "loss": 2.62642502784729,
+        "learning_rate": 0.0
+      },
+      {
+        "step": 2,
+        "epoch": 0.6666666666666666,
+        "loss": 2.5812723636627197,
+        "learning_rate": 2e-05
+      },
+      {
+        "step": 3,
+        "epoch": 1.0,
+        "loss": 1.177802324295044,
+        "learning_rate": 1.7500000000000002e-05
+      },
+      {
+        "step": 4,
+        "epoch": 1.3333333333333333,
+        "loss": 2.3229544162750244,
+        "learning_rate": 1.5000000000000002e-05
+      },
+      {
+        "step": 5,
+        "epoch": 1.6666666666666665,
+        "loss": 2.522738456726074,
+        "learning_rate": 1.25e-05
+      },
+      {
+        "step": 6,
+        "epoch": 2.0,
+        "loss": 1.0066554546356201,
+        "learning_rate": 1e-05
+      },
+      {
+        "step": 7,
+        "epoch": 2.3333333333333335,
+        "loss": 2.2065441608428955,
+        "learning_rate": 7.500000000000001e-06
+      },
+      {
+        "step": 8,
+        "epoch": 2.6666666666666665,
+        "loss": 2.1472363471984863,
+        "learning_rate": 5e-06
+      },
+      {
+        "step": 9,
+        "epoch": 3.0,
+        "loss": 1.6876920461654663,
+        "learning_rate": 2.5e-06
+      }
+    ],
+    "eval": [
+      {
+        "step": 3,
+        "epoch": 1.0,
+        "eval_loss": 1.6297109127044678
+      },
+      {
+        "step": 6,
+        "epoch": 2.0,
+        "eval_loss": 1.8325997591018677
+      },
+      {
+        "step": 9,
+        "epoch": 3.0,
+        "eval_loss": 1.9182251691818237
+      },
+      {
+        "step": 9,
+        "epoch": 3.0,
+        "eval_loss": 1.9182251691818237
+      }
+    ]
+  },
+  "artifacts": {
+    "model_dir": "C:\\Users\\aanya\\Documents\\SIH\\projects\\job recommendation system\\backend\\ml\\artifacts\\biencoder_finetuned",
+    "loss_curve_json": "C:\\Users\\aanya\\Documents\\SIH\\projects\\job recommendation system\\backend\\ml\\artifacts\\biencoder_loss_curve.json",
+    "loss_curve_png": "C:\\Users\\aanya\\Documents\\SIH\\projects\\job recommendation system\\backend\\ml\\artifacts\\biencoder_loss_curve.png"
+  },
+  "trained_at": "2026-11-15T07:18:16.470134+00:00"
+}

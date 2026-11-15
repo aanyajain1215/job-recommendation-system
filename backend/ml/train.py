@@ -44,10 +44,10 @@ def main() -> int:
 
     ensure_golden()
 
-    print("[train] M1 skill2vec …")
+    print("[train] M1 skill graph (Heterogeneous Node2Vec / GNN, Skill-Role-Project) …")
     from ml import train_skill2vec  # noqa: PLC0415
 
-    summary["skill2vec"] = train_skill2vec.run(register=True)
+    summary["skillgraph_m1_gnn"] = train_skill2vec.run(register=True)
 
     print("[train] datasets …")
     from ml import build_datasets  # noqa: PLC0415

@@ -300,18 +300,24 @@ class OpenAiProvider(_BaseProvider):
         self.model = model
 
     def _chat(self, messages: list[dict[str, str]], max_tokens: int) -> tuple[str, dict[str, int]]:
-        response = self._client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            max_tokens=max_tokens,
-            temperature=0,
-        )
-        raw = response.choices[0].message.content or ""
-        usage = getattr(response, "usage", None)
-        return raw, {
-            "prompt_tokens": int(getattr(usage, "prompt_tokens", 0) or 0),
-            "completion_tokens": int(getattr(usage, "completion_tokens", 0) or 0),
-        }
+        from app.core.resilience import retry_call
+
+        def _do():
+            response = self._client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                max_tokens=max_tokens,
+                temperature=0,
+            )
+            raw = response.choices[0].message.content or ""
+            usage = getattr(response, "usage", None)
+            return raw, {
+                "prompt_tokens": int(getattr(usage, "prompt_tokens", 0) or 0),
+                "completion_tokens": int(getattr(usage, "completion_tokens", 0) or 0),
+            }
+
+        # retry transient/provider errors with backoff (timeouts/network/429/5xx surfaced as exceptions)
+        return retry_call(_do, attempts=2, base_delay=0.8, max_delay=3.0)
 
 
 class GeminiProvider(_BaseProvider):
@@ -330,24 +336,30 @@ class GeminiProvider(_BaseProvider):
         self._timeout = timeout
 
     def _chat(self, messages: list[dict[str, str]], max_tokens: int) -> tuple[str, dict[str, int]]:
+        from app.core.resilience import retry_call
+
         # Gemini has no multi-turn chat in this thin wrapper; flatten to text
         # (repair turn appends its error text to the conversation list, which
         # flattening naturally includes).
         parts = [f"{m['role'].upper()}: {m['content']}" for m in messages]
-        response = self._model.generate_content(
-            "\n\n".join(parts),
-            generation_config={"max_output_tokens": max_tokens, "temperature": 0},
-            # Bound the call — the deprecated SDK otherwise waits forever on a
-            # stalled/throttled response, so a parse could sit in "parsing"
-            # with no failure to report (LLM_TIMEOUT_SECONDS, default 30).
-            request_options={"timeout": self._timeout},
-        )
-        raw = response.text or ""
-        meta = getattr(response, "usage_metadata", None)
-        return raw, {
-            "prompt_tokens": int(getattr(meta, "prompt_token_count", 0) or 0),
-            "completion_tokens": int(getattr(meta, "candidate_token_count", 0) or 0),
-        }
+
+        def _do():
+            response = self._model.generate_content(
+                "\n\n".join(parts),
+                generation_config={"max_output_tokens": max_tokens, "temperature": 0},
+                # Bound the call — the deprecated SDK otherwise waits forever on a
+                # stalled/throttled response, so a parse could sit in "parsing"
+                # with no failure to report (LLM_TIMEOUT_SECONDS, default 30).
+                request_options={"timeout": self._timeout},
+            )
+            raw = response.text or ""
+            meta = getattr(response, "usage_metadata", None)
+            return raw, {
+                "prompt_tokens": int(getattr(meta, "prompt_token_count", 0) or 0),
+                "completion_tokens": int(getattr(meta, "candidate_token_count", 0) or 0),
+            }
+
+        return retry_call(_do, attempts=2, base_delay=0.8, max_delay=3.0)
 
 
 # ---------------------------------------------------------------------------

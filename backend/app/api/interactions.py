@@ -61,6 +61,20 @@ def _persist_interaction(
         except Exception:
             db.rollback()
             logger.exception("M4 affinity update failed for job %s", job_id)
+
+        # RL/bandit online update from observed interaction (best-effort)
+        try:
+            from app.services import bandit
+            from app.models.profile import Profile
+            from sqlalchemy import select
+
+            reward = bandit.reward_for_event(event_type)
+            if reward is not None:
+                profile = db.scalar(select(Profile).where(Profile.user_id == user_id))
+                if profile is not None:
+                    bandit.apply_online_reward(db, profile.id, job_id, reward)
+        except Exception:
+            logger.exception("Bandit online update failed for job %s", job_id)
     except Exception:
         db.rollback()
         logger.exception(

@@ -224,37 +224,15 @@ def polish_explanation(contract: ExplanationContract) -> ExplanationContract:
 
 
 def readiness_from_score(score: float) -> dict:
-    """Readiness value/band for a displayed score (plan §12, §6 M3).
-
-    Two paths, one output shape — ``{value: 0..1, band}``:
-
-    * **Calibrated (M3):** when the calibrator artifact is active, value is
-      the isotonic/Platt P(positive outcome) for this score, banded by
-      settings (default low <0.60 ≤ medium <0.80 ≤ high).  The calibrator is
-      monotone non-decreasing, so roadmap/simulator score orderings survive
-      the mapping.
-    * **Raw fallback:** Phase-1 mapping — value = score/100 with bands
-      low <0.50 ≤ medium <0.75 ≤ high (no artifact, or
-      ``readiness_calibrator_enabled=false``).
-    """
+    """Readiness value/band for a displayed score (AI-calibrated, M3 required)."""
     from app.services.calibration import predict_positive  # noqa: PLC0415
 
     settings = get_settings()
     calibrated = predict_positive(float(score))
-    if calibrated is not None:
-        value = round(max(0.0, min(1.0, calibrated)), 2)
-        if value >= settings.readiness_band_high:
-            band = "high"
-        elif value >= settings.readiness_band_medium:
-            band = "medium"
-        else:
-            band = "low"
-        return {"value": value, "band": band}
-
-    value = round(max(0.0, min(100.0, float(score))) / 100.0, 2)
-    if value >= 0.75:
+    value = round(max(0.0, min(1.0, calibrated)), 2)
+    if value >= settings.readiness_band_high:
         band = "high"
-    elif value >= 0.50:
+    elif value >= settings.readiness_band_medium:
         band = "medium"
     else:
         band = "low"

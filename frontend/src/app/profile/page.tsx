@@ -480,7 +480,7 @@ export default function ProfilePage() {
 
               {profile?.resume_url && (
                 <a
-                  href={`http://localhost:8000${profile.resume_url}`}
+                  href={`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}${profile.resume_url}`}
                   target="_blank"
                   rel="noreferrer"
                   className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs font-medium text-zinc-300 hover:text-zinc-100 transition-colors"

@@ -19,43 +19,55 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
     refresh_token_expire_days: int = 7
-    # LLM resume parsing — leave blank to use the regex fallback parser
+    # LLM resume parsing — AI-only mode (no regex fallback)
     gemini_api_key: str = ""
 
-    # ---- LLM provider abstraction (plan §15: OpenAI default, Gemini kept) ----
+    # ---- LLM provider abstraction (AI-mandatory) ----
     openai_api_key: str = ""
     openai_base_url: str = ""  # optional OpenAI-compatible proxy
     llm_provider: str = "openai"  # "openai" | "gemini"
     llm_model: str = "gpt-4o-mini"
-    # §22 kill switch: false → get_provider() returns None, every LLM route
-    # degrades to its deterministic/template fallback (never a 500).
+    # AI-mandatory: LLM must be enabled and available; no deterministic fallbacks.
     llm_enabled: bool = True
     llm_timeout_seconds: int = 30
-    # P6 (§15): EXPLAIN_LLM=true → LLM rewrites explanation prose (never
-    # numbers — digit-multiset validator discards any drift). Default off.
-    explain_llm: bool = False
-    # TEMPORARY trial mode: true → any AI path failure (no provider, API
-    # error, rejected output) raises LlmStrictError → HTTP 502 with the
-    # reason, instead of silently using the deterministic fallback. Lets
-    # you see exactly which features work with the LLM. Set false again
-    # to restore graceful degradation.
-    llm_strict: bool = False
+    # P6: LLM rewrites explanation prose (numbers guarded by validators).
+    explain_llm: bool = True
+    # Strict mode: any AI path failure raises (no silent fallback) so issues are visible.
+    llm_strict: bool = True
     # How many recommender-feed items get LLM explanation polish per request.
     # A full 20-item feed would fire ~20 back-to-back requests and trip the
     # provider's per-minute rate limit; past top-N the deterministic
     # template ships (job detail stays polished — it is a single call).
     explain_polish_top_n: int = 3
 
-    # ---- Embeddings (plan §4/§13) ----
-    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
-    # "auto" = MiniLM if importable, else deterministic hashing fallback
-    embedding_backend: str = "auto"  # "auto" | "minilm" | "hashing"
+    # ---- Embeddings / M0 (research-grade: domain-tuned bi-encoder + cross-encoder) ----
+    # Bi-encoder for retrieval (768-d). Use fine-tuned path when available.
+    embedding_model: str = "BAAI/bge-base-en-v1.5"
+    embedding_finetuned_path: str = ""  # e.g. ml/artifacts/biencoder_finetuned
+    embedding_backend: str = "biencoder"  # "biencoder" required in AI-strict mode
+    embedding_dim: int = 768
+    # Cross-encoder for precise reranking of top-K candidates
+    cross_encoder_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    cross_encoder_finetuned_path: str = ""  # e.g. ml/artifacts/cross_encoder_finetuned
+    cross_encoder_top_k: int = 50
+    cross_encoder_batch_size: int = 16
 
     # ---- Recommender (plan §4/§6) ----
-    recommender_strategy: str = "deterministic"  # "deterministic" | "ltr_blend" | "ltr_full"
+    # AI-first: prefer the learned ranklet (M2) as the primary match/ranking
+    # decision when a valid artifact exists. Falls back safely to deterministic
+    # scoring if the model/manifest is missing or incompatible.
+    recommender_strategy: str = "ltr_full"  # "deterministic" | "ltr_blend" | "ltr_full"
     mmr_lambda: float = 0.7
     exploration_rate: float = 0.1667  # 1-in-6 feed slots
     transfer_similarity_threshold: float = 0.65
+
+    # ---- Contextual bandit / RL exploration ----
+    bandit_enabled: bool = True
+    bandit_exploration_policy: str = "linucb"  # "random" | "linucb"
+    bandit_alpha: float = 0.8
+    bandit_temperature: float = 0.5
+    bandit_min_pool: int = 2
+    bandit_online_updates: bool = True
 
     # ---- Skill Gap Engine (plan §8) ----
     gap_strong_min_years: float = 2.0
@@ -77,15 +89,13 @@ class Settings(BaseSettings):
     llm_cache_max_entries: int = 256
     llm_max_repair_turns: int = 1
 
-    # ---- Trained model suite M1–M3 (plan §6/§17/§21) ----
-    # M1: skill2vec cosine fallback inside transfer detection — opt-in so the
-    # seeded-edge behaviour stays byte-identical until the corpus is large.
-    skill2vec_enabled: bool = False
-    # M3: calibrated readiness.  Enabled, but only takes effect once an
-    # artifact exists (ml/calibrate.py); otherwise the raw mapping is used.
+    # ---- Trained model suite M1–M3 (AI-mandatory) ----
+    # M1: enable learned skill2vec transfer signals.
+    skill2vec_enabled: bool = True
+    # M3: calibrated readiness required (no raw fallback).
     readiness_calibrator_enabled: bool = True
     readiness_band_high: float = 0.80       # calibrated bands (plan §6 M3)
-    readiness_band_medium: float = 0.60     # raw fallback keeps 0.75/0.50
+    readiness_band_medium: float = 0.60
     calibrator_positive_min: int = 4        # graded label ≥ save = positive outcome
     synthetic_seed: int = 1729              # deterministic bootstrap seed (plan §6 M2)
 
@@ -95,6 +105,9 @@ class Settings(BaseSettings):
     adzuna_country: str = "in"
     ingest_http_timeout: int = 20
     ingest_delay_seconds: float = 0.5       # polite rate limit between requests
+
+    # ---- Ops ----
+    rate_limit_per_minute: int = 120
 
     @property
     def cors_origin_list(self) -> list[str]:

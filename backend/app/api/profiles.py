@@ -781,7 +781,18 @@ def create_project(
     db: Annotated[Session, Depends(get_db)],
 ) -> ProjectResponse:
     profile = _my_profile_or_404(db, current_user)
-    row = Project(profile_id=profile.id, **payload.model_dump())
+    data = payload.model_dump()
+    if not data.get("detected_skills"):
+        try:
+            from app.services.project_mapping import extract_project_skills
+
+            text = " ".join([str(data.get("title") or ""), str(data.get("description") or "")]).strip()
+            extracted = extract_project_skills(text)
+            if extracted:
+                data["detected_skills"] = extracted
+        except Exception:
+            pass
+    row = Project(profile_id=profile.id, **data)
     db.add(row)
     db.commit()
     db.refresh(row)
@@ -797,8 +808,20 @@ def update_project(
 ) -> ProjectResponse:
     profile = _my_profile_or_404(db, current_user)
     row = _owned_row_or_404(db, profile, Project, row_id)
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    updates = payload.model_dump(exclude_unset=True)
+    for field, value in updates.items():
         setattr(row, field, value)
+    # auto-extract skills if description/title changed and skills not explicitly set
+    if "detected_skills" not in updates and (("description" in updates) or ("title" in updates)):
+        try:
+            from app.services.project_mapping import extract_project_skills
+
+            text = f"{row.title or ''} {row.description or ''}".strip()
+            extracted = extract_project_skills(text)
+            if extracted:
+                row.detected_skills = extracted
+        except Exception:
+            pass
     db.commit()
     db.refresh(row)
     return row

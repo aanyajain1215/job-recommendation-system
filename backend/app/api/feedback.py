@@ -101,6 +101,17 @@ def create_feedback(
     personalization_note = personalization.apply_feedback(
         db, profile, job, payload.reason.value
     )
+
+    # RL/bandit online update from explicit feedback (best-effort)
+    try:
+        from app.services import bandit
+
+        reward = bandit.reward_for_reason(payload.reason.value)
+        if reward is not None:
+            bandit.apply_online_reward(db, profile.id, job.id, reward)
+    except Exception:
+        pass
+
     db.commit()
     db.refresh(entry)
 

@@ -47,6 +47,7 @@ class RoadmapResponse(BaseModel):
     readiness_before: dict[str, Any]
     readiness_after: dict[str, Any]
     summary: str
+    agent_trace: dict[str, Any] | None = None
 
 
 class StepCompleteResponse(BaseModel):
@@ -183,6 +184,7 @@ def get_job_roadmap(
         readiness_before=result.readiness_before,
         readiness_after=result.readiness_after,
         summary=result.summary,
+        agent_trace=result.agent_trace,
     )
 
 

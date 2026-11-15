@@ -39,10 +39,13 @@ from app.models.job import Job
 from app.models.profile import Profile
 from app.models.skill import JobSkill, ProfileSkill
 from app.services.embeddings import (
+    build_job_text,
+    build_profile_text,
     ensure_job_embeddings,
     ensure_profile_embedding,
     to_usd,
 )
+from app.services.cross_encoder import get_cross_encoder
 from app.services.explanation import (
     build_explanation,
     readiness_from_score,
@@ -54,6 +57,7 @@ from app.services.mmr import (
     exploration_should_apply,
     mmr_order,
 )
+from app.services import bandit
 from app.services.rerank import FeatureContext, RankOutcome, build_features, rerank
 from app.services.scoring import (
     ComponentInputs,
@@ -115,82 +119,63 @@ def generate_candidates(db: Session, profile: Profile, limit: int) -> list[Job]:
     per_leg = max(limit * 3, 30)
     legs: list[list[UUID]] = []
 
-    # Leg 1: pgvector KNN on profile↔job embeddings
-    try:
-        ensure_profile_embedding(profile)
-        if profile.embedding:
-            emb_literal = "[" + ",".join(f"{float(v):.6f}" for v in profile.embedding) + "]"
-            rows = db.execute(
-                text(
-                    "SELECT id FROM jobs "
-                    "WHERE status = :st AND embedding IS NOT NULL "
-                    "ORDER BY embedding <=> CAST(:emb AS vector) "
-                    "LIMIT :k"
-                ),
-                {"st": JobStatus.PUBLISHED.name, "emb": emb_literal, "k": per_leg},
-            ).all()
-            if rows:
-                legs.append([row[0] for row in rows])
-    except Exception:
-        log.exception("KNN candidate leg failed; continuing without it")
+    # Leg 1: pgvector KNN on profile↔job embeddings (AI-required)
+    ensure_profile_embedding(profile)
+    if profile.embedding:
+        emb_literal = "[" + ",".join(f"{float(v):.6f}" for v in profile.embedding) + "]"
+        rows = db.execute(
+            text(
+                "SELECT id FROM jobs "
+                "WHERE status = :st AND embedding IS NOT NULL "
+                "ORDER BY embedding <=> CAST(:emb AS vector) "
+                "LIMIT :k"
+            ),
+            {"st": JobStatus.PUBLISHED.name, "emb": emb_literal, "k": per_leg},
+        ).all()
+        if rows:
+            legs.append([row[0] for row in rows])
 
-    # Leg 2: Postgres FTS over the profile's descriptive text
-    try:
-        query = _profile_query_text(profile)
-        if query:
-            rows = db.execute(
-                text(
-                    "SELECT id, ts_rank_cd(search_vector, "
-                    "websearch_to_tsquery('english', :q)) AS rnk "
-                    "FROM jobs "
-                    "WHERE status = :st "
-                    "AND search_vector @@ websearch_to_tsquery('english', :q) "
-                    "ORDER BY rnk DESC, id LIMIT :k"
-                ),
-                {"st": JobStatus.PUBLISHED.name, "q": query, "k": per_leg},
-            ).all()
-            if rows:
-                legs.append([row[0] for row in rows])
-    except Exception:
-        log.exception("FTS candidate leg failed; continuing without it")
+    # Leg 2: Postgres FTS over the profile's descriptive text (required retrieval leg)
+    query = _profile_query_text(profile)
+    if query:
+        rows = db.execute(
+            text(
+                "SELECT id, ts_rank_cd(search_vector, "
+                "websearch_to_tsquery('english', :q)) AS rnk "
+                "FROM jobs "
+                "WHERE status = :st "
+                "AND search_vector @@ websearch_to_tsquery('english', :q) "
+                "ORDER BY rnk DESC, id LIMIT :k"
+            ),
+            {"st": JobStatus.PUBLISHED.name, "q": query, "k": per_leg},
+        ).all()
+        if rows:
+            legs.append([row[0] for row in rows])
 
     # Leg 3: skill overlap count (SQL-side join, canonical lowercase names)
-    try:
-        names = [
-            ps.skill.name.lower().strip()
-            for ps in (profile.skills or [])
-            if ps.skill is not None and ps.skill.name
-        ]
-        if names:
-            stmt = text(
-                "SELECT j.id AS id, COUNT(*) AS ov "
-                "FROM jobs j "
-                "JOIN job_skills js ON js.job_id = j.id "
-                "JOIN skills s ON s.id = js.skill_id "
-                "WHERE j.status = :st AND lower(s.name) IN :names "
-                "GROUP BY j.id ORDER BY ov DESC, j.id LIMIT :k"
-            ).bindparams(bindparam("names", expanding=True))
-            rows = db.execute(
-                stmt, {"st": JobStatus.PUBLISHED.name, "names": names, "k": per_leg}
-            ).all()
-            if rows:
-                legs.append([row[0] for row in rows])
-    except Exception:
-        log.exception("skill candidate leg failed; continuing without it")
+    names = [
+        ps.skill.name.lower().strip()
+        for ps in (profile.skills or [])
+        if ps.skill is not None and ps.skill.name
+    ]
+    if names:
+        stmt = text(
+            "SELECT j.id AS id, COUNT(*) AS ov "
+            "FROM jobs j "
+            "JOIN job_skills js ON js.job_id = j.id "
+            "JOIN skills s ON s.id = js.skill_id "
+            "WHERE j.status = :st AND lower(s.name) IN :names "
+            "GROUP BY j.id ORDER BY ov DESC, j.id LIMIT :k"
+        ).bindparams(bindparam("names", expanding=True))
+        rows = db.execute(
+            stmt, {"st": JobStatus.PUBLISHED.name, "names": names, "k": per_leg}
+        ).all()
+        if rows:
+            legs.append([row[0] for row in rows])
 
-    ordered_ids = _rrf(legs) if legs else []
-    if not ordered_ids:
-        # Fallback: everything published, newest first (previous behavior)
-        ordered_ids = list(
-            db.scalars(
-                select(Job.id)
-                .where(Job.status == JobStatus.PUBLISHED)
-                .order_by(Job.created_at.desc(), Job.id)
-                .limit(pool_cap)
-            ).all()
-        )
-    else:
-        ordered_ids = ordered_ids[:pool_cap]
+    if not legs:
+        raise RuntimeError("AI candidate generation failed: no retrieval legs produced results (embeddings/FTS/skills required)")
+    ordered_ids = _rrf(legs)[:pool_cap]
 
     if not ordered_ids:
         return []
@@ -418,7 +403,9 @@ class ContentRecommender:
         )
         has_text = bool(profile.headline or profile.bio or profile.raw_resume_text)
         if not (has_skills or has_text):
-            return cls._cold_feed(profile, jobs, limit, completeness)
+            raise RuntimeError(
+                "Insufficient profile data for AI recommendations: skills/headline/bio/resume text required (no heuristic cold-start fallback)"
+            )
 
         settings = get_settings()
         ctx = _ProfileContext(profile)
@@ -430,11 +417,54 @@ class ContentRecommender:
             projects = list(profile.project_rows or [])
         except Exception:  # detached profile in tests — project cards optional
             projects = []
+        # Bi-encoder retrieval already produced `jobs`; cross-encoder scores top-K pairs.
+        # Raw CE logit + sigmoid probability are passed as proper M2 ranker features;
+        # final score is calibrated via M3 (no ad-hoc 0.65/0.35 or /5.0 fusion hack).
+        ce_logits: dict[str, float] = {}
+        ce_probs: dict[str, float] = {}
+        try:
+            settings_ce_k = getattr(settings, "cross_encoder_top_k", 50)
+            ce_k = min(len(jobs), max(1, int(settings_ce_k)))
+            profile_text = build_profile_text(
+                headline=profile.headline,
+                bio=profile.bio,
+                skill_names=[
+                    ps.skill.name for ps in (profile.skills or []) if ps.skill is not None and ps.skill.name
+                ],
+                target_family=getattr(getattr(profile, "target_family", None), "name", None),
+                project_blurb=None,
+            )
+            job_texts = []
+            ce_jobs = jobs[:ce_k]
+            for job in ce_jobs:
+                req_skills = [
+                    js.skill.name
+                    for js in (job.skills or [])
+                    if js.skill is not None and js.skill.name and getattr(js, "is_required", True)
+                ]
+                job_texts.append(
+                    build_job_text(
+                        title=job.title,
+                        requirements=job.requirements,
+                        description=job.description,
+                        required_skills=req_skills,
+                    )
+                )
+            pairs = [(profile_text or " ", jt or " ") for jt in job_texts]
+            logits, probs = get_cross_encoder().score_pairs_detailed(pairs)
+            for job, lg, pr in zip(ce_jobs, logits, probs, strict=True):
+                jid = str(job.id)
+                ce_logits[jid] = float(lg)
+                ce_probs[jid] = float(pr)
+        except Exception as exc:
+            raise RuntimeError(f"Cross-encoder scoring failed (AI-strict): {exc}") from exc
+
         for job in jobs:
             inputs = ctx.inputs_for(job)
             if affinities:
                 inputs.seeker_skill_affinities = dict(affinities)
             result = score_pair(inputs, weights=weights)
+            jid = str(job.id)
             features = build_features(
                 inputs,
                 result,
@@ -443,9 +473,50 @@ class ContentRecommender:
                     applicant_count=_applicant_count(job),
                     profile_completeness=completeness,
                     historical_apply_rate=_apply_rate(job),
+                    cross_encoder_logit=ce_logits.get(jid, 0.0),
+                    cross_encoder_prob=ce_probs.get(jid, 0.0),
                 ),
             )
             outcome = rerank(result, features=features)
+            # Calibrate final score via M3 (readiness/probability calibrator)
+            try:
+                from app.services.calibration import predict_positive  # noqa: PLC0415
+
+                dcn_logit = None
+                try:
+                    attrs = outcome.attributions or []
+                    if attrs and isinstance(attrs[0], dict) and attrs[0].get("dcn_logit") is not None:
+                        dcn_logit = float(attrs[0]["dcn_logit"])
+                except Exception:
+                    dcn_logit = None
+                # Condition logit to calibrator's empirical range to avoid OOD
+                # extrapolation (isotonic step functions can collapse outside
+                # support) while preserving learned ranking signal.
+                cal_logit = dcn_logit
+                if cal_logit is not None:
+                    cal_logit = float(max(-12.0, min(12.0, cal_logit)))
+                calibrated = predict_positive(outcome.final, logit=cal_logit)
+                calibrated_score = float(calibrated) * 100.0
+
+                # outcome.final is the DCN-v2 sigmoid probability * 100 (learned).
+                # Keep calibration primary but guard against OOD collapse by using the
+                # model-derived DCN probability as a floor when calibration under-shoots.
+                dcn_prob_score = float(outcome.final)
+                if calibrated_score <= 0.0 and dcn_prob_score > 1.0:
+                    final_score = dcn_prob_score
+                else:
+                    final_score = max(calibrated_score, dcn_prob_score) if dcn_logit is not None else calibrated_score
+                calibrated_final = round(max(0.0, min(100.0, final_score)), 4)
+
+                outcome = RankOutcome(
+                    final=calibrated_final,
+                    strategy=f"{outcome.strategy}+m3_calibrated",
+                    model_version=outcome.model_version,
+                    delta_note=outcome.delta_note,
+                    attributions=outcome.attributions,
+                )
+            except Exception as exc:
+                raise RuntimeError(f"M3 calibration failed (AI-strict): {exc}") from exc
             scored.append((job, result, outcome))
 
         # 1. relevance order — deterministic tie-break on job id
@@ -472,8 +543,10 @@ class ContentRecommender:
         )
         ordered = [ordered[p] for p in capped_positions]
 
-        # 4. exploration slot — deterministic per (user, day), never slot 0
+        # 4. exploration slot - deterministic per (user, day), never slot 0
         explorer_slot: int | None = None
+        explorer_propensity: float | None = None
+        explorer_meta: dict | None = None
         slot = max(1, limit // 3)
         if (
             slot < limit
@@ -482,8 +555,64 @@ class ContentRecommender:
                 str(profile.user_id), rate=settings.exploration_rate
             )
         ):
-            ordered[slot], ordered[limit] = ordered[limit], ordered[slot]
-            explorer_slot = slot
+            policy_name = (settings.bandit_exploration_policy or "random").lower()
+            if settings.bandit_enabled and policy_name in ("linucb", "neuralucb", "neural_ucb"):
+                cand_positions = list(range(limit, len(ordered)))
+                if len(cand_positions) >= settings.bandit_min_pool:
+                    try:
+                        X = []
+                        for pos in cand_positions:
+                            j, res, outc = ordered[pos]
+                            inp = ctx.inputs_for(j)
+                            missing = len(res.skill_detail.missing_required)
+                            fam_match = 1.0 if (
+                                inp.seeker_target_family and inp.job_family and
+                                inp.seeker_target_family.strip().lower() == inp.job_family.strip().lower()
+                            ) else (0.5 if (inp.family_graph_distance is not None and inp.family_graph_distance <= 1) else 0.0)
+                            x = bandit.build_candidate_features(
+                                res.components,
+                                outc.final,
+                                missing_required_count=missing,
+                                job_age_days=_job_age_days(j, now),
+                                applicant_count=_applicant_count(j),
+                                profile_completeness=completeness,
+                                is_remote=bool(getattr(j, "is_remote", False)),
+                                salary_disclosed=bool(getattr(j, "salary_min", None) is not None),
+                                family_match=fam_match,
+                                transfer_count=len(res.skill_detail.transferable),
+                            )
+                            X.append(x)
+                        pol = bandit.get_policy(alpha=settings.bandit_alpha, temperature=settings.bandit_temperature)
+                        dec = pol.select(np.vstack(X))
+                        chosen_pos = cand_positions[dec.index]
+                        ordered[slot], ordered[chosen_pos] = ordered[chosen_pos], ordered[slot]
+                        explorer_slot = slot
+                        explorer_propensity = float(dec.propensity)
+                        explorer_meta = {
+                            "bandit": {
+                                "policy": dec.policy,
+                                "model_version": dec.model_version,
+                                "features": dec.features,
+                                "propensity": dec.propensity,
+                                "chosen_index_in_pool": int(dec.index),
+                            }
+                        }
+                    except Exception:
+                        log.exception("bandit exploration failed; falling back to random slot")
+                        ordered[slot], ordered[limit] = ordered[limit], ordered[slot]
+                        explorer_slot = slot
+                        explorer_propensity = exploration_propensity(settings.exploration_rate)
+                        explorer_meta = None
+                else:
+                    ordered[slot], ordered[limit] = ordered[limit], ordered[slot]
+                    explorer_slot = slot
+                    explorer_propensity = exploration_propensity(settings.exploration_rate)
+                    explorer_meta = None
+            else:
+                ordered[slot], ordered[limit] = ordered[limit], ordered[slot]
+                explorer_slot = slot
+                explorer_propensity = exploration_propensity(settings.exploration_rate)
+                explorer_meta = None
 
         # 5. build items with explanation contracts
         items: list[RecommendationItem] = []
@@ -511,7 +640,7 @@ class ContentRecommender:
             is_explorer = index == explorer_slot
             detail = cls._job_detail(job, outcome.final)
             if projects:
-                # §14 job-card direction: "Powered by: <project> — <band>"
+                # project relevance card
                 try:
                     from app.services.project_mapping import powered_by_label
 
@@ -520,6 +649,8 @@ class ContentRecommender:
                     )
                 except Exception:  # pragma: no cover - defensive
                     detail.project_relevance = None
+            item_propensity = explorer_propensity if (is_explorer and explorer_propensity is not None) else (exploration_propensity(settings.exploration_rate) if is_explorer else 1.0)
+            item_bandit = explorer_meta if is_explorer else None
             items.append(
                 RecommendationItem(
                     job=detail,
@@ -534,11 +665,8 @@ class ContentRecommender:
                     family=family,
                     strategy=outcome.strategy,
                     model_version=outcome.model_version,
-                    propensity=(
-                        exploration_propensity(settings.exploration_rate)
-                        if is_explorer
-                        else 1.0
-                    ),
+                    propensity=item_propensity,
+                    bandit=item_bandit,
                 )
             )
 

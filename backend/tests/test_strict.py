@@ -22,13 +22,13 @@ class TestStrictBail:
         strict_bail("test_route", "boom")  # must not raise
 
     def test_parse_query_bails_without_provider_under_strict(self, monkeypatch):
-        # conftest already stubs get_provider -> None
+        # conftest already stubs get_provider -> None; NL search is AI-mandatory
         monkeypatch.setattr(get_settings(), "llm_strict", True)
-        with pytest.raises(LlmStrictError, match="nl_search"):
+        with pytest.raises(RuntimeError, match="LLM provider required for NL search"):
             nl_search.parse_query("remote python jobs in berlin")
 
     def test_parse_query_degrades_without_provider_when_not_strict(self, monkeypatch):
+        # AI-mandatory: no FTS fallback even when not strict
         monkeypatch.setattr(get_settings(), "llm_strict", False)
-        filters, mode = nl_search.parse_query("remote python jobs in berlin")
-        assert mode == "fts"
-        assert filters.keywords
+        with pytest.raises(RuntimeError, match="LLM provider required for NL search"):
+            nl_search.parse_query("remote python jobs in berlin")

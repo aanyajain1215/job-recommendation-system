@@ -1,0 +1,45 @@
+{
+  "model": "contextual_bandit_linucb",
+  "version": "v1",
+  "feature_dim": 18,
+  "features": [
+    "bias",
+    "match_score",
+    "skill",
+    "semantic",
+    "experience",
+    "education",
+    "project",
+    "location",
+    "salary",
+    "interest",
+    "missing_required_count",
+    "job_age_days",
+    "applicant_count",
+    "profile_completeness",
+    "is_remote",
+    "salary_disclosed",
+    "family_match",
+    "transfer_count"
+  ],
+  "train": {
+    "n_rounds": 2400,
+    "avg_logged_reward": 0.9821,
+    "avg_reward_on_agreement": 0.9922,
+    "agreement_rate": 0.1613,
+    "ips_estimate": 0.13,
+    "snips_estimate": 0.9956,
+    "mean_target_score": 1.0701,
+    "mean_oracle_regret": 0.0074
+  },
+  "test": {
+    "n_rounds": 600,
+    "avg_logged_reward": 0.985,
+    "avg_reward_on_agreement": 0.9913,
+    "agreement_rate": 0.1917,
+    "ips_estimate": 0.1054,
+    "snips_estimate": 0.9976,
+    "mean_target_score": 1.0703,
+    "mean_oracle_regret": 0.0074
+  }
+}

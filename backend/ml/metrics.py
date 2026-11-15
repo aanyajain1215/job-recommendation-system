@@ -131,6 +131,55 @@ def recall_at_k_over_corpus(
     return sum(scores) / len(scores) if scores else 0.0
 
 
+def average_precision_at_k(labels: Sequence[float], k: int, threshold: float = 1.0) -> float:
+    """AP@k for a ranked label list (binary relevance by threshold)."""
+    if k <= 0:
+        return 0.0
+    top = list(labels)[:k]
+    total_rel = sum(1 for x in labels if x >= threshold)
+    if total_rel == 0:
+        return 0.0
+    hits = 0
+    score = 0.0
+    for i, x in enumerate(top, start=1):
+        if x >= threshold:
+            hits += 1
+            score += hits / i
+    return score / min(total_rel, k)
+
+
+def map_at_k(labels: Sequence[float], k: int, threshold: float = 1.0) -> float:
+    """Alias-style single-list MAP@k (same as AP@k for one ranked list)."""
+    return average_precision_at_k(labels, k, threshold=threshold)
+
+
+def auc_roc_binary(y_true: Sequence[int], scores: Sequence[float]) -> float:
+    """AUC-ROC via rank statistic (handles ties by average rank)."""
+    n = len(y_true)
+    if n == 0:
+        return 0.0
+    pos = sum(1 for y in y_true if int(y) == 1)
+    neg = n - pos
+    if pos == 0 or neg == 0:
+        return 0.0
+    order = sorted(range(n), key=lambda i: float(scores[i]))
+    ranks = [0.0] * n
+    i = 0
+    r = 1
+    while i < n:
+        j = i
+        while j + 1 < n and float(scores[order[j + 1]]) == float(scores[order[i]]):
+            j += 1
+        avg_rank = (r + (r + (j - i))) / 2.0
+        for kidx in range(i, j + 1):
+            ranks[order[kidx]] = avg_rank
+        r += (j - i + 1)
+        i = j + 1
+    sum_pos_ranks = sum(rank for rank, y in zip(ranks, y_true) if int(y) == 1)
+    auc = (sum_pos_ranks - pos * (pos + 1) / 2.0) / (pos * neg)
+    return float(max(0.0, min(1.0, auc)))
+
+
 def _cosine(a: Sequence[float], b: Sequence[float]) -> float:
     dot = sum(x * y for x, y in zip(a, b))
     na = math.sqrt(sum(x * x for x in a))

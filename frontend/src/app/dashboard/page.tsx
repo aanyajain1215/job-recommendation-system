@@ -509,7 +509,7 @@ export default function DashboardPage() {
           <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-6">
             <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-zinc-400">
               <ShieldCheck className="h-4 w-4 text-teal-400" />
-              Environment & Storage
+              Environment & System
             </h3>
 
             <div className="mt-4 space-y-3 text-xs">
@@ -518,12 +518,16 @@ export default function DashboardPage() {
                 <span className="font-mono text-zinc-200">{user.role}</span>
               </div>
               <div className="flex justify-between py-1.5 border-b border-zinc-800/60">
-                <span className="text-zinc-400">Storage Volume</span>
-                <span className="font-mono text-zinc-200">/app/uploads/resumes</span>
+                <span className="text-zinc-400">Ranking Strategy</span>
+                <span className="font-mono text-teal-300">ltr_blend (M2, auto-fallback)</span>
               </div>
               <div className="flex justify-between py-1.5 border-b border-zinc-800/60">
-                <span className="text-zinc-400">Vector Embeddings</span>
-                <span className="font-mono text-teal-400">pgvector ready</span>
+                <span className="text-zinc-400">Exploration</span>
+                <span className="font-mono text-zinc-200">deterministic 1-in-6 + bandit policy (configurable)</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b border-zinc-800/60">
+                <span className="text-zinc-400">Retrieval</span>
+                <span className="font-mono text-zinc-200">pgvector + FTS + RRF</span>
               </div>
               <div className="flex justify-between py-1.5">
                 <span className="text-zinc-400">User ID</span>

@@ -95,3 +95,22 @@ def require_roles(*allowed_roles: UserRole) -> Callable[[User], User]:
         return current_user
 
     return role_checker
+
+
+def get_current_admin_user(
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> User:
+    """Require authenticated admin user."""
+    admin_role = getattr(UserRole, "ADMIN", None)
+    if admin_role is not None and current_user.role != admin_role:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin privileges required.",
+        )
+    # fallback: if no ADMIN enum, deny non-admin-like access explicitly when role name differs
+    if admin_role is None and str(getattr(current_user.role, "value", current_user.role)).lower() != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin privileges required.",
+        )
+    return current_user

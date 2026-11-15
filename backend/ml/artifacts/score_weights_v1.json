@@ -1,0 +1,52 @@
+{
+  "name": "score_weights",
+  "version": "v1",
+  "weights": {
+    "semantic": 0.0001,
+    "skill": 0.449331,
+    "experience": 0.0001,
+    "education": 0.0001,
+    "project": 0.396527,
+    "location": 0.0001,
+    "salary": 0.0001,
+    "interest": 0.153642
+  },
+  "components": [
+    "semantic",
+    "skill",
+    "experience",
+    "education",
+    "project",
+    "location",
+    "salary",
+    "interest"
+  ],
+  "trained_at": "2026-11-15T05:30:27.960164+00:00",
+  "metrics": {
+    "train": {
+      "n": 960,
+      "mse": 0.056694,
+      "mae": 0.194391,
+      "corr": 0.4522,
+      "baseline_mse_default_weights": 0.16485,
+      "improved_vs_default": true
+    },
+    "test": {
+      "n": 240,
+      "mse": 0.057919,
+      "mae": 0.195403,
+      "corr": 0.5063,
+      "baseline_mse_default_weights": 0.175138,
+      "improved_vs_default": true
+    },
+    "all": {
+      "n": 1200,
+      "mse": 0.056939,
+      "mae": 0.194593,
+      "corr": 0.4618,
+      "baseline_mse_default_weights": 0.166908,
+      "improved_vs_default": true
+    }
+  },
+  "method": "constrained_linear_regression_simplex_pgdm"
+}

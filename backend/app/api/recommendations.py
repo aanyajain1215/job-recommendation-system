@@ -116,6 +116,7 @@ def get_recommendation_feed(
                         "propensity": item.propensity,
                         "recommendation_type": feed.recommendation_type,
                         "request_limit": limit,
+                        "bandit": item.bandit,
                     },
                     strategy=feed.recommendation_type,
                     model_version=item.model_version,

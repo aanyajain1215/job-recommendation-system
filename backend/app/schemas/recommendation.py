@@ -47,6 +47,7 @@ class RecommendationItem(BaseModel):
         default=None,
         description="Exploration propensity for this slot (1.0 = always shown; logged for IPS)",
     )
+    bandit: dict | None = Field(default=None, description="Bandit/RL exploration metadata when applicable")
 
 
 class RecommendationFeedResponse(BaseModel):

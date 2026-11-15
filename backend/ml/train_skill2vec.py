@@ -1,22 +1,16 @@
 #!/usr/bin/env python
-"""M1 skill2vec trainer (plan §6 M1).
+"""M1 SkillGraph trainer (upgraded) — compatibility entrypoint.
 
-Skip-gram Word2Vec (gensim) over four sentence sources:
+M1 now uses a Graph Neural Network-style graph representation model:
+**Heterogeneous Node2Vec** (biased random walks, p/q) over a directed
+Skill-Role-Project heterogeneous graph, capturing multi-hop structural
+dependencies (e.g. Python -> Pandas -> Data Analyst role) instead of only
+flat window co-occurrence.
 
-    a) published job skill lists (DB)
-    b) golden posting skill lists (ml/data/golden/postings.jsonl)
-    c) family core skills (ml/data/families.yaml)
-    d) curated domain cluster lists (CLUSTERS below)
-
-Window = one "posting" (generous window so co-occurrence inside a sentence
-counts), vector_size = 64, min_count = 2, seed fixed, workers = 1 → fully
-deterministic.  Artifact: ml/artifacts/skill2vec_v{N}.joblib holding
-{"vectors": {skill_lower: [f32×64]}, "meta": {...}} + a model_registry row.
-
-The vectors feed an *optional* transfer-cosine fallback in the recommender
-(gate: settings.skill2vec_enabled, default off) and the M1 transfer-pair
-evaluation.  Gap-engine results stay edge-driven unless explicitly enabled,
-so pinned tests never change behavior silently.
+Implementation: ml/train_skill_graph_gnn.py
+This module remains as a stable import/run shim for existing callers
+(ml/train.py, ml/evaluate.py, tests) and provides compatible helpers
+(load_artifact, cosine, run).
 """
 
 from __future__ import annotations
@@ -202,69 +196,47 @@ def next_version() -> str:
 
 
 def load_artifact(path: Path | None = None) -> dict | None:
-    """Newest skill2vec payload or None (serving/eval helper)."""
-    import joblib  # noqa: PLC0415
-
-    if path is None:
-        candidates = sorted(ARTIFACTS.glob("skill2vec_v*.joblib"))
-        if not candidates:
-            return None
-        path = candidates[-1]
+    """Newest M1 skill graph/GNN embedding payload or None (serving/eval helper)."""
     try:
-        payload = joblib.load(path)
-        if isinstance(payload, dict) and "vectors" in payload:
-            return payload
-    except Exception as exc:  # noqa: BLE001
-        print(f"[skill2vec] artifact load failed: {exc}", file=sys.stderr)
-    return None
+        from ml.train_skill_graph_gnn import load_artifact as _load  # noqa: PLC0415
+
+        return _load(path)
+    except Exception:
+        import joblib  # noqa: PLC0415
+
+        if path is None:
+            candidates = sorted(ARTIFACTS.glob("skill2vec_v*.joblib"))
+            if not candidates:
+                return None
+            path = candidates[-1]
+        try:
+            payload = joblib.load(path)
+            if isinstance(payload, dict) and "vectors" in payload:
+                return payload
+        except Exception as exc:  # noqa: BLE001
+            print(f"[skill2vec] artifact load failed: {exc}", file=sys.stderr)
+        return None
 
 
 def cosine(a: list[float], b: list[float]) -> float:
-    dot = sum(x * y for x, y in zip(a, b))
-    na = sum(x * x for x in a) ** 0.5
-    nb = sum(y * y for y in b) ** 0.5
-    if na <= 0 or nb <= 0:
-        return 0.0
-    return dot / (na * nb)
+    try:
+        from ml.train_skill_graph_gnn import cosine as _cos  # noqa: PLC0415
+
+        return float(_cos(a, b))
+    except Exception:
+        dot = sum(x * y for x, y in zip(a, b))
+        na = sum(x * x for x in a) ** 0.5
+        nb = sum(y * y for y in b) ** 0.5
+        if na <= 0 or nb <= 0:
+            return 0.0
+        return dot / (na * nb)
 
 
 def run(register: bool = True) -> dict:
-    import joblib  # noqa: PLC0415
+    """Train M1 heterogeneous Node2Vec GNN over directed Skill-Role-Project graph."""
+    from ml.train_skill_graph_gnn import run as _run  # noqa: PLC0415
 
-    sentences = collect_sentences()
-    if not sentences:
-        raise SystemExit("[skill2vec] no training sentences — run synthesize_corpus.py")
-
-    vectors, meta = train(sentences)
-    version = next_version()
-    ARTIFACTS.mkdir(parents=True, exist_ok=True)
-    artifact_path = ARTIFACTS / f"skill2vec_{version}.joblib"
-    joblib.dump({"vectors": vectors, "meta": meta}, artifact_path)
-
-    result = {
-        "artifact": str(artifact_path),
-        "version": version,
-        "vocab_size": meta["vocab_size"],
-        "sentence_count": meta["sentence_count"],
-    }
-
-    if register:
-        # evaluation lives in ml/evaluate.py (transfer-pair P/R/F1)
-        from ml import evaluate as evaluate_mod  # noqa: PLC0415
-        import ml.ml_registry as registry  # noqa: PLC0415
-
-        metrics = evaluate_mod.transfer_metrics(vectors)
-        row = registry.register(
-            "skill2vec",
-            version,
-            str(artifact_path.relative_to(BACKEND_ROOT)),
-            metrics,
-            promote=True,
-        )
-        result["registry"] = row
-
-    print(json.dumps(result, indent=2))
-    return result
+    return _run(register=register, include_db=True)
 
 
 def main(argv: list[str] | None = None) -> int:

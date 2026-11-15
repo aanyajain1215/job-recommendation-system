@@ -1,22 +1,39 @@
 """Runtime configuration store — precedence for scoring weights (plan §7).
 
-Precedence: defaults (``scoring.DEFAULT_WEIGHTS``) → ``system_config`` row
-(admin panel, ``PUT /admin/config``) → env overrides.  The LLM never reads
-or writes this store; validation is deterministic and Σw = 1 is enforced on
-save (plan §7 "Weights validated Σ=1 on save").
+Precedence: defaults (``scoring.DEFAULT_WEIGHTS``) → learned AI weights artifact
+(data-fitted, when present) → ``system_config`` row (admin panel override).
+Validation is deterministic and Σw = 1 is enforced on save.
 """
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.ops import SystemConfig
 from app.services.scoring import DEFAULT_WEIGHTS
+
+ARTIFACT_DIR = Path(__file__).resolve().parents[2] / "ml" / "artifacts"
+
+
+def _learned_weights_from_artifact() -> dict[str, float] | None:
+    """Load latest learned score weights (AI-fitted) if available."""
+    try:
+        if not ARTIFACT_DIR.exists():
+            return None
+        cands = sorted(ARTIFACT_DIR.glob("score_weights_v*.json"))
+        if not cands:
+            return None
+        payload = json.loads(cands[-1].read_text(encoding="utf-8"))
+        weights = payload.get("weights") or {}
+        return validate_weights(weights)
+    except Exception:
+        return None
 
 SCORING_WEIGHTS_KEY = "scoring_weights"
 WEIGHT_TOLERANCE = 1e-6
@@ -67,15 +84,21 @@ def validate_weights(raw: Any) -> dict[str, float]:
 
 
 def get_scoring_weights(db: Session) -> dict[str, float]:
-    """Effective global weight vector: defaults overlaid with the admin row."""
+    """Effective global weight vector.
+
+    AI-first: prefer data-learned weights artifact when present, then apply the
+    admin `system_config` override if set. Falls back to code defaults if
+    artifacts/config are missing or invalid.
+    """
+    base = _learned_weights_from_artifact() or dict(DEFAULT_WEIGHTS)
     row = db.get(SystemConfig, SCORING_WEIGHTS_KEY)
     if row is None or not isinstance(row.value, dict):
-        return dict(DEFAULT_WEIGHTS)
+        return base
     try:
         return validate_weights(row.value)
     except ValueError:
-        # Never let a corrupt admin row break the feed — fall back to code defaults.
-        return dict(DEFAULT_WEIGHTS)
+        # Never let a corrupt admin row break the feed — fall back to learned/default base.
+        return base
 
 
 def has_custom_weights(db: Session) -> bool:

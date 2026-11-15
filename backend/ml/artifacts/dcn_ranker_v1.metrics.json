@@ -1,0 +1,35 @@
+{
+  "baseline_heuristic": {
+    "ndcg@5": 0.9551695880348845,
+    "ndcg@10": 0.9586724353498873,
+    "mrr@10": 0.9166666666666666,
+    "map@10": 0.9166666666666666,
+    "auc_roc": 0.9845481049562682,
+    "n_eval_queries": 6,
+    "n_total_groups": 43,
+    "positive_label_min": 4
+  },
+  "lightgbm_gbdt": {
+    "ndcg@5": 0.8931120597550493,
+    "ndcg@10": 0.9061168041153126,
+    "mrr@10": 0.8333333333333334,
+    "map@10": 0.8333333333333334,
+    "auc_roc": 0.926530612244898,
+    "n_eval_queries": 6,
+    "n_total_groups": 43,
+    "positive_label_min": 4,
+    "model": "LGBMRanker"
+  },
+  "dcn_v2": {
+    "ndcg@5": 0.9612444531423665,
+    "ndcg@10": 0.9612444531423665,
+    "mrr@10": 0.9166666666666666,
+    "map@10": 0.9166666666666666,
+    "auc_roc": 0.9743440233236151,
+    "n_eval_queries": 6,
+    "n_total_groups": 43,
+    "positive_label_min": 4
+  },
+  "artifact": "C:\\Users\\aanya\\Documents\\SIH\\projects\\job recommendation system\\backend\\ml\\artifacts\\dcn_ranker_v1.pt",
+  "loss_curve_png": "C:\\Users\\aanya\\Documents\\SIH\\projects\\job recommendation system\\backend\\ml\\artifacts\\dcn_loss_curve.png"
+}

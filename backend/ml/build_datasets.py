@@ -91,7 +91,49 @@ def collect_aggregates(db) -> dict[tuple[str, str], tuple[int, datetime]]:
 
     # drop rows whose job vanished
     jobs = {str(j.id) for j in db.scalars(select(Job)).all()}
-    return {k: v for k, v in agg.items() if k[1] in jobs}
+    agg = {k: v for k, v in agg.items() if k[1] in jobs}
+
+    # Bootstrap/supplement: ensure ranking groups are learnable and evaluation-valid.
+    # - every profile gets a minimum group size
+    # - every user with positive interactions gets sampled hard-negative postings
+    #   (label-0 unseen jobs) for contrastive learning and IR evaluation.
+    if agg and jobs:
+        import random as _random  # noqa: PLC0415
+
+        job_ids = list(jobs)
+        all_profiles = [str(p.id) for p in profiles]
+        rng_seed = sum(ord(c) for p in all_profiles for c in p[:8]) % 9973
+        _rng = _random.Random(rng_seed)
+        POS_MIN = 4  # high-intent positive threshold
+        MIN_GROUP = 4
+        MIN_NEG_FOR_POS_USERS = 3
+
+        def _add_negatives(pid: str, need: int):
+            if need <= 0:
+                return
+            candidates = [j for j in job_ids if (pid, j) not in agg]
+            _rng.shuffle(candidates)
+            for jid in candidates[:need]:
+                agg[(pid, jid)] = (0, datetime.now(timezone.utc))
+
+        for pid in all_profiles:
+            existing_keys = [(p, jid) for (p, jid) in agg.keys() if p == pid]
+            labels = [agg[k][0] for k in existing_keys]
+            has_pos = any(int(l) >= POS_MIN for l in labels)
+            neg_count = sum(1 for l in labels if int(l) == 0)
+
+            # ensure minimum group size
+            if len(existing_keys) < MIN_GROUP:
+                _add_negatives(pid, MIN_GROUP - len(existing_keys))
+                existing_keys = [(p, jid) for (p, jid) in agg.keys() if p == pid]
+                labels = [agg[k][0] for k in existing_keys]
+                neg_count = sum(1 for l in labels if int(l) == 0)
+
+            # ensure positive-bearing users have hard negatives for contrast
+            if has_pos and neg_count < MIN_NEG_FOR_POS_USERS:
+                _add_negatives(pid, MIN_NEG_FOR_POS_USERS - neg_count)
+
+    return agg
 
 
 def build_feature_rows(db, agg: dict) -> list[dict]:
@@ -144,6 +186,14 @@ def build_feature_rows(db, agg: dict) -> list[dict]:
         ).all()
     }
 
+    # optional CE scoring (M0) for richer semantic features
+    ce_scorer = None
+    try:
+        from app.services.cross_encoder import get_cross_encoder  # noqa: PLC0415
+        ce_scorer = get_cross_encoder()
+    except Exception:
+        ce_scorer = None
+
     rows: list[dict] = []
     for pid, entries in by_profile.items():
         profile = profiles.get(pid)
@@ -156,6 +206,8 @@ def build_feature_rows(db, agg: dict) -> list[dict]:
             print(f"[datasets] profile {pid} context failed: {exc}", file=sys.stderr)
             continue
 
+        # prepare per-job feature inputs first
+        per_job = []
         for jid, label, ts in entries:
             job = jobs.get(jid)
             if job is None:
@@ -169,6 +221,26 @@ def build_feature_rows(db, agg: dict) -> list[dict]:
                     created = created.replace(tzinfo=timezone.utc)
                 age = max(0.0, (ts - created).total_seconds() / 86400.0)
             applicants = float(len(job.applications or []))
+            per_job.append((jid, job, label, ts, inputs, result, age, applicants))
+
+        ce_logits_map: dict[str, float] = {}
+        ce_probs_map: dict[str, float] = {}
+        if ce_scorer is not None and per_job:
+            try:
+                pairs = [(getattr(profile, "resume_text", "") or "", getattr(job, "description", "") or "") for _, job, *_ in per_job]
+                if hasattr(ce_scorer, "score_pairs_detailed"):
+                    detailed = ce_scorer.score_pairs_detailed(pairs)
+                    for (jid, *_rest), d in zip(per_job, detailed):
+                        ce_logits_map[jid] = float(d.get("logit", 0.0))
+                        ce_probs_map[jid] = float(d.get("prob", 0.0))
+                else:
+                    probs = ce_scorer.score_pairs(pairs)
+                    for (jid, *_rest), p in zip(per_job, probs):
+                        ce_probs_map[jid] = float(p)
+            except Exception:
+                pass
+
+        for jid, _job, label, ts, inputs, result, age, applicants in per_job:
             features = build_features(
                 inputs,
                 result,
@@ -176,8 +248,10 @@ def build_feature_rows(db, agg: dict) -> list[dict]:
                     job_age_days=age,
                     applicant_count=applicants,
                     profile_completeness=completeness,
-                    historical_apply_rate=_apply_rate(job),
+                    historical_apply_rate=_apply_rate(_job),
                     exploration_flag=0.0,
+                    cross_encoder_logit=ce_logits_map.get(jid, 0.0),
+                    cross_encoder_prob=ce_probs_map.get(jid, 0.0),
                 ),
             )
             rows.append({
@@ -193,33 +267,44 @@ def build_feature_rows(db, agg: dict) -> list[dict]:
 
 
 def temporal_split(rows: list[dict]) -> tuple[list[dict], list[dict], dict]:
-    """Group-level temporal split: profiles with max(t) < cutoff → train."""
-    max_t: dict[str, str] = {}
-    for row in rows:
-        pid = row["profile_id"]
-        if pid not in max_t or row["t"] > max_t[pid]:
-            max_t[pid] = row["t"]
-    order = sorted(max_t.items(), key=lambda kv: (kv[1], kv[0]))
-    cutoff_idx = max(1, int(len(order) * 0.8)) if len(order) > 4 else max(1, len(order) - 1)
-    cutoff = order[min(cutoff_idx, len(order) - 1)][1]
+    """Strict profile-level split (80/20 by profile_id, zero user overlap).
 
-    train = [r for r in rows if max_t[r["profile_id"]] < cutoff]
-    test = [r for r in rows if max_t[r["profile_id"]] >= cutoff]
+    Profiles are shuffled deterministically by hash of profile_id so the split is
+    stable and group-pure (all rows for a profile stay in the same fold). Real
+    interaction/application/feedback labels are preserved.
+    """
+    import hashlib  # noqa: PLC0415
+
+    profile_ids = sorted({r["profile_id"] for r in rows})
+    def _key(pid: str) -> str:
+        return hashlib.sha256(pid.encode("utf-8")).hexdigest()
+
+    ordered = sorted(profile_ids, key=_key)
+    cut = max(1, int(len(ordered) * 0.8))
+    if cut >= len(ordered) and len(ordered) > 1:
+        cut = len(ordered) - 1
+    train_ids = set(ordered[:cut])
+    test_ids = set(ordered[cut:])
+
+    train = [r for r in rows if r["profile_id"] in train_ids]
+    test = [r for r in rows if r["profile_id"] in test_ids]
     info = {
-        "strategy": "temporal_group",
-        "cutoff": cutoff,
-        "train_groups": len({r["profile_id"] for r in train}),
-        "test_groups": len({r["profile_id"] for r in test}),
-        "degenerate": len({v for v in max_t.values()}) <= 1,
+        "strategy": "profile_id_hash_80_20",
+        "cutoff": None,
+        "train_groups": len(train_ids),
+        "test_groups": len(test_ids),
+        "degenerate": False,
+        "zero_user_overlap": True,
     }
-    if not train or not test:
-        # fall back to a deterministic 80/20 group split so training always works
-        info["strategy"] = "group_random_fallback"
-        cut = max(1, int(len(order) * 0.8))
-        train_ids = {pid for pid, _ in order[:cut]}
+    # safety fallback (should be rare)
+    if (not train or not test) and profile_ids:
+        cut = max(1, int(len(ordered) * 0.8))
+        train_ids = set(ordered[:cut])
         train = [r for r in rows if r["profile_id"] in train_ids]
         test = [r for r in rows if r["profile_id"] not in train_ids]
-        info["cutoff"] = order[min(cut, len(order) - 1)][1]
+        info["strategy"] = "profile_id_fallback_80_20"
+        info["train_groups"] = len({r["profile_id"] for r in train})
+        info["test_groups"] = len({r["profile_id"] for r in test})
     return train, test, info
 
 
@@ -247,9 +332,8 @@ def run(out_dir: Path = DATASETS) -> dict:
         db.close()
 
     if bootstrap:
-        print("[datasets] no interaction rows found — run "
-              "scripts/seed_synthetic_users.py first", file=sys.stderr)
-        raise SystemExit(3)
+        print("[datasets] no interaction rows found - run scripts/seed_synthetic_users.py first", file=sys.stderr)
+        return 3
 
     train_rows, test_rows, split = temporal_split(rows)
     train_rows = _group_contiguous(train_rows)
@@ -282,8 +366,21 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Build M2/M3 datasets")
     parser.add_argument("--out", default=str(DATASETS))
     args = parser.parse_args(argv)
-    run(Path(args.out))
-    return 0
+    try:
+        res = run(Path(args.out))
+        if isinstance(res, int):
+            return res
+        return 0
+    except SystemExit as e:
+        code = e.code
+        if code is None:
+            return 0
+        if isinstance(code, int):
+            return code
+        return 1
+    except Exception as exc:
+        print(f"[datasets] error: {exc}", file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":

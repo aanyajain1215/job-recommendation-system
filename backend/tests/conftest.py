@@ -1,19 +1,11 @@
 """Shared test fixtures.
 
-Three guarantees for a deterministic, hermetic suite:
-
-1. ``LLM_STRICT`` (loaded from .env for the runtime trial) is forced off —
-   the suite validates the *graceful-fallback* contract (parse_query
-   degrades to FTS, polish returns the template, ...).
-2. No test ever spends live provider quota or depends on the network:
-   ``get_provider``/``llm_available`` are stubbed to report "no provider".
-   Tests that need a provider inject their own fake, which overrides this.
-3. The query-time Adzuna search is blocked the same way — ``fetch_adzuna_search``
-   raises, and ``search_postings`` converts that into the platform-only
-   degradation path (identical to "no keys configured").  Tests that
-   exercise the live leg monkeypatch the fetch with their own fake, which
-   overrides this fixture's stub for that test.
+Hermetic by default: LLM disabled/falling back, live providers blocked.
+DB-dependent integration tests require a reachable Postgres with schema/migrations
+configured via DATABASE_URL (or TEST_DATABASE_URL).
 """
+
+import os
 
 import pytest
 
@@ -50,3 +42,13 @@ def _no_live_provider(monkeypatch):
         raise RuntimeError("live Adzuna provider is blocked in tests")
 
     monkeypatch.setattr(live_jobs_pkg, "fetch_adzuna_search", _blocked)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _test_db_url():
+    """Default to local docker-compose DB for integration tests when unset."""
+    if not os.environ.get("DATABASE_URL"):
+        os.environ["DATABASE_URL"] = "postgresql+psycopg://jobrec:change_me_in_production@localhost:55432/jobrec"
+    if not os.environ.get("TEST_DATABASE_URL"):
+        os.environ["TEST_DATABASE_URL"] = os.environ["DATABASE_URL"]
+    yield
