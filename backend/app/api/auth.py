@@ -1,4 +1,5 @@
 import re
+from datetime import datetime, timezone
 from typing import Annotated
 from uuid import UUID
 
@@ -59,6 +60,7 @@ def register(
         role=data.role,
         is_active=True,
         is_verified=False,
+        last_active_at=datetime.now(timezone.utc),
     )
     db.add(new_user)
     db.flush()
@@ -126,6 +128,9 @@ def login(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User account is deactivated.",
         )
+
+    user.last_active_at = datetime.now(timezone.utc)
+    db.commit()
 
     access_token = create_access_token(subject=user.id, role=user.role.value)
     refresh_token = create_refresh_token(subject=user.id)

@@ -21,8 +21,9 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
-      await login({ email, password });
-      router.push("/dashboard");
+      const signedIn = await login({ email, password });
+      // Admins monitor the marketplace; they never land in a tenant workspace.
+      router.push(signedIn.role === "admin" ? "/admin" : "/dashboard");
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message);

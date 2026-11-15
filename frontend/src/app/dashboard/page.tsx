@@ -57,6 +57,13 @@ export default function DashboardPage() {
       return;
     }
 
+    // The dashboard is the seeker/employer workspace. Admins belong in the
+    // monitoring console, not in a tenant surface that can post jobs.
+    if (!isAuthLoading && user?.role === "admin") {
+      router.replace("/admin");
+      return;
+    }
+
     if (token && user) {
       if (user.role === "employer" || user.role === "admin") {
         getEmployerJobs(token)

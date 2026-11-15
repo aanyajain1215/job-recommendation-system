@@ -295,6 +295,7 @@ def get_posting_pipeline(
             interview=counts[ApplicationStatus.INTERVIEW],
             rejected=counts[ApplicationStatus.REJECTED],
             offer=counts[ApplicationStatus.OFFER],
+            hired=counts[ApplicationStatus.HIRED],
             saved=counts[ApplicationStatus.SAVED],
         ),
         recent_7d=recent_7d,
@@ -638,11 +639,13 @@ def get_posting_performance(
 
     conversion = StageConversion(
         viewed_rate=_rate(_cnt(ApplicationStatus.VIEWED, ApplicationStatus.SHORTLISTED,
-                               ApplicationStatus.INTERVIEW, ApplicationStatus.OFFER)),
+                               ApplicationStatus.INTERVIEW, ApplicationStatus.OFFER,
+                               ApplicationStatus.HIRED)),
         shortlist_rate=_rate(_cnt(ApplicationStatus.SHORTLISTED, ApplicationStatus.INTERVIEW,
-                                  ApplicationStatus.OFFER)),
-        interview_rate=_rate(_cnt(ApplicationStatus.INTERVIEW, ApplicationStatus.OFFER)),
-        offer_rate=_rate(_cnt(ApplicationStatus.OFFER)),
+                                  ApplicationStatus.OFFER, ApplicationStatus.HIRED)),
+        interview_rate=_rate(_cnt(ApplicationStatus.INTERVIEW, ApplicationStatus.OFFER,
+                                  ApplicationStatus.HIRED)),
+        offer_rate=_rate(_cnt(ApplicationStatus.OFFER, ApplicationStatus.HIRED)),
         rejection_rate=_rate(_cnt(ApplicationStatus.REJECTED)),
     )
 
@@ -674,6 +677,7 @@ def get_posting_performance(
                     ApplicationStatus.SHORTLISTED,
                     ApplicationStatus.INTERVIEW,
                     ApplicationStatus.OFFER,
+                    ApplicationStatus.HIRED,
                     ApplicationStatus.REJECTED,
                 ]
             ),

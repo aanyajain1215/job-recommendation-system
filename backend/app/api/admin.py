@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import logging
 import math
+from datetime import datetime, timedelta, timezone
 from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Annotated, Any
@@ -29,17 +30,28 @@ from uuid import UUID
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import case, func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import require_roles
 from app.api.profiles import UPLOAD_DIR, _run_resume_parse
 from app.core.config import get_settings
 from app.core.db import get_db
+from app.models.application import Application
 from app.models.career_path import CareerPathStep, LearningResource
-from app.models.enums import UserRole
+from app.models.company import Company
+from app.models.enums import (
+    ApplicationStatus,
+    FlagSeverity,
+    FlagStatus,
+    FlagTargetType,
+    JobStatus,
+    UserRole,
+)
 from app.models.feedback import SkillAffinity
 from app.models.job import Job
+from app.models.moderation import ModerationFlag
 from app.models.ops import LlmUsage, ModelRegistry
+from app.models.profile import Profile
 from app.models.profile_entities import Resume
 from app.models.skill import JobSkill, ProfileSkill, Skill
 from app.models.skill_graph import SkillAlias, SkillEdge
@@ -73,6 +85,535 @@ class SkillMergeRequest(BaseModel):
 
 class ConfigUpdateRequest(BaseModel):
     weights: dict[str, float]
+
+
+class UserUpdateRequest(BaseModel):
+    is_active: bool | None = None
+    role: UserRole | None = None
+
+
+class JobStatusUpdateRequest(BaseModel):
+    status: JobStatus
+
+
+# ---------------------------------------------------------------------------
+# Overview + user/job administration (everything below is read live from DB)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/overview")
+def overview(_: AdminDep, db: DbDep) -> dict[str, Any]:
+    """Single DB-backed snapshot for the admin landing page."""
+    now = datetime.now(timezone.utc)
+    week_ago = now - timedelta(days=7)
+    month_ago = now - timedelta(days=30)
+    day_ago = now - timedelta(hours=24)
+    online_window = now - timedelta(minutes=5)
+    stuck_before = now - timedelta(minutes=STUCK_PARSE_MINUTES)
+
+    def count(stmt) -> int:
+        return int(db.scalar(stmt) or 0)
+
+    role_counts = {
+        role.value: int(total)
+        for role, total in db.execute(
+            select(User.role, func.count(User.id)).group_by(User.role)
+        ).all()
+    }
+    job_status_counts = {
+        value.value: int(total)
+        for value, total in db.execute(
+            select(Job.status, func.count(Job.id)).group_by(Job.status)
+        ).all()
+    }
+    application_status_counts = {
+        value.value: int(total)
+        for value, total in db.execute(
+            select(Application.status, func.count(Application.id)).group_by(
+                Application.status
+            )
+        ).all()
+    }
+    llm_totals = db.execute(
+        select(
+            func.count(LlmUsage.id),
+            func.coalesce(func.sum(LlmUsage.prompt_tokens), 0),
+            func.coalesce(func.sum(LlmUsage.completion_tokens), 0),
+            func.coalesce(
+                func.sum(case((LlmUsage.flagged == True, 1), else_=0)), 0  # noqa: E712
+            ),
+            func.coalesce(
+                func.sum(case((LlmUsage.created_at >= week_ago, 1), else_=0)), 0
+            ),
+        )
+    ).one()
+
+    # ---- live usage (last_active_at is refreshed on authenticated requests) ----
+    online_now = count(
+        select(func.count(User.id)).where(User.last_active_at >= online_window)
+    )
+    active_today = count(
+        select(func.count(User.id)).where(User.last_active_at >= day_ago)
+    )
+    active_week = count(
+        select(func.count(User.id)).where(User.last_active_at >= week_ago)
+    )
+    active_month = count(
+        select(func.count(User.id)).where(User.last_active_at >= month_ago)
+    )
+
+    # ---- hiring outcomes ----
+    hires = count(
+        select(func.count(Application.id)).where(
+            Application.status == ApplicationStatus.HIRED
+        )
+    )
+    offers = count(
+        select(func.count(Application.id)).where(
+            Application.status == ApplicationStatus.OFFER
+        )
+    )
+    job_seekers_hired = count(
+        select(func.count(func.distinct(Application.user_id))).where(
+            Application.status == ApplicationStatus.HIRED
+        )
+    )
+    hires_last_30d = count(
+        select(func.count(Application.id)).where(
+            Application.status == ApplicationStatus.HIRED,
+            Application.updated_at >= month_ago,
+        )
+    )
+    applicants = count(
+        select(func.count(func.distinct(Application.user_id))).where(
+            Application.status != ApplicationStatus.SAVED
+        )
+    )
+    employers_with_hires = count(
+        select(func.count(func.distinct(Job.company_id)))
+        .join(Application, Application.job_id == Job.id)
+        .where(Application.status == ApplicationStatus.HIRED)
+    )
+
+    # ---- employer health ----
+    companies_total = count(select(func.count(Company.id)))
+    companies_verified = count(
+        select(func.count(Company.id)).where(Company.is_verified == True)  # noqa: E712
+    )
+    companies_active_owners = count(
+        select(func.count(func.distinct(Company.created_by_user_id)))
+        .join(User, User.id == Company.created_by_user_id)
+        .where(User.is_active == True)  # noqa: E712
+    )
+    companies_with_published_jobs = count(
+        select(func.count(func.distinct(Job.company_id))).where(
+            Job.status == JobStatus.PUBLISHED
+        )
+    )
+
+    # ---- trust & safety ----
+    open_flags = count(
+        select(func.count(ModerationFlag.id)).where(
+            ModerationFlag.status == FlagStatus.OPEN
+        )
+    )
+    high_severity_flags = count(
+        select(func.count(ModerationFlag.id)).where(
+            ModerationFlag.status == FlagStatus.OPEN,
+            ModerationFlag.severity == FlagSeverity.HIGH,
+        )
+    )
+    flagged_jobs = count(
+        select(func.count(func.distinct(ModerationFlag.target_id))).where(
+            ModerationFlag.status == FlagStatus.OPEN,
+            ModerationFlag.target_type == FlagTargetType.JOB,
+        )
+    )
+    flagged_companies = count(
+        select(func.count(func.distinct(ModerationFlag.target_id))).where(
+            ModerationFlag.status == FlagStatus.OPEN,
+            ModerationFlag.target_type == FlagTargetType.COMPANY,
+        )
+    )
+    flagged_users = count(
+        select(func.count(func.distinct(ModerationFlag.target_id))).where(
+            ModerationFlag.status == FlagStatus.OPEN,
+            ModerationFlag.target_type == FlagTargetType.USER,
+        )
+    )
+    resolved_last_7d = count(
+        select(func.count(ModerationFlag.id)).where(
+            ModerationFlag.status.in_([FlagStatus.RESOLVED, FlagStatus.DISMISSED]),
+            ModerationFlag.resolved_at >= week_ago,
+        )
+    )
+
+    return {
+        "generated_at": now.isoformat(),
+        "users": {
+            "total": count(select(func.count(User.id))),
+            "active": count(select(func.count(User.id)).where(User.is_active == True)),  # noqa: E712
+            "job_seekers": role_counts.get(UserRole.JOB_SEEKER.value, 0),
+            "employers": role_counts.get(UserRole.EMPLOYER.value, 0),
+            "admins": role_counts.get(UserRole.ADMIN.value, 0),
+            "new_last_7d": count(
+                select(func.count(User.id)).where(User.created_at >= week_ago)
+            ),
+            "deactivated": count(
+                select(func.count(User.id)).where(User.is_active == False)  # noqa: E712
+            ),
+            # Live usage — refreshed on authenticated requests (5-minute window).
+            "online_now": online_now,
+            "active_today": active_today,
+            "active_week": active_week,
+            "active_month": active_month,
+        },
+        "profiles": {
+            "total": count(select(func.count(Profile.id))),
+            "with_resume": count(
+                select(func.count(Profile.id)).where(Profile.resume_url.isnot(None))
+            ),
+        },
+        "companies": {
+            "total": companies_total,
+            "verified": companies_verified,
+            "unverified": max(0, companies_total - companies_verified),
+            "active_owners": companies_active_owners,
+            "with_published_jobs": companies_with_published_jobs,
+            "new_last_7d": count(
+                select(func.count(Company.id)).where(Company.created_at >= week_ago)
+            ),
+        },
+        "jobs": {
+            "total": count(select(func.count(Job.id))),
+            "published": job_status_counts.get(JobStatus.PUBLISHED.value, 0),
+            "draft": job_status_counts.get(JobStatus.DRAFT.value, 0),
+            "closed": job_status_counts.get(JobStatus.CLOSED.value, 0),
+            "archived": job_status_counts.get(JobStatus.ARCHIVED.value, 0),
+            "new_last_7d": count(
+                select(func.count(Job.id)).where(Job.created_at >= week_ago)
+            ),
+        },
+        "applications": {
+            "total": count(select(func.count(Application.id))),
+            "last_7d": count(
+                select(func.count(Application.id)).where(
+                    Application.applied_at >= week_ago
+                )
+            ),
+            "by_status": application_status_counts,
+            # ---- hiring outcomes (the platform's actual success metric) ----
+            "hires": hires,
+            "job_seekers_hired": job_seekers_hired,
+            "offers": offers,
+            "hires_last_30d": hires_last_30d,
+            "applicants": applicants,
+            "employers_with_hires": employers_with_hires,
+            "hire_rate": (
+                round(100.0 * job_seekers_hired / applicants, 1)
+                if applicants
+                else 0.0
+            ),
+        },
+        "moderation": {
+            "open_flags": open_flags,
+            "high_severity_flags": high_severity_flags,
+            "flagged_jobs": flagged_jobs,
+            "flagged_companies": flagged_companies,
+            "flagged_users": flagged_users,
+            "resolved_last_7d": resolved_last_7d,
+        },
+        "skills": {
+            "total": count(select(func.count(Skill.id))),
+            "embedded": count(
+                select(func.count(Skill.id)).where(Skill.embedding.isnot(None))
+            ),
+        },
+        "llm": {
+            "calls": int(llm_totals[0] or 0),
+            "prompt_tokens": int(llm_totals[1] or 0),
+            "completion_tokens": int(llm_totals[2] or 0),
+            "flagged": int(llm_totals[3] or 0),
+            "last_7d": int(llm_totals[4] or 0),
+        },
+        "parse_failures": {
+            "failed": count(
+                select(func.count(Resume.id)).where(Resume.parse_status == "failed")
+            ),
+            "stuck": count(
+                select(func.count(Resume.id)).where(
+                    Resume.parse_status == "parsing",
+                    Resume.created_at < stuck_before,
+                )
+            ),
+        },
+    }
+
+
+@router.get("/users")
+def list_users(
+    _: AdminDep,
+    db: DbDep,
+    q: Annotated[str | None, Query(max_length=200)] = None,
+    role: Annotated[UserRole | None, Query()] = None,
+    is_active: Annotated[bool | None, Query()] = None,
+    page: Annotated[int, Query(ge=1)] = 1,
+    limit: Annotated[int, Query(ge=1, le=100)] = 25,
+) -> dict[str, Any]:
+    """Paginated account directory with profile, company and application counts."""
+    conditions = []
+    if q:
+        conditions.append(User.email.ilike(f"%{q.strip()}%"))
+    if role is not None:
+        conditions.append(User.role == role)
+    if is_active is not None:
+        conditions.append(User.is_active == is_active)
+
+    total = int(db.scalar(select(func.count(User.id)).where(*conditions)) or 0)
+    rows = db.scalars(
+        select(User)
+        .options(selectinload(User.profile))
+        .where(*conditions)
+        .order_by(User.created_at.desc(), User.id)
+        .offset((page - 1) * limit)
+        .limit(limit)
+    ).all()
+
+    user_ids = [u.id for u in rows]
+    app_counts: dict[UUID, int] = {}
+    company_counts: dict[UUID, int] = {}
+    hire_counts: dict[UUID, int] = {}
+    open_flags: dict[UUID, int] = {}
+    if user_ids:
+        app_counts = dict(
+            db.execute(
+                select(Application.user_id, func.count(Application.id))
+                .where(Application.user_id.in_(user_ids))
+                .group_by(Application.user_id)
+            ).all()
+        )
+        hire_counts = dict(
+            db.execute(
+                select(Application.user_id, func.count(Application.id))
+                .where(
+                    Application.user_id.in_(user_ids),
+                    Application.status == ApplicationStatus.HIRED,
+                )
+                .group_by(Application.user_id)
+            ).all()
+        )
+        company_counts = dict(
+            db.execute(
+                select(Company.created_by_user_id, func.count(Company.id))
+                .where(Company.created_by_user_id.in_(user_ids))
+                .group_by(Company.created_by_user_id)
+            ).all()
+        )
+
+        # Open flags raised directly against the account, its companies or its
+        # postings — one number the admin can sort on.
+        for target_type in (
+            FlagTargetType.USER,
+            FlagTargetType.COMPANY,
+            FlagTargetType.JOB,
+        ):
+            if target_type == FlagTargetType.USER:
+                owner_map = {uid: uid for uid in user_ids}
+            elif target_type == FlagTargetType.COMPANY:
+                owner_map = dict(
+                    db.execute(
+                        select(Company.id, Company.created_by_user_id).where(
+                            Company.created_by_user_id.in_(user_ids)
+                        )
+                    ).all()
+                )
+            else:
+                owner_map = dict(
+                    db.execute(
+                        select(Job.id, Job.posted_by_user_id).where(
+                            Job.posted_by_user_id.in_(user_ids)
+                        )
+                    ).all()
+                )
+            if not owner_map:
+                continue
+            rows_flagged = db.execute(
+                select(ModerationFlag.target_id, func.count(ModerationFlag.id))
+                .where(
+                    ModerationFlag.status == FlagStatus.OPEN,
+                    ModerationFlag.target_type == target_type,
+                    ModerationFlag.target_id.in_(list(owner_map.keys())),
+                )
+                .group_by(ModerationFlag.target_id)
+            ).all()
+            for target_id, count in rows_flagged:
+                owner_id = owner_map.get(target_id)
+                if owner_id is not None:
+                    open_flags[owner_id] = open_flags.get(owner_id, 0) + int(count)
+
+    return {
+        "items": [
+            {
+                "id": str(user.id),
+                "email": user.email,
+                "role": user.role.value,
+                "is_active": user.is_active,
+                "is_verified": user.is_verified,
+                "created_at": (
+                    user.created_at.isoformat() if user.created_at else None
+                ),
+                "last_active_at": (
+                    user.last_active_at.isoformat() if user.last_active_at else None
+                ),
+                "profile": (
+                    {
+                        "first_name": user.profile.first_name,
+                        "last_name": user.profile.last_name,
+                        "headline": user.profile.headline,
+                        "location": user.profile.location,
+                        "years_of_experience": user.profile.years_of_experience,
+                    }
+                    if user.profile is not None
+                    else None
+                ),
+                "companies": int(company_counts.get(user.id, 0)),
+                "applications": int(app_counts.get(user.id, 0)),
+                "hired": int(hire_counts.get(user.id, 0)),
+                "open_flags": int(open_flags.get(user.id, 0)),
+            }
+            for user in rows
+        ],
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "total_pages": max(1, math.ceil(total / limit)),
+    }
+
+
+@router.patch("/users/{user_id}")
+def update_user(
+    user_id: UUID,
+    payload: UserUpdateRequest,
+    admin: AdminDep,
+    db: DbDep,
+) -> dict[str, Any]:
+    """Activate/deactivate an account or change its role.
+
+    An admin cannot lock themselves out of the console or demote their own
+    account — that keeps at least one operator able to reach this page.
+    """
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found."
+        )
+
+    if user.id == admin.id and (
+        payload.is_active is False
+        or (payload.role is not None and payload.role != UserRole.ADMIN)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You cannot deactivate or demote your own admin account.",
+        )
+
+    if payload.is_active is not None:
+        user.is_active = payload.is_active
+    if payload.role is not None:
+        user.role = payload.role
+    db.commit()
+
+    return {
+        "status": "updated",
+        "user": {
+            "id": str(user.id),
+            "role": user.role.value,
+            "is_active": user.is_active,
+        },
+    }
+
+
+@router.get("/jobs")
+def list_jobs(
+    _: AdminDep,
+    db: DbDep,
+    q: Annotated[str | None, Query(max_length=200)] = None,
+    job_status: Annotated[JobStatus | None, Query(alias="status")] = None,
+    page: Annotated[int, Query(ge=1)] = 1,
+    limit: Annotated[int, Query(ge=1, le=100)] = 25,
+) -> dict[str, Any]:
+    """Paginated moderation queue of native postings (live API jobs are transient)."""
+    conditions = []
+    if q:
+        conditions.append(Job.title.ilike(f"%{q.strip()}%"))
+    if job_status is not None:
+        conditions.append(Job.status == job_status)
+
+    total = int(db.scalar(select(func.count(Job.id)).where(*conditions)) or 0)
+    rows = db.execute(
+        select(Job, Company.name)
+        .join(Company, Company.id == Job.company_id)
+        .where(*conditions)
+        .order_by(Job.created_at.desc(), Job.id)
+        .offset((page - 1) * limit)
+        .limit(limit)
+    ).all()
+
+    job_ids = [job.id for job, _company_name in rows]
+    applicant_counts: dict[UUID, int] = {}
+    if job_ids:
+        applicant_counts = dict(
+            db.execute(
+                select(Application.job_id, func.count(Application.id))
+                .where(Application.job_id.in_(job_ids))
+                .group_by(Application.job_id)
+            ).all()
+        )
+
+    return {
+        "items": [
+            {
+                "id": str(job.id),
+                "title": job.title,
+                "company_name": company_name,
+                "location": job.location,
+                "is_remote": job.is_remote,
+                "employment_type": job.employment_type.value,
+                "experience_level": job.experience_level.value,
+                "status": job.status.value,
+                "source": job.source,
+                "applicants": int(applicant_counts.get(job.id, 0)),
+                "created_at": job.created_at.isoformat() if job.created_at else None,
+            }
+            for job, company_name in rows
+        ],
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "total_pages": max(1, math.ceil(total / limit)),
+    }
+
+
+@router.patch("/jobs/{job_id}")
+def update_job_status(
+    job_id: UUID,
+    payload: JobStatusUpdateRequest,
+    _: AdminDep,
+    db: DbDep,
+) -> dict[str, Any]:
+    """Moderate a posting by moving it between draft/published/closed/archived."""
+    job = db.get(Job, job_id)
+    if job is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Job posting not found."
+        )
+    job.status = payload.status
+    job.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    return {
+        "status": "updated",
+        "job": {"id": str(job.id), "status": job.status.value},
+    }
 
 
 # ---------------------------------------------------------------------------

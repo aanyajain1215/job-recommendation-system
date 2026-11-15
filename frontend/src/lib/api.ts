@@ -1,6 +1,11 @@
 import {
   AdminConfigResponse,
+  AdminEmployersResponse,
+  AdminFlagItem,
+  AdminFlagsResponse,
   AdminSkillsResponse,
+  AdminSuspiciousEmployersResponse,
+  AdminSuspiciousJobsResponse,
   ApplicationItem,
   ApplicationStats,
   ApplicationStatusHistoryItem,
@@ -13,6 +18,9 @@ import {
   EmployerApplication,
   FeedbackPayload,
   FeedbackResponse,
+  FlagSeverity,
+  FlagStatus,
+  FlagTargetType,
   GapResponse,
   JobCreatePayload,
   JobDetail,
@@ -626,6 +634,163 @@ export async function removeSavedJob(
 }
 
 // ---------------- Phase 5: Admin · M5 Onboarding ---------------- //
+
+export async function getAdminOverview(token: string): Promise<import("./types").AdminOverview> {
+  const base = getBrowserApiBaseUrl();
+  return authedJson(`${base}/api/v1/admin/overview`, token);
+}
+
+export async function getAdminUsers(
+  token: string,
+  params: { q?: string; role?: string; is_active?: string; page?: number; limit?: number } = {},
+): Promise<import("./types").AdminUsersResponse> {
+  const base = getBrowserApiBaseUrl();
+  const search = new URLSearchParams();
+  if (params.q) search.set("q", params.q);
+  if (params.role) search.set("role", params.role);
+  if (params.is_active !== undefined && params.is_active !== "") search.set("is_active", params.is_active);
+  if (params.page) search.set("page", String(params.page));
+  if (params.limit) search.set("limit", String(params.limit));
+  const suffix = search.toString() ? `?${search.toString()}` : "";
+  return authedJson(`${base}/api/v1/admin/users${suffix}`, token);
+}
+
+export async function updateAdminUser(
+  userId: string,
+  payload: { is_active?: boolean; role?: string },
+  token: string,
+): Promise<{ status: string; user: { id: string; role: string; is_active: boolean } }> {
+  const base = getBrowserApiBaseUrl();
+  return authedJson(`${base}/api/v1/admin/users/${userId}`, token, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getAdminJobs(
+  token: string,
+  params: { q?: string; status?: string; page?: number; limit?: number } = {},
+): Promise<import("./types").AdminJobsResponse> {
+  const base = getBrowserApiBaseUrl();
+  const search = new URLSearchParams();
+  if (params.q) search.set("q", params.q);
+  if (params.status) search.set("status", params.status);
+  if (params.page) search.set("page", String(params.page));
+  if (params.limit) search.set("limit", String(params.limit));
+  const suffix = search.toString() ? `?${search.toString()}` : "";
+  return authedJson(`${base}/api/v1/admin/jobs${suffix}`, token);
+}
+
+export async function updateAdminJobStatus(
+  jobId: string,
+  status: string,
+  token: string,
+): Promise<{ status: string; job: { id: string; status: string } }> {
+  const base = getBrowserApiBaseUrl();
+  return authedJson(`${base}/api/v1/admin/jobs/${jobId}`, token, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
+}
+
+// ---- employer oversight + trust & safety ---- //
+
+export async function getAdminEmployers(
+  token: string,
+  params: { q?: string; verified?: string; page?: number; limit?: number } = {},
+): Promise<AdminEmployersResponse> {
+  const base = getBrowserApiBaseUrl();
+  const search = new URLSearchParams();
+  if (params.q) search.set("q", params.q);
+  if (params.verified !== undefined && params.verified !== "") {
+    search.set("verified", params.verified);
+  }
+  if (params.page) search.set("page", String(params.page));
+  if (params.limit) search.set("limit", String(params.limit));
+  const suffix = search.toString() ? `?${search.toString()}` : "";
+  return authedJson(`${base}/api/v1/admin/employers${suffix}`, token);
+}
+
+export async function updateAdminEmployer(
+  companyId: string,
+  payload: { is_verified: boolean },
+  token: string,
+): Promise<{ status: string; company: { id: string; is_verified: boolean } }> {
+  const base = getBrowserApiBaseUrl();
+  return authedJson(`${base}/api/v1/admin/employers/${companyId}`, token, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getAdminFlags(
+  token: string,
+  params: { status?: string; target_type?: string; limit?: number } = {},
+): Promise<AdminFlagsResponse> {
+  const base = getBrowserApiBaseUrl();
+  const search = new URLSearchParams();
+  if (params.status) search.set("status", params.status);
+  if (params.target_type) search.set("target_type", params.target_type);
+  if (params.limit) search.set("limit", String(params.limit));
+  const suffix = search.toString() ? `?${search.toString()}` : "";
+  return authedJson(`${base}/api/v1/admin/moderation/flags${suffix}`, token);
+}
+
+export async function createAdminFlag(
+  payload: {
+    target_type: FlagTargetType;
+    target_id: string;
+    reason: string;
+    severity: FlagSeverity;
+    details?: string;
+  },
+  token: string,
+): Promise<{ status: string; flag: AdminFlagItem }> {
+  const base = getBrowserApiBaseUrl();
+  return authedJson(`${base}/api/v1/admin/moderation/flags`, token, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateAdminFlag(
+  flagId: string,
+  payload: { status: FlagStatus; resolution_note?: string },
+  token: string,
+): Promise<{ status: string; flag: AdminFlagItem }> {
+  const base = getBrowserApiBaseUrl();
+  return authedJson(`${base}/api/v1/admin/moderation/flags/${flagId}`, token, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getSuspiciousJobs(
+  token: string,
+  params: { min_score?: number; limit?: number } = {},
+): Promise<AdminSuspiciousJobsResponse> {
+  const base = getBrowserApiBaseUrl();
+  const search = new URLSearchParams();
+  if (params.min_score) search.set("min_score", String(params.min_score));
+  if (params.limit) search.set("limit", String(params.limit));
+  const suffix = search.toString() ? `?${search.toString()}` : "";
+  return authedJson(`${base}/api/v1/admin/moderation/suspicious-jobs${suffix}`, token);
+}
+
+export async function getSuspiciousEmployers(
+  token: string,
+  params: { min_score?: number; limit?: number } = {},
+): Promise<AdminSuspiciousEmployersResponse> {
+  const base = getBrowserApiBaseUrl();
+  const search = new URLSearchParams();
+  if (params.min_score) search.set("min_score", String(params.min_score));
+  if (params.limit) search.set("limit", String(params.limit));
+  const suffix = search.toString() ? `?${search.toString()}` : "";
+  return authedJson(
+    `${base}/api/v1/admin/moderation/suspicious-employers${suffix}`,
+    token,
+  );
+}
 
 export async function getAdminSkills(token: string, q?: string): Promise<AdminSkillsResponse> {
   const base = getBrowserApiBaseUrl();

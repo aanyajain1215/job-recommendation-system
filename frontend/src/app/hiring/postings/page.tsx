@@ -142,13 +142,15 @@ export default function PostingsPage() {
             Publish, close, clone or delete the roles you&apos;ve posted.
           </p>
         </div>
-        <Link
-          href="/jobs/new"
-          className="inline-flex items-center gap-2 rounded-xl bg-teal-500 px-4 py-2.5 text-sm font-semibold text-zinc-950 shadow-lg shadow-teal-500/25 hover:bg-teal-400 active:scale-[0.98] transition-all"
-        >
-          <PlusCircle className="h-4 w-4" />
-          Post a job
-        </Link>
+        {!isAdmin && (
+          <Link
+            href="/jobs/new"
+            className="inline-flex items-center gap-2 rounded-xl bg-teal-500 px-4 py-2.5 text-sm font-semibold text-zinc-950 shadow-lg shadow-teal-500/25 hover:bg-teal-400 active:scale-[0.98] transition-all"
+          >
+            <PlusCircle className="h-4 w-4" />
+            Post a job
+          </Link>
+        )}
       </div>
 
       {error && (

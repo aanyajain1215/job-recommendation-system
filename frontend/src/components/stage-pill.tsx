@@ -15,6 +15,7 @@ export const STAGES: {
   { key: "shortlisted", label: "Shortlisted", chip: "bg-teal-500/10 text-teal-300 ring-teal-500/30", bar: "bg-teal-400" },
   { key: "interview", label: "Interview", chip: "bg-amber-500/10 text-amber-300 ring-amber-500/30", bar: "bg-amber-400" },
   { key: "offer", label: "Offer", chip: "bg-emerald-500/10 text-emerald-300 ring-emerald-500/30", bar: "bg-emerald-400" },
+  { key: "hired", label: "Hired", chip: "bg-teal-500/15 text-teal-200 ring-teal-400/40", bar: "bg-teal-300" },
   { key: "rejected", label: "Rejected", chip: "bg-rose-500/10 text-rose-300 ring-rose-500/30", bar: "bg-rose-400" },
   { key: "saved", label: "Saved", chip: "bg-purple-500/10 text-purple-300 ring-purple-500/30", bar: "bg-purple-400" },
 ];

@@ -9,6 +9,7 @@ import { ApplicationItem, ApplicationStats, ApplicationStatus, ApplicationStatus
 import {
   AlertCircle,
   ArrowRight,
+  Award,
   CheckCircle,
   Clock,
   ExternalLink,
@@ -28,6 +29,7 @@ const PIPELINE_STATUSES: ApplicationStatus[] = [
   "interview",
   "rejected",
   "offer",
+  "hired",
 ];
 
 const STATUS_STYLES: Record<string, string> = {
@@ -37,6 +39,7 @@ const STATUS_STYLES: Record<string, string> = {
   interview: "bg-indigo-500/10 text-indigo-300 ring-indigo-500/30",
   rejected: "bg-rose-500/10 text-rose-300 ring-rose-500/30",
   offer: "bg-emerald-500/10 text-emerald-300 ring-emerald-500/30",
+  hired: "bg-teal-500/15 text-teal-200 ring-teal-400/40",
   saved: "bg-teal-500/10 text-teal-300 ring-teal-500/30",
 };
 
@@ -125,6 +128,7 @@ export default function TrackerPage() {
     { label: "Shortlisted", value: stats?.shortlisted ?? 0, icon: TrendingUp, color: "text-amber-400" },
     { label: "Interviews", value: stats?.interview ?? 0, icon: Eye, color: "text-indigo-400" },
     { label: "Offers", value: stats?.offer ?? 0, icon: CheckCircle, color: "text-emerald-400" },
+    { label: "Hired", value: stats?.hired ?? 0, icon: Award, color: "text-teal-300" },
     { label: "Rejected", value: stats?.rejected ?? 0, icon: XCircle, color: "text-rose-400" },
     { label: "Saved", value: stats?.saved ?? 0, icon: Clock, color: "text-teal-400" },
   ];

@@ -56,6 +56,7 @@ class ApplicationStatsOut(BaseModel):
     interview: int
     rejected: int
     offer: int
+    hired: int = 0
     saved: int = 0
     successful_skills: list[str] = []
     observation_note: str = ""
