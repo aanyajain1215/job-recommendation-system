@@ -69,8 +69,7 @@ export default function SettingsPage() {
           </div>
           <h1 className="mt-1 text-3xl font-bold tracking-tight text-zinc-100">Personalization Settings</h1>
           <p className="mt-1 text-sm text-zinc-400">
-            The model adapts the 8 scoring weights from your feedback — bounded, shrunk toward
-            defaults, and fully resettable (plan §16). Scores stay deterministic; only weights move.
+            Your feedback adjusts what matters most in your AI job recommendations. You can reset these priorities to default anytime.
           </p>
         </div>
         <button
@@ -102,16 +101,16 @@ export default function SettingsPage() {
             </div>
             <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-4">
               <p className="text-[11px] font-medium uppercase tracking-wider text-zinc-400">
-                Shrinkage toward defaults
+                Personalization strength
               </p>
               <p className="mt-1.5 text-2xl font-bold text-zinc-100">
                 {(prefs.shrinkage * 100).toFixed(0)}%
               </p>
-              <p className="mt-1 text-[11px] text-zinc-500">n / (n + 10), empirical-Bayes</p>
+              <p className="mt-1 text-[11px] text-zinc-500">Grows as you rate more jobs</p>
             </div>
             <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-4">
               <p className="text-[11px] font-medium uppercase tracking-wider text-zinc-400">
-                Skill leans
+                Skill preferences
               </p>
               <p className="mt-1.5 text-2xl font-bold text-zinc-100">{prefs.affinities.length}</p>
             </div>
@@ -129,9 +128,9 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between">
               <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-zinc-400">
                 <Sparkles className="h-4 w-4 text-teal-400" />
-                Learned scoring weights
+                Match priorities
               </h2>
-              <span className="text-[11px] text-zinc-500">▮ current · │ global default</span>
+              <span className="text-[11px] text-zinc-500">Current priority vs. standard default</span>
             </div>
             <div className="mt-5 space-y-4">
               {prefs.weights.map((w) => (
@@ -165,7 +164,7 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* Recent learned changes */}
+          {/* Recent preference updates */}
           <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
             <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/40 p-6">
               <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-zinc-400">
@@ -174,7 +173,7 @@ export default function SettingsPage() {
               </h2>
               {prefs.history.length === 0 ? (
                 <p className="mt-4 text-xs text-zinc-500">
-                  No weight movement yet — give feedback on a recommendation to start learning.
+                  No updates yet. Rate recommended jobs to tailor your matches.
                 </p>
               ) : (
                 <ul className="mt-4 space-y-2.5">
@@ -201,12 +200,11 @@ export default function SettingsPage() {
             <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/40 p-6">
               <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-zinc-400">
                 <Sparkles className="h-4 w-4 text-teal-400" />
-                Skill leans (30-day half-life)
+                Skill preferences
               </h2>
               {prefs.affinities.length === 0 ? (
                 <p className="mt-4 text-xs text-zinc-500">
-                  No skill leans yet — feedback like &quot;too difficult&quot; or &quot;relevant&quot;
-                  leans the skills a job requires. Leans never hide a skill completely.
+                  No skill preferences yet. Rating recommended jobs helps prioritize the skills you want to see.
                 </p>
               ) : (
                 <div className="mt-4 flex flex-wrap gap-2">
@@ -218,7 +216,7 @@ export default function SettingsPage() {
                           ? "bg-emerald-500/10 text-emerald-300 ring-emerald-500/30"
                           : "bg-rose-500/10 text-rose-300 ring-rose-500/30"
                       }`}
-                      title={`Affinity ${a.score.toFixed(3)} — credit scaled by max(0, 1 + affinity·0.3)`}
+                      title="Preference score based on your feedback"
                     >
                       {a.skill}
                       <span className="font-mono text-[10px] opacity-80">
@@ -233,10 +231,7 @@ export default function SettingsPage() {
           </div>
 
           <div className="mt-6 rounded-xl border border-zinc-800/60 bg-zinc-950/40 p-4 text-[11px] leading-relaxed text-zinc-500">
-            How it works: each feedback event applies one bounded multiplicative step (η=0.15)
-            toward or away from that job&apos;s component profile, clamped to [0.5×, 2.0×] of the
-            global weights and renormalized to Σ=1. With few events, weights shrink toward the
-            defaults (n/(n+10)) so new users aren&apos;t over-fit. The LLM never assigns scores.
+            How it works: Whenever you share feedback on a recommended job, JobRec gradually adjusts these priorities toward the roles you prefer. With only a few ratings, matches stay close to balanced defaults.
           </div>
 
           <div className="mt-6 flex justify-center">

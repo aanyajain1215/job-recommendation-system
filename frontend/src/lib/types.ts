@@ -252,6 +252,7 @@ export interface ExplanationContract {
 }
 
 export interface RecommendationItem {
+  recommendation_id?: string | null;
   job: JobDetail;
   match_score: number;
   skill_match_score: number;
@@ -699,6 +700,7 @@ export interface FeedbackPayload {
   job_id: string;
   reason: FeedbackReason;
   note?: string;
+  recommendation_id?: string | null;
 }
 
 export interface FeedbackResponse {
@@ -1031,4 +1033,20 @@ export interface OnboardingCompleteResponse {
   weights: { component: string; label: string; weight: number }[];
   target_family: string | null;
   message: string;
+}
+
+export interface ApplicationStatusHistoryItem {
+  id: string;
+  application_id: string;
+  previous_status: ApplicationStatus | null;
+  new_status: ApplicationStatus;
+  changed_by_user_id: string | null;
+  reason: string | null;
+  changed_at: string;
+}
+
+export interface RecommendationEventPayload {
+  recommendation_id: string;
+  event_type: 'generated' | 'served' | 'impression' | 'clicked' | 'dismissed' | 'saved' | 'applied';
+  rank?: number;
 }

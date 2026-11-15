@@ -1,4 +1,4 @@
-from app.models.application import Application
+from app.models.application import Application, ApplicationStatusHistory
 from app.models.career_path import CareerPath, CareerPathStep, LearningResource
 from app.models.company import Company
 from app.models.enums import (
@@ -11,6 +11,7 @@ from app.models.enums import (
     PathStatus,
     PathStepKind,
     ProficiencyLevel,
+    RecommendationEventType,
     SkillEdgeType,
     SkillSource,
     UserRole,
@@ -30,7 +31,7 @@ from app.models.profile_entities import (
     Project,
     Resume,
 )
-from app.models.recommendation import Recommendation, SkillGap
+from app.models.recommendation import Recommendation, RecommendationEvent, SkillGap
 from app.models.simulation import Simulation
 from app.models.skill import JobSkill, ProfileSkill, Skill
 from app.models.skill_graph import SkillAlias, SkillEdge
@@ -39,6 +40,7 @@ from app.models.user import User
 __all__ = [
     "Application",
     "ApplicationStatus",
+    "ApplicationStatusHistory",
     "CareerPath",
     "CareerPathStep",
     "Certification",
@@ -65,6 +67,8 @@ __all__ = [
     "ProfileSkill",
     "Project",
     "Recommendation",
+    "RecommendationEvent",
+    "RecommendationEventType",
     "Resume",
     "Simulation",
     "Skill",

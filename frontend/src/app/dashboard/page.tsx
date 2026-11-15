@@ -133,7 +133,7 @@ export default function DashboardPage() {
           <p className="mt-1.5 text-sm text-zinc-400">
             {user.role === "employer"
               ? "Manage your active job postings and candidate pipelines."
-              : "Track your profile completeness, tagged skills, and recommendations."}
+              : "Track your profile progress, skills, and recommended jobs."}
           </p>
         </div>
 
@@ -265,7 +265,7 @@ export default function DashboardPage() {
                 <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-5">
                   <div className="flex items-center justify-between text-zinc-400">
                     <span className="text-xs font-medium uppercase tracking-wider">Applied</span>
-                    <Clock className="h-4 w-4 text-cyan-400" />
+                    <Clock className="h-4 w-4 text-cyan-600" />
                   </div>
                   <p className="mt-3 text-2xl font-bold text-zinc-100">
                     {appStats?.total_applied ?? 0}
@@ -332,7 +332,7 @@ export default function DashboardPage() {
                               className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${
                                 item.match_score >= 70
                                   ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
-                                  : "bg-cyan-500/10 text-cyan-400 border border-cyan-500/30"
+                                  : "bg-cyan-500/10 text-cyan-600 border border-cyan-500/30"
                               }`}
                             >
                               <Zap className="h-3 w-3 fill-current" />
@@ -504,37 +504,46 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Right Column: Platform Telemetry & Quick Links */}
+        {/* Right Column: Account Overview & Quick Links */}
         <div className="space-y-6">
           <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-6">
             <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-zinc-400">
               <ShieldCheck className="h-4 w-4 text-teal-400" />
-              Environment & System
+              Account Overview
             </h3>
 
             <div className="mt-4 space-y-3 text-xs">
               <div className="flex justify-between py-1.5 border-b border-zinc-800/60">
-                <span className="text-zinc-400">Role</span>
-                <span className="font-mono text-zinc-200">{user.role}</span>
-              </div>
-              <div className="flex justify-between py-1.5 border-b border-zinc-800/60">
-                <span className="text-zinc-400">Ranking Strategy</span>
-                <span className="font-mono text-teal-300">ltr_blend (M2, auto-fallback)</span>
-              </div>
-              <div className="flex justify-between py-1.5 border-b border-zinc-800/60">
-                <span className="text-zinc-400">Exploration</span>
-                <span className="font-mono text-zinc-200">deterministic 1-in-6 + bandit policy (configurable)</span>
-              </div>
-              <div className="flex justify-between py-1.5 border-b border-zinc-800/60">
-                <span className="text-zinc-400">Retrieval</span>
-                <span className="font-mono text-zinc-200">pgvector + FTS + RRF</span>
-              </div>
-              <div className="flex justify-between py-1.5">
-                <span className="text-zinc-400">User ID</span>
-                <span className="font-mono text-zinc-500 truncate max-w-[120px]">
-                  {user.id}
+                <span className="text-zinc-400">Account Type</span>
+                <span className="font-medium text-zinc-200">
+                  {user.role === "employer" ? "Employer" : user.role === "admin" ? "Admin" : "Job Seeker"}
                 </span>
               </div>
+              <div className="flex justify-between py-1.5 border-b border-zinc-800/60">
+                <span className="text-zinc-400">Email</span>
+                <span className="text-zinc-200 truncate max-w-[160px]">{user.email}</span>
+              </div>
+              {user.role === "job_seeker" ? (
+                <>
+                  <div className="flex justify-between py-1.5 border-b border-zinc-800/60">
+                    <span className="text-zinc-400">Resume</span>
+                    <span className={profile?.resume_url ? "text-teal-400 font-medium" : "text-zinc-400"}>
+                      {profile?.resume_url ? "On file" : "Not uploaded"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-1.5">
+                    <span className="text-zinc-400">Skills Listed</span>
+                    <span className="font-medium text-zinc-200">
+                      {profile?.skills?.length ?? 0} skills
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <div className="flex justify-between py-1.5">
+                  <span className="text-zinc-400">Active Postings</span>
+                  <span className="font-medium text-zinc-200">{employerJobs.length}</span>
+                </div>
+              )}
             </div>
           </div>
 

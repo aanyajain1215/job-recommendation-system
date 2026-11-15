@@ -47,6 +47,16 @@ class ApplicationStatus(str, Enum):
     SAVED = "saved"
 
 
+class RecommendationEventType(str, Enum):
+    GENERATED = "generated"
+    SERVED = "served"
+    IMPRESSION = "impression"
+    CLICKED = "clicked"
+    DISMISSED = "dismissed"
+    SAVED = "saved"
+    APPLIED = "applied"
+
+
 class InteractionType(str, Enum):
     VIEW = "view"
     SAVE = "save"

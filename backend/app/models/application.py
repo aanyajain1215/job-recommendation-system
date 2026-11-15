@@ -1,9 +1,19 @@
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, Enum as SQLEnum, ForeignKey, String, Text, UniqueConstraint, func
-from sqlalchemy.dialects.postgresql import UUID as PGUUID
+from sqlalchemy import (
+    DateTime,
+    Enum as SQLEnum,
+    ForeignKey,
+    ForeignKeyConstraint,
+    Index,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
+from sqlalchemy.dialects.postgresql import JSONB, UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
@@ -19,6 +29,12 @@ class Application(Base):
     __tablename__ = "applications"
     __table_args__ = (
         UniqueConstraint("job_id", "user_id", name="uq_application_job_user"),
+        ForeignKeyConstraint(
+            ["profile_id", "user_id"],
+            ["profiles.id", "profiles.user_id"],
+            name="fk_applications_profile_user",
+            ondelete="CASCADE",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(
@@ -79,5 +95,68 @@ class Application(Base):
 
     # Relationships
     job: Mapped["Job"] = relationship("Job", back_populates="applications")
-    user: Mapped["User"] = relationship("User", back_populates="applications")
-    profile: Mapped["Profile"] = relationship("Profile", back_populates="applications")
+    user: Mapped["User"] = relationship("User", back_populates="applications", foreign_keys=[user_id])
+    profile: Mapped["Profile"] = relationship(
+        "Profile",
+        back_populates="applications",
+        foreign_keys=[profile_id, user_id],
+        overlaps="user",
+    )
+    status_history: Mapped[list["ApplicationStatusHistory"]] = relationship(
+        "ApplicationStatusHistory",
+        back_populates="application",
+        cascade="all, delete-orphan",
+        order_by="ApplicationStatusHistory.changed_at.asc()",
+    )
+
+
+class ApplicationStatusHistory(Base):
+    """Auditable log of candidate application status transitions (plan §3, Phase 2.3)."""
+
+    __tablename__ = "application_status_history"
+    __table_args__ = (
+        Index("ix_app_status_history_app_changed", "application_id", "changed_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+    )
+    application_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("applications.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    previous_status: Mapped[ApplicationStatus | None] = mapped_column(
+        SQLEnum(ApplicationStatus, name="application_status", native_enum=True),
+        nullable=True,
+    )
+    new_status: Mapped[ApplicationStatus] = mapped_column(
+        SQLEnum(ApplicationStatus, name="application_status", native_enum=True),
+        nullable=False,
+    )
+    changed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+    changed_by_user_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    reason: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+    metadata_: Mapped[dict[str, Any] | None] = mapped_column(
+        "metadata",
+        JSONB,
+        nullable=True,
+    )
+
+    # Relationships
+    application: Mapped["Application"] = relationship("Application", back_populates="status_history")
+    changed_by: Mapped["User | None"] = relationship("User")

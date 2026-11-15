@@ -75,7 +75,7 @@ export default function RegisterPage() {
             Create your account
           </h2>
           <p className="mt-1.5 text-sm text-zinc-400">
-            Join the next-generation AI recommendation platform
+            Create your account to find roles matched to your skills
           </p>
         </div>
 
@@ -112,7 +112,7 @@ export default function RegisterPage() {
               </div>
               <p className="mt-3 font-semibold text-sm text-zinc-100">Job Seeker</p>
               <p className="mt-0.5 text-xs text-zinc-400">
-                Discover AI-matched roles and track applications
+                Explore AI-matched roles and track every application
               </p>
             </button>
 
@@ -137,7 +137,7 @@ export default function RegisterPage() {
               </div>
               <p className="mt-3 font-semibold text-sm text-zinc-100">Employer</p>
               <p className="mt-0.5 text-xs text-zinc-400">
-                Post positions and get ranked candidate recommendations
+                Post open roles and review matched applicants
               </p>
             </button>
           </div>

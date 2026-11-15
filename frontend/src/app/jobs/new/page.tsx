@@ -301,7 +301,7 @@ export default function NewJobPage() {
                 Required Skills & Weights
               </h2>
               <p className="mt-1 text-xs text-zinc-400">
-                Skills tagged here drive the LightGBM re-ranking algorithm scoring.
+                Skills tagged here help match and rank qualified candidates.
               </p>
             </div>
             <span className="text-xs text-indigo-400 font-medium">

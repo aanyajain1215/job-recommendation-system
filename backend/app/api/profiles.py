@@ -127,6 +127,10 @@ def _run_resume_parse(
         if result.work_experience:
             profile.work_experience = [w.model_dump(exclude_none=True) for w in result.work_experience]
 
+        # Authoritative structured sync (Phase 1.2)
+        from app.services.profile_sync import sync_jsonb_to_structured
+        sync_jsonb_to_structured(db, profile)
+
         profile.parsed_resume_data = {
             "parser_used": result.parser_used,
             "skills_extracted": len(result.skills),
@@ -321,6 +325,9 @@ def update_my_profile(
         profile.education = [e.model_dump() for e in payload.education]
     if payload.work_experience is not None:
         profile.work_experience = [w.model_dump() for w in payload.work_experience]
+    if payload.education is not None or payload.work_experience is not None:
+        from app.services.profile_sync import sync_jsonb_to_structured
+        sync_jsonb_to_structured(db, profile)
 
     # ---- additive Phase 1: preferences (None = leave unchanged; "" clears) ----
     if payload.expected_salary_min is not None:

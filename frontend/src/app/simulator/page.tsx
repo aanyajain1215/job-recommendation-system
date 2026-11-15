@@ -200,9 +200,7 @@ export default function SimulatorPage() {
             Try a change before you make it
           </h1>
           <p className="mt-2 text-sm text-zinc-400 max-w-2xl">
-            Add a skill, raise your salary expectation, or switch to remote — the
-            simulator re-scores a shadow copy of your profile against live candidates.
-            Your real profile is never modified.
+            Add a skill, adjust your salary target, or switch to remote work to preview how your job matches would change without altering your saved profile.
           </p>
         </div>
       </div>
@@ -213,7 +211,7 @@ export default function SimulatorPage() {
           <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
-                <Plus className="h-4 w-4 text-teal-400" /> Your mutation
+                <Plus className="h-4 w-4 text-teal-400" /> Test Changes
               </h2>
               <button
                 onClick={handleReset}
@@ -455,11 +453,9 @@ export default function SimulatorPage() {
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-zinc-900 border border-zinc-800 mb-4">
                 <Sparkles className="h-7 w-7 text-teal-400" />
               </div>
-              <h3 className="text-lg font-semibold text-zinc-200">Counterfactuals appear here</h3>
+              <h3 className="text-lg font-semibold text-zinc-200">Preview results appear here</h3>
               <p className="mt-2 text-sm text-zinc-500 max-w-md">
-                Build a mutation on the left and run it — you&apos;ll see exactly how each
-                candidate job&apos;s score and readiness band would shift, plus which
-                skills move the needle most for your target role.
+                Choose a change on the left and run a simulation to see how your job match scores and readiness would shift.
               </p>
               <Link
                 href="/careers"
@@ -474,7 +470,7 @@ export default function SimulatorPage() {
                 <Zap className="h-4 w-4 text-teal-400 fill-current" />
                 Simulation results
                 <span className="ml-auto text-xs font-medium text-zinc-500">
-                  profile unchanged — shadow re-score only
+                  Preview only — your saved profile is unchanged
                 </span>
               </div>
               <DeltaTable result={result} />

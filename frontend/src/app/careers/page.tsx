@@ -57,9 +57,9 @@ function AffinityCard({
       </div>
       <div className="flex justify-between text-[10px] text-zinc-600 mb-3">
         <span>
-          overlap {entry.overlap} · semantic {entry.semantic}
+          Skill match {entry.overlap} · Profile fit {entry.semantic}
         </span>
-        {threshold !== undefined && <span>τ = {threshold}</span>}
+        {threshold !== undefined && <span>Target {threshold}</span>}
       </div>
 
       {/* Evidence explanation (§11 contract) */}
@@ -172,19 +172,15 @@ export default function CareersPage() {
             Where else your skills take you
           </h1>
           <p className="mt-2 text-sm text-zinc-400 max-w-2xl">
-            Families ranked by a deterministic blend of skill overlap and embedding
-            similarity. Everything below τ is hidden — nothing is padded.
+            Career paths ranked by how closely they align with your current skills and background. Only relevant paths are shown.
           </p>
           <div className="mt-4 flex flex-wrap gap-2 text-xs">
             <span className="rounded-full border border-zinc-700 bg-zinc-900 px-3 py-1 font-semibold text-zinc-300">
-              Threshold τ = {data.threshold}
-            </span>
-            <span className="rounded-full border border-zinc-700 bg-zinc-900 px-3 py-1 font-semibold text-zinc-300">
-              {data.explored} families explored
+              {data.explored} career paths checked
             </span>
             {data.target_family && (
               <span className="rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1 font-semibold text-violet-300">
-                current: {data.target_family}
+                Current target: {data.target_family}
               </span>
             )}
           </div>
@@ -196,18 +192,16 @@ export default function CareersPage() {
         <section>
           <div className="flex items-center gap-2 mb-4">
             <Sparkles className="h-4 w-4 text-teal-400" />
-            <h2 className="text-lg font-bold text-zinc-100">Above your threshold</h2>
+            <h2 className="text-lg font-bold text-zinc-100">Recommended Paths</h2>
           </div>
           {data.suggestions.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-zinc-800 bg-zinc-900/30 p-10 text-center">
               <Target className="h-10 w-10 text-zinc-600 mx-auto mb-3" />
               <h3 className="text-base font-semibold text-zinc-200">
-                No family clears τ = {data.threshold} yet
+                No close career matches yet
               </h3>
               <p className="mt-2 text-sm text-zinc-500 max-w-md mx-auto">
-                Your current skills are concentrated in one direction. Add a few more
-                skills or projects to your profile — or start from the curated
-                directions below, rendered with the exact same math.
+                Your skills are currently focused in one area. Add more skills or projects to your profile, or explore the starting paths below.
               </p>
             </div>
           ) : (
@@ -224,7 +218,7 @@ export default function CareersPage() {
           <div className="flex items-center gap-2 mb-4">
             <Shuffle className="h-4 w-4 text-violet-400" />
             <h2 className="text-lg font-bold text-zinc-100">Curated starting points</h2>
-            <span className="text-xs text-zinc-600">· same scoring, never threshold-filtered</span>
+            <span className="text-xs text-zinc-600">· popular career directions to explore</span>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {data.presets.map((entry) => (
@@ -238,8 +232,7 @@ export default function CareersPage() {
           <div>
             <h3 className="text-sm font-bold text-zinc-100">See what a switch would cost</h3>
             <p className="mt-1 text-xs text-zinc-400 max-w-lg">
-              The What-If simulator re-scores your profile against every candidate job
-              under any mutation — skills, salary, location, or work mode.
+              Use the What-If simulator to see how adding skills or changing salary, location, or work mode affects your job matches.
             </p>
           </div>
           <Link

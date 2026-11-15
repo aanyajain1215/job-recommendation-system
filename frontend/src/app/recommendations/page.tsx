@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { getRecommendations, submitFeedback } from "@/lib/api";
+import { getRecommendations, submitFeedback, recordRecommendationEvent } from "@/lib/api";
 import { formatSalary } from "@/lib/format";
 import {
   FeedbackReason,
@@ -21,7 +21,6 @@ import {
   DollarSign,
   ExternalLink,
   GraduationCap,
-  Layers,
   MapPin,
   RefreshCw,
   Route,
@@ -64,6 +63,14 @@ export default function RecommendationsPage() {
     try {
       setError(null);
       const data = await getRecommendations(token, 30);
+      data.items.forEach((it, idx) => {
+        if (it.recommendation_id) {
+          recordRecommendationEvent(
+            { recommendation_id: it.recommendation_id, event_type: "impression", rank: idx + 1 },
+            token,
+          ).catch(() => {});
+        }
+      });
       setFeed(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load recommendations");
@@ -88,11 +95,11 @@ export default function RecommendationsPage() {
     fetchFeed();
   };
 
-  const handleFeedback = async (jobId: string, reason: FeedbackReason) => {
+  const handleFeedback = async (jobId: string, reason: FeedbackReason, recommendationId?: string | null) => {
     if (!token) return;
     setSendingFeedbackId(jobId);
     try {
-      const resp = await submitFeedback({ job_id: jobId, reason }, token);
+      const resp = await submitFeedback({ job_id: jobId, reason, recommendation_id: recommendationId ?? undefined }, token);
       setFeedbackNotes((prev) => ({
         ...prev,
         [jobId]:
@@ -139,7 +146,7 @@ export default function RecommendationsPage() {
     }
     if (score >= 40) {
       return {
-        badge: "bg-cyan-500/10 text-cyan-400 border-cyan-500/30",
+        badge: "bg-cyan-500/10 text-cyan-600 border-cyan-500/30",
         ring: "border-cyan-500/20 hover:border-cyan-500/40",
         bar: "bg-cyan-400",
         label: "Moderate Fit",
@@ -162,14 +169,13 @@ export default function RecommendationsPage() {
           <div>
             <div className="inline-flex items-center gap-2 rounded-full bg-teal-500/10 px-3 py-1 text-xs font-semibold text-teal-300 ring-1 ring-inset ring-teal-500/30 mb-3">
               <Sparkles className="h-3.5 w-3.5 animate-pulse" />
-              Content-Based Hybrid Engine
+              Personalized For You
             </div>
             <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-zinc-100">
               AI Job Recommendations
             </h1>
             <p className="mt-2 text-zinc-400 max-w-2xl text-sm sm:text-base">
-              Personalized matches computed from your skills, proficiency levels, and headline
-              using TF-IDF cosine similarity and skill-gap diagnostics.
+              Personalized AI matches ranked by how closely each role aligns with your skills, experience, and preferences.
             </p>
           </div>
 
@@ -180,14 +186,14 @@ export default function RecommendationsPage() {
               className="inline-flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900/90 px-4 py-2.5 text-sm font-medium text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 transition-all shadow-sm"
             >
               <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin text-teal-400" : ""}`} />
-              Re-score Feed
+              Refresh Matches
             </button>
             <Link
               href="/profile"
               className="inline-flex items-center gap-2 rounded-xl bg-teal-500 px-4 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-teal-400 transition-all shadow-lg shadow-teal-500/20"
             >
               <UserCheck className="h-4 w-4" />
-              Tune Profile Skills
+              Update Skills
             </Link>
           </div>
         </div>
@@ -215,29 +221,9 @@ export default function RecommendationsPage() {
                 {feed.recommendation_type === "cold_start" && (
                   <p className="mt-2 text-xs text-amber-400 flex items-center gap-1.5">
                     <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
-                    Cold-start mode active: Add skills to your profile to get high-accuracy tailored recommendations!
+                    Add a few skills to your profile to unlock stronger, more tailored AI matches.
                   </p>
                 )}
-
-                {/* Phase 3: honest strategy/model provenance for this feed */}
-                <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
-                  <span
-                    className="inline-flex items-center gap-1.5 rounded-full border border-zinc-700 bg-zinc-800/80 px-2.5 py-0.5 font-semibold text-zinc-300"
-                    title="Ranking strategy used to score this feed"
-                  >
-                    <Layers className="h-3 w-3 text-teal-400" />
-                    Strategy: {feed.strategy ?? feed.recommendation_strategy}
-                  </span>
-                  {feed.model_version && (
-                    <span
-                      className="inline-flex items-center gap-1.5 rounded-full border border-teal-500/30 bg-teal-500/10 px-2.5 py-0.5 font-semibold text-teal-300"
-                      title="Learned model version used for re-ranking"
-                    >
-                      <Zap className="h-3 w-3" />
-                      Model: {feed.model_version}
-                    </span>
-                  )}
-                </div>
                 {feed.personalization_note && (
                   <p className="mt-2 text-xs text-teal-300/90 flex items-start gap-1.5">
                     <Compass className="h-3.5 w-3.5 flex-shrink-0 mt-px" />
@@ -369,28 +355,16 @@ export default function RecommendationsPage() {
                           </span>
                         )}
 
-                        {/* Phase 3: per-item rerank strategy / model version */}
-                        {(item.model_version ||
-                          (item.strategy ?? "deterministic") !== "deterministic") && (
-                          <span
-                            className="rounded-full border border-indigo-500/30 bg-indigo-500/10 px-2.5 py-0.5 text-xs font-semibold text-indigo-300"
-                            title="Ranking strategy and model behind this item's score"
-                          >
-                            {[item.strategy, item.model_version].filter(Boolean).join(" · ")}
-                          </span>
-                        )}
-
                         {item.job.is_remote && (
                           <span className="rounded-full bg-teal-500/10 px-2.5 py-0.5 text-xs font-medium text-teal-400 border border-teal-500/20">
                             Remote
                           </span>
                         )}
 
-                        {/* Phase 4 §14: "Powered by: <project> — <band>" */}
                         {item.job.project_relevance && (
                           <span
                             className="inline-flex items-center gap-1 rounded-full border border-violet-500/30 bg-violet-500/10 px-2.5 py-0.5 text-xs font-semibold text-violet-300"
-                            title="One of your projects powers this job's career family (plan §14)"
+                            title="Matches skills demonstrated in one of your projects"
                           >
                             <Wrench className="h-3 w-3" />
                             {item.job.project_relevance}
@@ -412,6 +386,14 @@ export default function RecommendationsPage() {
                       ) : (
                         <Link
                           href={`/jobs/${item.job.id}`}
+                          onClick={() => {
+                            if (item.recommendation_id && token) {
+                              recordRecommendationEvent(
+                                { recommendation_id: item.recommendation_id, event_type: "clicked", rank: index + 1 },
+                                token,
+                              ).catch(() => {});
+                            }
+                          }}
                           className="text-xl font-bold text-zinc-100 group-hover:text-teal-400 transition-colors inline-block"
                         >
                           {item.job.title}
@@ -553,14 +535,14 @@ export default function RecommendationsPage() {
                             {feedbackMenu === item.job.id && (
                               <div className="absolute right-0 bottom-full z-30 mb-1 w-48 rounded-xl border border-zinc-700 bg-zinc-900 p-1 shadow-2xl shadow-black/50">
                                 <p className="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-                                  Why? (trains your model)
+                                  Help us improve your matches
                                 </p>
                                 {FEEDBACK_REASONS.map((reason) => (
                                   <button
                                     key={reason.value}
                                     type="button"
                                     onClick={() =>
-                                      handleFeedback(item.job.id, reason.value)
+                                      handleFeedback(item.job.id, reason.value, item.recommendation_id)
                                     }
                                     className="block w-full rounded-lg px-2.5 py-1.5 text-left text-xs text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 transition-colors"
                                   >
@@ -593,6 +575,14 @@ export default function RecommendationsPage() {
                       ) : (
                         <Link
                           href={`/jobs/${item.job.id}`}
+                          onClick={() => {
+                            if (item.recommendation_id && token) {
+                              recordRecommendationEvent(
+                                { recommendation_id: item.recommendation_id, event_type: "clicked", rank: index + 1 },
+                                token,
+                              ).catch(() => {});
+                            }
+                          }}
                           className="inline-flex items-center gap-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-zinc-950 font-semibold px-4 py-2.5 text-sm transition-all shadow-md shadow-teal-500/20"
                         >
                           View & Apply

@@ -131,7 +131,7 @@ def seed_aliases(db, skills_by_lower: dict[str, Skill]) -> int:
             if not alias_key:
                 continue
             existing = db.scalar(
-                select(SkillAlias).where(func.lower(SkillAlias.alias) == alias_key)
+                select(SkillAlias).where(SkillAlias.normalized_alias == alias_key)
             )
             if existing is None:
                 db.add(

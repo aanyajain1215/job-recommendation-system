@@ -22,8 +22,8 @@ from dataclasses import asdict, dataclass
 from typing import Any, Iterable
 
 DISCLAIMER = (
-    "We will never add a skill you haven't demonstrated. Rewrites cite your "
-    "original text; skills outside your evidence are removed automatically."
+    "We will never add a skill you haven't demonstrated. Suggestions are based "
+    "strictly on the experience already in your resume."
 )
 
 SECTION_PATTERNS: dict[str, re.Pattern[str]] = {

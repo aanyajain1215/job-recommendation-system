@@ -200,7 +200,7 @@ export default function OnboardingPage() {
               href="/settings"
               className="text-xs font-semibold text-teal-400 hover:text-teal-300"
             >
-              Review weights in Settings
+              Review preferences in Settings
             </Link>
           </div>
         </div>
@@ -217,14 +217,13 @@ export default function OnboardingPage() {
       <div className="border-b border-zinc-800/80 pb-6 text-center">
         <div className="inline-flex items-center gap-2 rounded-full bg-teal-500/10 px-3 py-1 text-xs font-semibold text-teal-300 ring-1 ring-inset ring-teal-500/30">
           <Sparkles className="h-3.5 w-3.5" />
-          Adaptive setup · plan §6 M5
+          Quick Setup
         </div>
         <h1 className="mt-3 text-3xl font-bold tracking-tight text-zinc-100">
           What do you look for in a job?
         </h1>
         <p className="mx-auto mt-2 max-w-2xl text-sm text-zinc-400">
-          Answer a few quick picks — the next question adapts to your last answer, and your
-          weights update live. You can skip anytime.
+          Answer a few quick questions to tailor your AI job matches. You can skip anytime.
         </p>
       </div>
 
@@ -240,11 +239,11 @@ export default function OnboardingPage() {
           <div className="mb-1 flex justify-between text-xs text-zinc-500">
             <span>
               {step === "family"
-                ? "Almost done — pick a target family"
+                ? "Almost done — pick a target career area"
                 : `Question ${answers.length + 1}`}
             </span>
             <span>
-              {answers.length} answered · {flow?.min_questions ?? 3} to set weights
+              {answers.length} answered · {flow?.min_questions ?? 3} to personalize matches
             </span>
           </div>
           <div className="h-2 rounded-full bg-zinc-800">
@@ -272,7 +271,7 @@ export default function OnboardingPage() {
             <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/40 p-6">
               <label className="flex items-center gap-2 text-sm font-semibold text-zinc-300">
                 <Target className="h-4 w-4 text-teal-400" />
-                Target career family (optional)
+                Target career area (optional)
               </label>
               <select
                 value={family}
@@ -287,7 +286,7 @@ export default function OnboardingPage() {
                 ))}
               </select>
               <p className="mt-3 text-xs text-zinc-500">
-                This powers the career-interest match from your very first feed.
+                Helps tailor your job feed from the start.
               </p>
             </div>
           ) : q ? (

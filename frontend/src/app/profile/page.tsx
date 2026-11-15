@@ -234,9 +234,7 @@ export default function ProfilePage() {
           setMessage({
             type: "error",
             text:
-              "Resume is taking longer than usual — it keeps parsing in the background;" +
-              " press Auto-fill again in a moment to pick up the result." +
-              " If it never finishes, run `docker compose logs backend` to see why.",
+              "Your resume is still being processed. Wait a moment and click Auto-fill again, or try re-uploading the file if it does not finish.",
           });
           return;
         }
@@ -245,12 +243,10 @@ export default function ProfilePage() {
       }
       setProfile(data);
       applyAutofill(data);
-      const parser = data.parsed_resume_data?.parser_used;
       setMessage({
         type: "success",
         text:
-          `Auto-filled from your resume${typeof parser === "string" ? ` (parser: ${parser})` : ""} —` +
-          " review the fields below and press “Save Profile” to keep them.",
+          "Auto-filled from your resume. Review the details below and click “Save Profile” to keep your changes.",
       });
     } catch (err) {
       if (err instanceof Error) setMessage({ type: "error", text: err.message });
@@ -368,7 +364,7 @@ export default function ProfilePage() {
             Profile Builder & Resume
           </h1>
           <p className="mt-1 text-sm text-zinc-400">
-            Define your skills, background, and upload your resume to sharpen AI recommendations.
+            Add your skills, experience, and resume to improve your AI job matches.
           </p>
         </div>
 
@@ -407,8 +403,7 @@ export default function ProfilePage() {
             Resume Document
           </h2>
           <p className="mt-1 text-xs text-zinc-400">
-            Upload PDF, DOCX, or TXT (up to 10MB). The AI parses it and auto-fills the form below —
-            review everything, edit freely, then press Save Profile.
+            Upload a PDF, DOCX, or TXT resume (up to 10MB) to auto-fill your details below with AI. Review everything and click Save Profile when ready.
           </p>
 
           <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl border border-dashed border-zinc-700 bg-zinc-950/40 p-5">
@@ -419,9 +414,8 @@ export default function ProfilePage() {
                   Resume active on profile
                   {latestResume && (
                     <span className="rounded-full border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-[11px] font-normal text-zinc-400">
-                      {latestResume.parse_status === "parsing" && "AI parsing…"}
-                      {latestResume.parse_status === "parsed" &&
-                        `Parsed${latestResume.parser_used ? ` · ${latestResume.parser_used}` : ""}`}
+                      {latestResume.parse_status === "parsing" && "Processing…"}
+                      {latestResume.parse_status === "parsed" && "Ready"}
                       {latestResume.parse_status === "failed" && "Parse failed"}
                     </span>
                   )}
@@ -583,7 +577,7 @@ export default function ProfilePage() {
               rows={3}
               value={bio}
               onChange={(e) => setBio(e.target.value)}
-              placeholder="Tell employers and the recommendation engine about your background and goals..."
+              placeholder="Share a brief summary of your background and what you are looking for..."
               className="mt-1.5 block w-full rounded-lg border border-zinc-800 bg-zinc-950/70 py-2 px-3 text-sm text-zinc-100 placeholder-zinc-500 focus:border-teal-500 focus:outline-none"
             />
           </div>
@@ -595,7 +589,7 @@ export default function ProfilePage() {
             <div>
               <h2 className="text-lg font-semibold text-zinc-100">Skills & Proficiencies</h2>
               <p className="mt-1 text-xs text-zinc-400">
-                Directly matches against employer job requirements in the recommendation system.
+                Used to match your profile with relevant job openings.
               </p>
             </div>
             <span className="text-xs font-medium text-teal-400">

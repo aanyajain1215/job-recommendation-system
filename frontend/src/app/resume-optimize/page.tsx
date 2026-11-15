@@ -76,14 +76,13 @@ export default function ResumeOptimizePage() {
       <div className="border-b border-zinc-800/80 pb-6">
         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-teal-400">
           <FileSearch className="h-4 w-4" />
-          Resume Optimizer · plan §13
+          AI Resume Check
         </div>
         <h1 className="mt-1 text-3xl font-bold tracking-tight text-zinc-100">
-          ATS Report & Grounded Suggestions
+          ATS Compatibility & Bullet Suggestions
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-zinc-400">
-          Two layers: deterministic ATS checks against the job&apos;s requirements, then optional
-          LLM bullet rewrites — validated so a skill outside your evidence is never suggested.
+          Check how well your resume matches this job&apos;s requirements and get AI bullet-point suggestions based strictly on your actual experience.
         </p>
       </div>
 
@@ -141,11 +140,7 @@ export default function ResumeOptimizePage() {
               <p className="font-semibold text-teal-400">{result.disclaimer}</p>
               <p className="mt-1 text-teal-300/80">
                 Analyzing: <span className="text-zinc-100">{result.job_title}</span>
-                {result.violations_dropped > 0 && (
-                  <span className="ml-2 text-amber-300">
-                    · {result.violations_dropped} suggestion(s) dropped by the evidence validator
-                  </span>
-                )}
+
               </p>
             </div>
           </div>
@@ -188,7 +183,7 @@ export default function ResumeOptimizePage() {
                     Missing keywords
                   </p>
                   {result.ats.missing_keywords.length === 0 ? (
-                    <p className="mt-2 text-xs text-zinc-500">None — full keyword coverage.</p>
+                    <p className="mt-2 text-xs text-zinc-500">None — all key skills covered.</p>
                   ) : (
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {result.ats.missing_keywords.map((k) => (
@@ -204,10 +199,10 @@ export default function ResumeOptimizePage() {
                 </div>
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-rose-400">
-                    Weak evidence (list-only)
+                    Needs experience context
                   </p>
                   {result.ats.weak_evidence.length === 0 ? (
-                    <p className="mt-2 text-xs text-zinc-500">None — skills appear in bullets.</p>
+                    <p className="mt-2 text-xs text-zinc-500">All listed skills appear in your experience.</p>
                   ) : (
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {result.ats.weak_evidence.map((k) => (
@@ -233,17 +228,12 @@ export default function ResumeOptimizePage() {
               {!result.llm_used ? (
                 <div className="mt-4 rounded-lg border border-dashed border-zinc-800 p-5 text-center">
                   <p className="text-xs text-zinc-400">
-                    The deterministic ATS report above is complete. Connect an LLM API key to
-                    enable grounded bullet rewrites (prompt P9).
-                  </p>
-                  <p className="mt-2 text-[11px] text-zinc-600">
-                    No key? No problem — scores never depend on the LLM.
+                    Your ATS compatibility report is complete. AI bullet-point rewrites are currently unavailable on this server.
                   </p>
                 </div>
               ) : result.suggestions.length === 0 ? (
                 <p className="mt-4 text-xs text-zinc-500">
-                  All LLM suggestions were dropped by the evidence validator — nothing fabricated
-                  reached you.
+                  No rewrite suggestions were needed for your current bullet points.
                 </p>
               ) : (
                 <ul className="mt-4 space-y-4">

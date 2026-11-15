@@ -80,8 +80,7 @@ export default function SavedJobsPage() {
         </div>
         <h1 className="mt-1 text-3xl font-bold tracking-tight text-zinc-100">Saved Jobs</h1>
         <p className="mt-1 text-sm text-zinc-400">
-          Shortlist roles now, apply when you&apos;re ready — saved rows persist as{" "}
-          <code className="rounded bg-zinc-800 px-1.5 py-0.5 text-[11px] text-teal-600">status=saved</code>.
+          Bookmark roles now and apply whenever you&apos;re ready.
         </p>
       </div>
 

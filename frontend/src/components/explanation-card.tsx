@@ -15,9 +15,9 @@ export function ExplanationCard({ gap }: { gap: GapResponse }) {
   );
 
   const recommendedAction = gap.weakest_link
-    ? `Build one small project using ${gap.weakest_link} and add it to your profile — that converts your biggest gap into demonstrated evidence.`
+    ? `Build a small project using ${gap.weakest_link} and add it to your profile to turn your biggest gap into a strength.`
     : gap.missing_required.length === 0
-      ? "Apply — this posting aligns with your current profile."
+      ? "You are well matched to apply for this role."
       : `Close the gap on ${gap.missing_required[0]} first, then re-check your readiness.`;
 
   return (
@@ -55,7 +55,7 @@ export function ExplanationCard({ gap }: { gap: GapResponse }) {
           </span>
           <div className="flex flex-wrap gap-1.5">
             {strengths.length === 0 ? (
-              <span className="text-xs text-zinc-500">No strong signals yet</span>
+              <span className="text-xs text-zinc-500">No matching skills found yet</span>
             ) : (
               strengths.map((c) => (
                 <span

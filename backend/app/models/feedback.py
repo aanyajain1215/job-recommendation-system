@@ -19,6 +19,7 @@ from app.models.enums import FeedbackReason
 if TYPE_CHECKING:
     from app.models.job import Job
     from app.models.profile import Profile
+    from app.models.recommendation import Recommendation
 
 
 class Feedback(Base):
@@ -30,6 +31,12 @@ class Feedback(Base):
         PGUUID(as_uuid=True),
         primary_key=True,
         default=uuid4,
+    )
+    recommendation_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("recommendations.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
     profile_id: Mapped[UUID] = mapped_column(
         PGUUID(as_uuid=True),
@@ -60,6 +67,12 @@ class Feedback(Base):
         back_populates="feedback_entries",
     )
     job: Mapped["Job"] = relationship("Job")
+    recommendation: Mapped["Recommendation | None"] = relationship(
+        "Recommendation",
+        back_populates="feedback_entries",
+        foreign_keys=[recommendation_id],
+        passive_deletes=True,
+    )
 
 
 class SkillAffinity(Base):

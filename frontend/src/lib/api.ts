@@ -3,6 +3,8 @@ import {
   AdminSkillsResponse,
   ApplicationItem,
   ApplicationStats,
+  ApplicationStatusHistoryItem,
+  RecommendationEventPayload,
   ApplicationStatus,
   CompanyDetail,
   ConfigSaveResponse,
@@ -814,3 +816,22 @@ export const api = {
     return this.request<T>(endpoint, { method: "DELETE", headers });
   },
 };
+
+export async function getApplicationHistory(
+  applicationId: string,
+  token: string,
+): Promise<ApplicationStatusHistoryItem[]> {
+  const base = getBrowserApiBaseUrl();
+  return authedJson(`${base}/api/v1/applications/${applicationId}/history`, token);
+}
+
+export async function recordRecommendationEvent(
+  payload: RecommendationEventPayload,
+  token: string,
+): Promise<void> {
+  const base = getBrowserApiBaseUrl();
+  await authedJson(`${base}/api/v1/recommendations/events`, token, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
