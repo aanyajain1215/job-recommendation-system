@@ -19,7 +19,6 @@ import {
   CheckCircle2,
   Circle,
   Copy,
-  DollarSign,
   Eye,
   EyeOff,
   MapPin,
@@ -244,8 +243,7 @@ export default function PostingDetailPage() {
             </div>
           </div>
           <div>
-            <div className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-zinc-500">
-              <DollarSign className="h-3.5 w-3.5" />
+            <div className="text-xs uppercase tracking-wider text-zinc-500">
               Salary
             </div>
             <div className="mt-1 text-sm font-medium text-zinc-200">

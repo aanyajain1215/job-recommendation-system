@@ -1,118 +1,188 @@
-# JobRec — AI-Powered Job Recommendation & Career Path Intelligence
+# JobRec — AI/ML Job Recommendation System
 
-Full-stack job recommendation platform: **Next.js frontend, FastAPI backend, PostgreSQL + pgvector**, with a deterministic 8-component scoring engine, five trained model artifacts (M1–M5), and an LLM layer that never assigns scores or executes SQL.
+JobRec is a full-stack job recommendation and career-path platform built with **Next.js (App Router)**, **FastAPI**, and **PostgreSQL + pgvector**. It combines retrieval, graph reasoning, neural ranking, calibration, contextual bandits, and LLM-assisted planning to deliver job matches, skill-gap insights, and roadmaps.
 
-**Design:** the full technical design (data model, scoring engine, model suite, LLM layer, evaluation, file-by-file plan) lives in [`docs/DESIGN.md`](docs/DESIGN.md). The 25-point original plan maps 1:1 to its §1 traceability table.
+> **Note:** This README reflects the current implementation/workflow in this repository. For historical design intent, see [`docs/DESIGN.md`](docs/DESIGN.md).
 
-## Architecture
+## Current system at a glance
 
-```
-frontend (Next.js 16, App Router, 19 routes)
-   │  fetch / JWT
-backend (FastAPI, /api/v1, 58 OpenAPI paths)
-   ├─ deterministic core   scoring.py · gap engine · roadmap · simulator · project mapping
-   ├─ personalization      M4 weight learner + skill affinities · M5 onboarding elicitation
-   ├─ search               PostgreSQL FTS + pgvector KNN + skill overlap (RRF fusion) · NL filter parser
-   ├─ LLM layer            provider abstraction (OpenAI default / Gemini / OpenAI-compat)
-   │                       prompts P1–P10, all schema-validated with deterministic fallbacks
-   └─ ml/                  M1 skill2vec · M2 LightGBM ranklet · M3 isotonic calibrator
-postgres (pgvector, Alembic migrations head 0011_ops)
-```
+### Core capabilities
+- **Job discovery & recommendations:** candidate generation + learned ranking + calibrated match scores
+- **Live jobs:** query-time **Adzuna** results are fetched and merged into search/recommendation flows (transient `adzuna-*` listings, external apply). Native employer-posted jobs are supported in-app.
+- **Career intelligence:** skill-gap analysis, roadmap generation, simulator, resume optimization, and profile-driven personalization
+- **Auth/roles:** job seeker, employer, admin flows
+- **Frontend UX (current):** yellow/blue high-visibility theme, no signup questionnaire (register → dashboard), no Tracker/Settings tabs, in-app job detail modal for live listings, local save support for external (Adzuna) jobs, currency-aware salary display (₹ for Indian listings, appropriate symbols by currency/location)
 
-### Model suite (real trained artifacts)
-
-| Model | What it is | Trained by |
+### ML/AI pipeline (M0–M5, current)
+| Stage | Current implementation | Notes / artifacts |
 |---|---|---|
-| M0 embedder | MiniLM-384 sentence embeddings (backbone) | off-the-shelf, live |
-| M1 `skill2vec` | skill representation + transfer classification | `ml/train_skill2vec.py` |
-| M2 `ranklet` | LightGBM learning-to-rank re-ranker | `ml/train_ranklet.py` |
-| M3 `calibrator` | isotonic readiness calibration (score → probability) | `ml/calibrate.py` |
-| M4 `preference-learner` | per-user utility weights + skill affinities (online, bounded) | feedback API |
-| M5 `elicitation` | Bradley-Terry cold-start weight fit from 3 pairwise choices | `/onboarding` |
+| **M0 Retrieval** | Domain-tuned **`BAAI/bge-base-en-v1.5` bi-encoder (768-d)** + **cross-encoder reranker** (two-stage retrieval) | M0 eval/report artifacts under `backend/ml/reports/` (e.g. `m0_embedding_eval.json`) and fine-tuned model dirs under `backend/ml/artifacts/` |
+| **M1 Skill/graph reasoning** | **Relational GraphSAGE** over directed Skill–Role–Project graph (inductive, contrastive link prediction) | Trained/evaluated via ML scripts; hybrid graph+embedding transfer logic used in runtime paths |
+| **M2 Ranking** | **PyTorch DCN-v2** neural ranker (31-feature schema, profile-split training/eval) with LightGBM/heuristic baselines for comparison | Primary learned ranking path (AI-strict/learned-primary runtime strategy) |
+| **M3 Calibration** | **Calibrator on DCN-v2 logits** (`input_kind=dcn_logit`) with stratified OOF pre/post metrics; production fit on val logits | Produces calibrated readiness/match probabilities/scores for display and downstream use |
+| **M4 Personalization/bandit** | **NeuralUCB** contextual bandit (with compatibility for prior policy interfaces), evaluated via IPS/SNIPS/regret (OPE) | Artifacts/reports under `backend/ml/artifacts/` and `backend/ml/reports/` |
+| **M5 Planning** | **3-stage Agentic Planner–Critic** roadmap pipeline with `agent_trace` (gap/prereq analysis → curriculum/project planning → feasibility/grounding critic) | Evaluated on real DB `(profile, job)` pairs in unified evaluation |
 
-Artifacts and metrics are recorded in the `model_registry` table (visible in the admin console).
+**Unified evaluation:** `backend/ml/evaluate_all.py` aggregates M0–M5 into `backend/ml/reports/master_project_evaluation.json` and prints summary tables.
 
-### Deterministic scoring (plan §6/§7)
+## Tech stack
 
-```
-FinalScore = 0.30·Semantic + 0.25·Skill + 0.15·Experience + 0.10·Education
-           + 0.05·(Project + Location + Salary + CareerInterest)      Σw = 1.00
-```
+- **Frontend:** Next.js 16 (App Router), React 19, Tailwind CSS 4, TanStack Query
+- **Backend:** FastAPI, SQLAlchemy, Alembic, Pydantic v2
+- **Database:** PostgreSQL + **pgvector**
+- **ML:** PyTorch, sentence-transformers/cross-encoders, scikit-learn, LightGBM, NumPy, etc. (see `backend/requirements.txt`)
+- **LLM layer:** provider-backed LLM features with validation/fallback behavior (configured via `.env`; optional depending on feature/flags)
 
-- All components ∈ [0, 100]; every input comes from DB/config — no network calls inside scoring.
-- Weights are configurable with precedence **code defaults → `system_config` (admin PUT /admin/config, validated Σ=1) → env**; M4 personalization adapts per-user within [0.5×, 2.0×] of that baseline.
-- The LLM never touches a score, a ranking, or a query — validators enforce evidence spans, skill tokens, digit preservation, and strict filter whitelists.
+## Repository layout
+
+- `frontend/` — Next.js app (pages, components, API client, styling)
+- `backend/` — FastAPI app, services, models, migrations, ML training/evaluation
+  - `backend/app/api/` — API routers
+  - `backend/app/services/` — recommendation, retrieval/rerank, roadmap, live jobs, etc.
+  - `backend/ml/` — training/evaluation scripts, datasets, artifacts, reports
+  - `backend/alembic/versions/` — DB migrations
+- `docs/` — design and project state documentation
+- `docker-compose.yml` — local stack (Postgres, backend, frontend)
 
 ## Prerequisites
 
-- Docker Desktop
-- Docker Compose v2
+- **Docker Desktop** with **Docker Compose v2** (recommended)
+- Optional: **Adzuna API credentials** for live job fetch (`ADZUNA_APP_ID`, `ADZUNA_APP_KEY`, `ADZUNA_COUNTRY`)
+- Optional: LLM provider credentials/flags for LLM-dependent features
 
-## Run the stack
+## Run with Docker (recommended)
 
-```bash
-copy .env.example .env
+### 1) Configure environment
+From the project root:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Update `.env` as needed:
+- **Ports/URLs:** `FRONTEND_PORT`, `API_PORT`, `POSTGRES_PORT`, `NEXT_PUBLIC_API_URL`
+- **Database:** `POSTGRES_*`, `DATABASE_URL`
+- **Live jobs (Adzuna):** `ADZUNA_APP_ID`, `ADZUNA_APP_KEY`, `ADZUNA_COUNTRY` (e.g. `in`)
+- **LLM (optional):** provider/model/key flags as configured in your environment
+
+### 2) Start the stack
+
+```powershell
 docker compose up --build
 ```
 
-- App: http://localhost:3000
-- API docs: http://localhost:8000/docs
-- Readiness (DB probe): http://localhost:8000/api/v1/health/ready
+- Backend container runs migrations on startup (`alembic upgrade head`)
+- Source volumes are mounted for local development; behavior may depend on container command/hot-reload setup
 
-Postgres is published on host port **55432** because 5432/5433 were already in use on this machine. The API still talks to Postgres on the Docker network at `postgres:5432`.
+**After first build (normal restart):**
 
-LLM routes degrade gracefully without keys; set `OPENAI_API_KEY` (or `LLM_PROVIDER=gemini` + `GEMINI_API_KEY`) in `.env` to enable them. **Kill switch:** `LLM_ENABLED=false` forces every route to its deterministic fallback. **Trial mode:** `LLM_STRICT=true` inverts the graceful degradation — any AI failure (missing provider, API error, validator rejection) returns HTTP 502 with the reason instead of silently falling back, so you can see exactly which features work with the LLM; set it back to `false` afterwards. Optional **explanation polish**: `EXPLAIN_LLM=true` lets the LLM rewrite explanation wording only — a digit-multiset validator discards the polish unless every number survives verbatim (default off).
+```powershell
+docker compose up -d
+```
 
-**Live jobs, no pre-loaded corpus:** jobs come from two places only — employers post their own listings on the platform (native, applied to in-app), and every keyword search hits **Adzuna at query time** (also merged into unfiltered browse and the recommendation feed). Nothing is ingested into the database: live results are transient, carry `source: "adzuna"` and `adzuna-<id>` ids, and their cards link out to the provider (Adzuna exposes no details API). The offline pipeline remains available for manual/corpus runs: `docker exec jobrec-backend python scripts/fetch_jobs_live.py --query "..."`; one-time removal of the legacy ingested corpus: `docker exec jobrec-backend python scripts/purge_ingest.py`.
+### 3) Access the app
+- **Frontend:** http://localhost:3000
+- **Backend API:** http://localhost:8000
+- **Swagger docs:** http://localhost:8000/docs
+- **Health:** http://localhost:8000/api/v1/health
+- **Readiness:** http://localhost:8000/api/v1/health/ready
+- **Postgres (host):** `localhost:55432` (container listens on `5432` internally)
 
-**Resume auto-fill:** on the Profile page, *Auto-fill from resume* uploads (or reuses) the stored resume, waits for the AI parse, and fills the editable form — name, headline, summary, location, phone, years, skills, education, work history. Nothing lands in the profile until you review the fields and press **Save Profile**; every field stays manually editable. Identity values the parser cannot verify against the resume text are dropped rather than trusted, and failed or pre-identity parses can be re-run from the stored file with the **Re-parse** button (`POST /profiles/me/resume/reparse`).
+### 4) Demo credentials (if present in DB)
+- **Job seeker:** `aanya.seeker@example.com` / `Password123!`
+- **Employer:** `employer.qa@jobrec.io` / `Password123!`
+- **Admin:** `admin.qa@jobrec.io` / `Password123!`
 
-## Layout
+## Common Docker commands
 
-- `frontend/` — Next.js App Router (19 pages: feed, gap, roadmap, simulator, careers, NL search, tracker, saved, settings, resume optimizer, onboarding, admin, …)
-- `backend/` — FastAPI + Alembic; `app/api` (58 paths), `app/services`, `ml/` training + evaluation
-- `backend/scripts/` — offline corpus pipeline (Adzuna/Arbeitnow/Remotive/Jobicy → preprocess → embed), one-time `purge_ingest.py`, and the historical synthetic interaction bootstrap
-- `docker-compose.yml` — Postgres, API, frontend
+```powershell
+# Start detached
+docker compose up -d
+
+# Rebuild images (after dependency/Dockerfile changes)
+docker compose up --build -d
+
+# Status / logs
+docker compose ps
+docker compose logs -f backend
+docker compose logs -f frontend
+
+# Restart a service
+docker compose restart frontend
+
+# Stop / remove containers
+docker compose stop
+docker compose down
+```
+
+> Use `docker compose up --build` when dependencies or Docker build inputs change. For routine restarts, `docker compose up -d` (or `docker compose start` for stopped containers) is sufficient.
+
+## Workflow notes
+
+- **Live Adzuna jobs:** fetched at query time and processed through search/recommendation pipelines. Listings are transient (`adzuna-*`), open externally for apply, and are not stored as native DB job rows.
+- **Saving jobs:** native jobs use backend persistence; live external Adzuna listings are saved locally in the browser (Saved Jobs view) because they are not DB records.
+- **Currency display:** salary formatting is location/currency-aware (e.g. Indian listings show **₹/L/Cr** where applicable).
+- **Frontend caching:** after UI/theme changes, do a hard refresh (`Ctrl+Shift+R`) or use incognito if you see stale styling/routes.
+
+## Local development (without Docker)
+
+Requires **Python 3.13+**, **Node.js 22+**, and **PostgreSQL (pgvector-enabled)**.
+
+1. Create/configure `.env` and ensure `DATABASE_URL` points to your local Postgres.
+2. **Backend** (`backend/`):
+   ```powershell
+   pip install -r requirements.txt
+   alembic upgrade head
+   uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+   ```
+3. **Frontend** (`frontend/`):
+   ```powershell
+   npm ci
+   npm run dev
+   ```
+4. Ensure frontend API env vars point to the backend (e.g. `NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1`).
+
+## Evaluation & model workflows
+
+Run from `backend/` (with required environment, DB access, and dependencies configured):
+
+```powershell
+# Unified M0–M5 evaluation (writes master report)
+python ml/evaluate_all.py
+
+# Bandit/OPE evaluation (as used by project scripts)
+python ml/eval_bandit.py
+```
+
+- **Master report:** `backend/ml/reports/master_project_evaluation.json`
+- **Model artifacts:** `backend/ml/artifacts/`
+- **Datasets/reports:** `backend/ml/datasets/`, `backend/ml/reports/`
+
+> Some fine-tuned model weight files (e.g. large `.safetensors`) may be kept local/untracked due to size. Regeneration/training scripts (e.g. bi-encoder/cross-encoder trainers) are available in `backend/ml/` when the full training environment is set up.
 
 ## Testing
 
-```bash
-# backend (~250 tests: golden pins, API contracts, eval gates, ops)
+```powershell
+# Backend (example; configure DB/env for your setup)
 cd backend
-$env:DATABASE_URL='postgresql+psycopg://jobrec:change_me_in_production@localhost:55432/jobrec'
-$env:EMBEDDING_BACKEND='minilm'
-python -m pytest tests/ -q
+python -m pytest tests -q
 
-# frontend
+# Frontend
 cd frontend
 npx tsc --noEmit
-npx next build
+npm run build
 ```
 
-## Evaluation (plan §21/§24 — nothing ships on vibes)
+> Test/runtime behavior may depend on external services, DB state, model artifacts, and strict/LLM configuration flags.
 
-```bash
-cd backend
+## Database migrations
 
-# train all models (M1 → datasets → M2 → M3), registers artifacts + metrics
-python ml/train.py
+- Alembic versions: `backend/alembic/versions/`
+- Current migration chain in this repo includes M0/traceability revisions through **`0014_phase2_traceability`**
+- Docker startup applies migrations automatically; for local runs use `alembic upgrade head`
 
-# run the §21 evaluation harness: Precision@K / Recall@K / NDCG@K / MRR,
-# baselines (popularity, deterministic, M2), F1 for skill extraction,
-# ECE/Brier for calibration — report written to ml/reports/eval-YYYY-MM-DD.json
-python ml/evaluate.py
+## Additional docs
 
-# CI mode: exit 1 when a required gate fails
-python ml/evaluate.py --gate
-```
-
-Gates (enforced in `tests/test_eval_regression.py`): ranker NDCG@10 ≥ deterministic baseline, skill-extraction F1 ≥ 0.85, transfer F1 ≥ 0.80, calibration ECE ≤ 0.10, semantic Recall@20 ≥ 0.75, plus determinism property tests (same input → identical score, Σw = 1, simulator idempotence).
-
-## Admin console (`/admin`, admin role)
-
-- **Skill merge** — transactional re-point of profiles, jobs, aliases, edges, affinities, learning resources; target embedding refreshed; JSONB snapshots stay immutable.
-- **Duplicate jobs** — embedding cosine ≥ 0.92 + title similarity ≥ 0.60 (detection only; merging is a human decision).
-- **LLM usage** — per-route/per-model call counts, tokens, latency, flagged calls, estimated cost; kill-switch state.
-- **Parse failures** — failed/stuck resume parses with retry.
-- **Scoring weights** — edit + save with Σ = 1 validation; LLM/M4 hyperparameters surfaced.
-- **Model registry** — trained artifacts, versions, metrics, on-disk check.
+- [`docs/DESIGN.md`](docs/DESIGN.md) — original/expanded technical design (historical reference)
+- [`docs/PROJECT_STATE.md`](docs/PROJECT_STATE.md) — project state snapshot and operational notes
+- ML reports under `backend/ml/reports/` — latest evaluation outputs (when generated)

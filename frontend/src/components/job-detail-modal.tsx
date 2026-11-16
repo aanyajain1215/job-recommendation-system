@@ -14,7 +14,6 @@ import {
   Building2,
   Calendar,
   CheckCircle,
-  DollarSign,
   ExternalLink,
   Globe,
   MapPin,
@@ -218,10 +217,9 @@ export default function JobDetailModal({ job, open, onClose }: Props) {
             <div className="w-full space-y-4 lg:w-80 lg:shrink-0">
               <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-4">
                 {job.salary_min || job.salary_max ? (
-                  <div className="flex items-center gap-1 text-lg font-bold text-zinc-100">
-                    <DollarSign className="h-4 w-4 text-emerald-400" />
-                    <span>{formatSalary(job.salary_min, job.salary_max, job.salary_currency, job.location)}</span>
-                    <span className="text-xs font-normal text-zinc-400">/ year</span>
+                  <div className="text-lg font-bold text-zinc-100">
+                    {formatSalary(job.salary_min, job.salary_max, job.salary_currency, job.location)}
+                    <span className="ml-1 text-xs font-normal text-zinc-400">/ year</span>
                   </div>
                 ) : (
                   <span className="text-sm font-medium text-zinc-400">Competitive salary</span>

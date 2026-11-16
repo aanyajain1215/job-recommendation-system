@@ -12,7 +12,6 @@ import {
   Building2,
   Calendar,
   Compass,
-  DollarSign,
   ExternalLink,
   MapPin,
   Search,
@@ -570,11 +569,8 @@ export default function JobsPage() {
 
                 <div className="sm:text-right shrink-0">
                   {job.salary_min || job.salary_max ? (
-                    <div className="flex items-center gap-1 text-base font-bold text-zinc-100 sm:justify-end">
-                      <DollarSign className="h-4 w-4 text-emerald-400" />
-                      <span>
-                        {formatSalary(job.salary_min, job.salary_max, job.salary_currency, job.location)}
-                      </span>
+                    <div className="text-base font-bold text-zinc-100 sm:text-right">
+                      {formatSalary(job.salary_min, job.salary_max, job.salary_currency, job.location)}
                     </div>
                   ) : (
                     <span className="text-xs text-zinc-500">Competitive salary</span>

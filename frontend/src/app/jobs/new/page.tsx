@@ -13,7 +13,6 @@ import {
 import {
   ArrowLeft,
   Building2,
-  DollarSign,
   MapPin,
   Plus,
   PlusCircle,
@@ -241,8 +240,7 @@ export default function NewJobPage() {
 
         {/* Compensation */}
         <section className="rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-6 backdrop-blur space-y-4">
-          <h2 className="text-lg font-semibold text-zinc-100 flex items-center gap-2">
-            <DollarSign className="h-5 w-5 text-indigo-400" />
+          <h2 className="text-lg font-semibold text-zinc-100">
             Compensation & Salary Band
           </h2>
 

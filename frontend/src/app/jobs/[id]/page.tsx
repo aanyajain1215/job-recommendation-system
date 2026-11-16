@@ -16,7 +16,6 @@ import {
   Building2,
   Calendar,
   CheckCircle,
-  DollarSign,
   ExternalLink,
   Globe,
   MapPin,
@@ -214,12 +213,9 @@ export default function JobDetailPage() {
           {/* Action Box */}
           <div className="lg:text-right shrink-0">
             {job.salary_min || job.salary_max ? (
-              <div className="text-xl font-bold text-zinc-100 flex items-center lg:justify-end gap-1">
-                <DollarSign className="h-5 w-5 text-emerald-400" />
-                <span>
-                  {formatSalary(job.salary_min, job.salary_max, job.salary_currency, job.location)}
-                </span>
-                <span className="text-xs text-zinc-400 font-normal">/ year</span>
+              <div className="text-xl font-bold text-zinc-100 lg:text-right">
+                {formatSalary(job.salary_min, job.salary_max, job.salary_currency, job.location)}
+                <span className="ml-1 text-xs font-normal text-zinc-400">/ year</span>
               </div>
             ) : (
               <span className="text-sm font-medium text-zinc-400">Competitive salary</span>

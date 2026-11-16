@@ -1,7 +1,12 @@
 # JobRec — Technical Design
 ## AI-Powered Job Recommendation & Career Path Intelligence System
 
-**Status:** v1.3 — all phases implemented: LLM = Gemini (default), stack = Next.js + FastAPI, primary job API = **Adzuna**, corpus = live-first + **preprocessing pipeline (§20.1)**, synthetic interaction bootstrap confirmed. M5 Bradley-Terry elicitation shipped (§6); admin console (§22) live.
+**Status:** historical design/specification document (v1.x). The implementation has evolved since this was written.
+
+**Current implementation (high-level):** Next.js + FastAPI + PostgreSQL/pgvector stack with live Adzuna query-time job fetching/merge, M0–M5 ML pipeline (BGE bi-encoder + cross-encoder retrieval, Relational GraphSAGE skill graph, DCN-v2 neural ranker, DCN-logit calibrator, NeuralUCB bandit/OPE, 3-stage agentic planner–critic roadmap), updated frontend UX (no signup questionnaire, tracker/settings removed, live job detail modal, local save for external listings, yellow/blue theme), and unified evaluation (`backend/ml/evaluate_all.py` → `backend/ml/reports/master_project_evaluation.json`).
+
+**Use for:** design rationale, architecture intent, and historical plan details. **For current setup/workflow and implemented behavior, see:** [`../README.md`](../README.md) and [`PROJECT_STATE.md`](PROJECT_STATE.md).
+
 **Scope:** Full-system design: data model, deterministic scoring engine, trained models, LLM layer, APIs, UI, evaluation, file-by-file implementation plan.
 
 ---

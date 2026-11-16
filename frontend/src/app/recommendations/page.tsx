@@ -20,7 +20,6 @@ import {
   CheckCircle2,
   ChevronRight,
   Compass,
-  DollarSign,
   ExternalLink,
   GraduationCap,
   MapPin,
@@ -417,7 +416,6 @@ export default function RecommendationsPage() {
                         </span>
                         {(item.job.salary_min || item.job.salary_max) && (
                           <span className="flex items-center gap-1 text-zinc-300 font-medium">
-                            <DollarSign className="h-3.5 w-3.5 text-emerald-400" />
                             {formatSalary(item.job.salary_min, item.job.salary_max, item.job.salary_currency, item.job.location)}
                           </span>
                         )}
