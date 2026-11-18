@@ -1,6 +1,7 @@
 from app.models.application import Application, ApplicationStatusHistory
 from app.models.career_path import CareerPath, CareerPathStep, LearningResource
 from app.models.company import Company
+from app.models.copilot import CopilotConversation, CopilotMemory, CopilotMessage
 from app.models.enums import (
     ApplicationStatus,
     EmploymentType,
@@ -38,6 +39,9 @@ from app.models.skill_graph import SkillAlias, SkillEdge
 from app.models.user import User
 
 __all__ = [
+    "CopilotConversation",
+    "CopilotMemory",
+    "CopilotMessage",
     "Application",
     "ApplicationStatus",
     "ApplicationStatusHistory",

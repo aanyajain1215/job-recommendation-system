@@ -1,4 +1,10 @@
 import {
+  CopilotChatResponse,
+  CopilotConversation,
+  CopilotConversationSummary,
+  CopilotMemory,
+  CopilotMemoryKind,
+  CopilotStatus,
   AdminConfigResponse,
   AdminSkillsResponse,
   ApplicationItem,
@@ -834,4 +840,81 @@ export async function recordRecommendationEvent(
     method: 'POST',
     body: JSON.stringify(payload),
   });
+}
+
+// ---------------- Career Copilot (agent chat + memory) ---------------- //
+
+/** For endpoints that answer 204 No Content. */
+async function authedVoid(url: string, token: string, init: RequestInit = {}): Promise<void> {
+  const res = await fetch(url, {
+    ...init,
+    headers: { Accept: "application/json", Authorization: `Bearer ${token}`, ...(init.headers || {}) },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: `Request failed (${res.status})` }));
+    throw new Error(
+      typeof err.detail === "string" ? err.detail : `Request failed (${res.status})`,
+    );
+  }
+}
+
+const copilotBase = () => `${getBrowserApiBaseUrl()}/api/v1/copilot`;
+
+export async function getCopilotStatus(token: string): Promise<CopilotStatus> {
+  return authedJson(`${copilotBase()}/status`, token);
+}
+
+export async function copilotChat(
+  payload: { message: string; conversation_id?: string },
+  token: string,
+): Promise<CopilotChatResponse> {
+  return authedJson(`${copilotBase()}/chat`, token, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function copilotDigest(token: string): Promise<CopilotChatResponse> {
+  return authedJson(`${copilotBase()}/digest`, token, { method: "POST" });
+}
+
+export async function getCopilotConversations(
+  token: string,
+): Promise<CopilotConversationSummary[]> {
+  return authedJson(`${copilotBase()}/conversations`, token);
+}
+
+export async function getCopilotConversation(
+  conversationId: string,
+  token: string,
+): Promise<CopilotConversation> {
+  return authedJson(`${copilotBase()}/conversations/${conversationId}`, token);
+}
+
+export async function deleteCopilotConversation(
+  conversationId: string,
+  token: string,
+): Promise<void> {
+  return authedVoid(`${copilotBase()}/conversations/${conversationId}`, token, {
+    method: "DELETE",
+  });
+}
+
+export async function getCopilotMemories(token: string): Promise<CopilotMemory[]> {
+  return authedJson(`${copilotBase()}/memories`, token);
+}
+
+export async function addCopilotMemory(
+  payload: { content: string; kind: CopilotMemoryKind },
+  token: string,
+): Promise<CopilotMemory> {
+  return authedJson(`${copilotBase()}/memories`, token, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteCopilotMemory(memoryId: string, token: string): Promise<void> {
+  return authedVoid(`${copilotBase()}/memories/${memoryId}`, token, { method: "DELETE" });
 }

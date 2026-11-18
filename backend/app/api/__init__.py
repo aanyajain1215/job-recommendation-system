@@ -48,6 +48,10 @@ api_router.include_router(admin_router)
 api_router.include_router(onboarding_router)
 # ---- Phase E0 (employer experience): company profile + posting lifecycle ----
 api_router.include_router(employer_router)
+# ---- Career Copilot: tool-using, memory-backed job-search agent ----
+from app.api.copilot import router as copilot_router  # noqa: E402
+
+api_router.include_router(copilot_router)
 
 # ---- Ops/monitoring ----
 from app.api.monitoring import router as monitoring_router  # noqa: E402

@@ -1050,3 +1050,186 @@ export interface RecommendationEventPayload {
   event_type: 'generated' | 'served' | 'impression' | 'clicked' | 'dismissed' | 'saved' | 'applied';
   rank?: number;
 }
+
+// ---------------- Career Copilot (agent chat + memory) ---------------- //
+
+/** One skill's demand across a set of analysed jobs. */
+export interface SkillDemand {
+  skill: string;
+  /** How many analysed jobs ask for this skill. */
+  jobs: number;
+  /** jobs / jobs_analyzed (0..1). */
+  share: number;
+  status: "have" | "transferable" | "missing";
+}
+
+/** Skill disparity across a whole result set (search / AI search / feed). */
+export interface SkillGapSummary {
+  jobs_analyzed: number;
+  /** 0..100 */
+  avg_skill_match: number | null;
+  top_missing: SkillDemand[];
+  top_transferable: SkillDemand[];
+  top_matched: SkillDemand[];
+  headline: string | null;
+}
+
+export interface DirectionGapSampleJob {
+  id: string | null;
+  title: string | null;
+  company: string | null;
+  source: string | null;
+  url?: string | null;
+}
+
+/** What the market asks of one target role/domain vs. the seeker's skills. */
+export interface DirectionGap {
+  target: string;
+  kind: "role" | "family";
+  jobs_analyzed: number;
+  /** "platform" and/or "live" */
+  sources: string[];
+  /** 0..100, demand-weighted coverage */
+  readiness: number | null;
+  skills: SkillDemand[];
+  top_missing: SkillDemand[];
+  sample_jobs: DirectionGapSampleJob[];
+  note: string | null;
+}
+
+export type CopilotMode = "llm" | "fallback";
+
+export interface CopilotStatus {
+  mode: CopilotMode;
+  provider: string | null;
+  model: string | null;
+  tools: string[];
+}
+
+/** One tool call the agent made during a turn. */
+export interface CopilotTrace {
+  tool: string;
+  args: Record<string, unknown>;
+  ok: boolean;
+  ms: number;
+  /** True when the tool changed the user's data (save job, remember, ...). */
+  writes: boolean;
+  error: string | null;
+}
+
+export interface CopilotJobCard {
+  type: "job";
+  id: string;
+  title: string;
+  company: string;
+  location: string;
+  is_remote: boolean;
+  salary: string | null;
+  source: string;
+  url: string | null;
+  match_score: number | null;
+  skill_match: number | null;
+  matched_skills: string[];
+  missing_skills: string[];
+  transferable_skills: string[];
+  reasons: string[];
+}
+
+export type CopilotSkillGapSummaryCard = SkillGapSummary & { type: "skill_gap_summary" };
+
+export type CopilotDirectionGapCard = DirectionGap & { type: "direction_gap" };
+
+export interface CopilotGapCard {
+  type: "gap";
+  job_id: string;
+  title: string;
+  match_score: number | null;
+  skill_gap_score: number | null;
+  /** Backend sends `{value, band}`; tolerate a bare number too. */
+  readiness: Readiness | number | null;
+  counts: Partial<Record<"strong" | "partial" | "transferable" | "missing", number>> | null;
+  missing_required_skills: string[];
+  weakest_link: string | null;
+  skills: { skill: string; status: string }[];
+  reasons: string[];
+}
+
+export interface CopilotApplicationsCard {
+  type: "applications";
+  items: {
+    job_id: string;
+    title: string;
+    company: string;
+    status: string;
+    updated: string | null;
+  }[];
+}
+
+export interface CopilotResumeCard {
+  type: "resume";
+  job_id: string;
+  job_title: string;
+  ats: Record<string, unknown>;
+  suggestions: Record<string, unknown>[];
+  llm_used: boolean;
+  disclaimer: string | null;
+}
+
+export type CopilotCard =
+  | CopilotJobCard
+  | CopilotSkillGapSummaryCard
+  | CopilotDirectionGapCard
+  | CopilotGapCard
+  | CopilotApplicationsCard
+  | CopilotResumeCard;
+
+export interface CopilotChatResponse {
+  conversation_id: string;
+  message_id: string;
+  reply: string;
+  /** May contain card types this UI doesn't know yet — they are ignored. */
+  cards: CopilotCard[];
+  trace: CopilotTrace[];
+  mode: CopilotMode;
+  memories_used: string[];
+  model: string | null;
+}
+
+export interface CopilotConversationSummary {
+  id: string;
+  title: string;
+  updated_at: string;
+  created_at: string;
+}
+
+export interface CopilotMessageMeta {
+  cards?: CopilotCard[];
+  trace?: CopilotTrace[];
+  mode?: CopilotMode;
+  model?: string | null;
+  memories_used?: string[];
+  shown?: unknown;
+}
+
+export interface CopilotMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  created_at: string;
+  meta: CopilotMessageMeta | null;
+}
+
+export interface CopilotConversation extends CopilotConversationSummary {
+  summary: string | null;
+  messages: CopilotMessage[];
+}
+
+export type CopilotMemoryKind = "preference" | "dealbreaker" | "goal" | "fact";
+
+export interface CopilotMemory {
+  id: string;
+  kind: CopilotMemoryKind;
+  content: string;
+  source: "chat" | "tool" | "user";
+  updated_at: string;
+}

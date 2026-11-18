@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import {
+  Bot,
   Briefcase,
   Bookmark,
   Building2,
@@ -114,6 +115,10 @@ export function Navbar() {
           >
             <Sparkles className="h-3.5 w-3.5 shrink-0 text-teal-400" />
             AI Matches
+          </Link>
+          <Link href="/copilot" className={`${navLinkClass(pathname === "/copilot")}${linkExtra}`}>
+            <Bot className="h-3.5 w-3.5 shrink-0 text-teal-400" />
+            Copilot
           </Link>
           <Link href="/careers" className={`${navLinkClass(pathname === "/careers")}${linkExtra}`}>
             <Route className="h-3.5 w-3.5 shrink-0" />
