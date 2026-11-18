@@ -49,3 +49,6 @@ backend/ml/artifacts/**/*.safetensors
 backend/ml/data/raw/
 backend/ml/reports/*
 !backend/ml/reports/master_project_evaluation.json
+# Phase 0 audit evidence must be committed (rule 6)
+!backend/ml/reports/audit.md
+!backend/ml/reports/audit_feature_runs.json
