@@ -44,7 +44,9 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-ARTIFACTS = BACKEND_ROOT / "ml" / "artifacts"
+# Simulation study only: kept OUT of ml/artifacts/ so the app never serves a
+# policy trained on simulated clicks (the live bandit learns from real interactions).
+ARTIFACTS = BACKEND_ROOT / "ml" / "artifacts" / "simulation"
 DATASETS = BACKEND_ROOT / "ml" / "datasets"
 
 from app.services.bandit import BANDIT_FEATURE_NAMES, D, NeuralUCBPolicy  # noqa: E402

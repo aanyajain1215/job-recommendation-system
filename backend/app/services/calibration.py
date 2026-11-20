@@ -30,7 +30,11 @@ def _sigmoid(x: float) -> float:
 @lru_cache
 def load_calibrator() -> dict[str, Any]:
     """Newest calibrator payload. AI-strict: required."""
-    candidates = sorted(ARTIFACT_DIR.glob("calibrator_v*.joblib"))
+    def _num(p) -> int:  # numeric version, so v10 sorts after v9
+        digits = "".join(ch for ch in p.stem.rsplit("_v", 1)[-1] if ch.isdigit())
+        return int(digits) if digits else -1
+
+    candidates = sorted(ARTIFACT_DIR.glob("calibrator_v*.joblib"), key=_num)
     if not candidates:
         raise RuntimeError("Calibrator model artifact required but none found (expected calibrator_v*.joblib)")
     import joblib  # noqa: PLC0415
@@ -81,6 +85,19 @@ def predict_positive(score: float, *, logit: float | None = None) -> float:
     except Exception as exc:
         raise RuntimeError(f"Calibrator inference failed (AI-strict, no fallback): {exc}") from exc
     return prob
+
+
+def match_tier(probability: float) -> str | None:
+    """'top' | 'strong' | 'possible' for a calibrated probability, using the
+    cut-offs stored with the calibrator (None for calibrators without tiers)."""
+    tiers = load_calibrator().get("tiers") or {}
+    if "top" not in tiers or "strong" not in tiers:
+        return None
+    if probability >= float(tiers["top"]):
+        return "top"
+    if probability >= float(tiers["strong"]):
+        return "strong"
+    return "possible"
 
 
 def reset_cache() -> None:

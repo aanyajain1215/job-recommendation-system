@@ -25,6 +25,7 @@ from app.schemas.job import (
 )
 from app.schemas.user import CompanySummary
 from app.services import live_jobs, nl_search
+from app.services.ingest import detect_fresher
 from app.services.skill_normalizer import build_db_normalizer, resolve_skill
 
 router = APIRouter(tags=["jobs"])
@@ -37,6 +38,60 @@ _MERGE_PLATFORM_CAP = 500
 # Unfiltered browse fills from this live query so the catalog page shows
 # real-time openings instead of (an empty or fixed) pre-loaded corpus.
 _DEFAULT_BROWSE_QUERY = "software engineer"
+# Live results carry no server-side experience filter (Adzuna has none), so when a
+# level is requested we read up to this many 50-row pages and filter ourselves.
+_LEVEL_FILTER_MAX_PAGES = 3
+_LEVEL_FILTER_PAGE_SIZE = 50
+
+
+def _clean_live_query(text: str) -> str:
+    """Drop filler words ("jobs", "for", "freshers", ...) before sending to Adzuna,
+    which ANDs every word: "full stack jobs for freshers" would otherwise only
+    match postings containing all five words. Tokens are kept verbatim
+    (c++, node.js); falls back to the original text if nothing remains."""
+    kept = [
+        tok for tok in (text or "").split()
+        if "".join(ch for ch in tok.lower() if ch.isalnum()) not in nl_search._KEYWORD_FILLER
+    ]
+    return " ".join(kept).strip() or (text or "").strip()
+
+
+def _collect_live_by_level(
+    live_query: str,
+    live_location: str | None,
+    sort_by: str,
+    level: ExperienceLevel,
+    need: int,
+) -> list[dict]:
+    """Live postings whose detected experience level == `level`, up to `need`.
+
+    For entry level the query is first tried with "fresher" (how Indian
+    listings say it), then without; results are de-duplicated."""
+    queries = [live_query]
+    if level == ExperienceLevel.ENTRY:
+        queries = [f"{live_query} fresher".strip(), live_query]
+    want = level.value
+    out: list[dict] = []
+    seen: set = set()
+    for text in queries:
+        for page_no in range(1, _LEVEL_FILTER_MAX_PAGES + 1):
+            rows, _total = live_jobs.search_postings(
+                text, location=live_location, page=page_no,
+                page_size=_LEVEL_FILTER_PAGE_SIZE, sort_by=sort_by,
+            )
+            for row in rows:
+                key = row.get("external_id") or (row.get("title"), row.get("company"))
+                if key in seen:
+                    continue
+                seen.add(key)
+                lvl = row.get("experience_level")
+                if getattr(lvl, "value", lvl) == want:
+                    out.append(row)
+            if len(out) >= need or len(rows) < _LEVEL_FILTER_PAGE_SIZE:
+                break
+        if len(out) >= need:
+            break
+    return out
 
 
 def _format_job_response(
@@ -93,6 +148,7 @@ def _paginate_merged(
     sort_by: str,
     offset: int,
     page_size: int,
+    experience_level: ExperienceLevel | None = None,
 ) -> tuple[list[JobDetailResponse], int]:
     """One offset-paginated window over platform matches + live Adzuna results.
 
@@ -106,6 +162,28 @@ def _paginate_merged(
     p_count = len(platform_items)
     live_total = 0
     live_slice: list[JobDetailResponse] = []
+
+    if experience_level is not None:
+        # Filtered live leg: Adzuna cannot filter by experience, so collect
+        # enough matching postings ourselves (bounded page reads), then window.
+        need = max(0, offset + page_size - p_count)
+        platform_keys = {
+            f"{(p.title or '').strip().lower()}|{(p.company.name or '').strip().lower()}"
+            for p in platform_items
+        }
+        matched: list[JobDetailResponse] = []
+        seen_keys: set[str] = set()
+        if need > 0:
+            for row in _collect_live_by_level(live_query, live_location, sort_by, experience_level, need):
+                item = live_jobs.to_response(row)
+                key = f"{item.title.strip().lower()}|{item.company.name.strip().lower()}"
+                if key in seen_keys or key in platform_keys:
+                    continue
+                seen_keys.add(key)
+                matched.append(item)
+        start = max(0, offset - p_count)
+        window = platform_items[offset : offset + page_size]
+        return window + matched[start:need], p_count + len(matched)
 
     start = max(0, offset - p_count)
     end = offset + page_size - p_count
@@ -271,6 +349,8 @@ def list_jobs(
     every listed skill must be present, aliases canonicalized via the
     normalizer without creating rows)."""
     query_text = (q or search or "").strip()
+    if experience_level is None and detect_fresher(query_text):
+        experience_level = ExperienceLevel.ENTRY  # "freshers", "0-1 years", "entry level"
 
     query = (
         select(Job)
@@ -414,7 +494,9 @@ def list_jobs(
             min_salary,
         ]
     )
-    live_query = query_text or (None if has_filters else _DEFAULT_BROWSE_QUERY)
+    live_query = (_clean_live_query(query_text) if query_text else None) or (
+        None if has_filters else _DEFAULT_BROWSE_QUERY
+    )
 
     if live_query:
         if rank_column is not None and snippet_column is not None:
@@ -439,6 +521,7 @@ def list_jobs(
             sort_by=sort_by,
             offset=offset,
             page_size=page_size,
+            experience_level=experience_level,
         )
     else:
         # Filter-only view: platform postings only.
@@ -475,6 +558,9 @@ def nl_search_jobs(
     failure degrades to full-text search (`mode: "fts"`).
     """
     filters, mode = nl_search.parse_query(q)
+    if filters.experience_level is None and detect_fresher(q):
+        # don't rely on the LLM alone for the most common Indian phrasing
+        filters = filters.model_copy(update={"experience_level": ExperienceLevel.ENTRY})
     filters = nl_search.canonicalize_skills(db, filters)
     query, rank_column = nl_search.build_filtered_query(db, filters)
 
@@ -491,7 +577,7 @@ def nl_search_jobs(
 
     # Live leg: the parsed keywords/skills become the Adzuna `what` query, so
     # NL search also sees real-time listings (provider failure → platform only).
-    live_query = (
+    live_query = _clean_live_query(
         " ".join(
             part
             for part in [filters.keywords or "", *list(filters.skills)[:4]]
@@ -508,6 +594,7 @@ def nl_search_jobs(
             sort_by="relevance",
             offset=offset,
             page_size=page_size,
+            experience_level=filters.experience_level,
         )
     else:
         total = len(platform_items)

@@ -183,11 +183,12 @@ def build_features(
     seeker_loc = (inputs.seeker_location or "").strip().lower()
     job_loc = (inputs.job_location or "").strip().lower()
     preferred_locs = {p.lower().strip() for p in (inputs.seeker_preferred_locations or set()) if p}
-    location_exact_match = 1.0 if (seeker_loc and job_loc and seeker_loc == job_loc) else 0.0
-    location_preferred_match = 1.0 if (job_loc and job_loc in preferred_locs) else 0.0
-    seeker_region = seeker_loc.split(",")[-1].strip() if seeker_loc else ""
-    job_region = job_loc.split(",")[-1].strip() if job_loc else ""
-    location_region_match = 1.0 if (seeker_region and job_region and seeker_region == job_region) else 0.0
+    from app.services.location import same_city, same_region  # noqa: PLC0415
+
+    # city-level match with alias normalisation ("Pune, India" == "Pune, Maharashtra")
+    location_exact_match = 1.0 if (seeker_loc and job_loc and (seeker_loc == job_loc or same_city(seeker_loc, job_loc))) else 0.0
+    location_preferred_match = 1.0 if (job_loc and (job_loc in preferred_locs or any(same_city(job_loc, p) for p in preferred_locs))) else 0.0
+    location_region_match = 1.0 if same_region(seeker_loc, job_loc) else 0.0
     seeker_open_to_remote = 1.0 if inputs.seeker_open_to_remote else 0.0
 
     # salary IOU and gap ratio
@@ -409,9 +410,13 @@ def _build_dcn_model(in_dim: int, cross_layers: int = 2, hidden=(128, 64), dropo
 @lru_cache
 def _load_dcn() -> tuple[Any | None, dict | None, str | None]:
     """Load newest DCN-v2 ranker artifact: (model, payload, version)."""
-    candidates = sorted(ARTIFACT_DIR.glob("dcn_ranker_v*.pt"))
+    def _num(p: Path) -> int:  # numeric version, so v10 sorts after v9
+        digits = "".join(ch for ch in p.stem.rsplit("_v", 1)[-1] if ch.isdigit())
+        return int(digits) if digits else -1
+
+    candidates = sorted(ARTIFACT_DIR.glob("dcn_ranker_v*.pt"), key=_num)
     if not candidates:
-        candidates = sorted(ARTIFACT_DIR.glob("dcn_ranker_v*.pth"))
+        candidates = sorted(ARTIFACT_DIR.glob("dcn_ranker_v*.pth"), key=_num)
     if not candidates:
         return None, None, None
     path = candidates[-1]

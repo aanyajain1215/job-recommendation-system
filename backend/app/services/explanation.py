@@ -223,13 +223,25 @@ def polish_explanation(contract: ExplanationContract) -> ExplanationContract:
     return contract
 
 
-def readiness_from_score(score: float) -> dict:
-    """Readiness value/band for a displayed score (AI-calibrated, M3 required)."""
+def readiness_from_score(score: float, *, already_calibrated: bool = False) -> dict:
+    """Readiness value/band for a displayed score (AI-calibrated, M3 required).
+
+    `already_calibrated=True`: `score` is already the M3 probability x 100 (the
+    recommender's shown score) - use it as-is instead of calibrating it twice.
+    """
     from app.services.calibration import predict_positive  # noqa: PLC0415
 
     settings = get_settings()
-    calibrated = predict_positive(float(score))
+    calibrated = float(score) / 100.0 if already_calibrated else predict_positive(float(score))
     value = round(max(0.0, min(1.0, calibrated)), 2)
+    if already_calibrated:
+        from app.services.calibration import match_tier  # noqa: PLC0415
+
+        tier = match_tier(float(calibrated))
+        if tier is not None:
+            # apply-probability scale: bands come from the calibrator's tiers,
+            # not the 0.60/0.80 settings (which almost no job would reach)
+            return {"value": value, "band": {"top": "high", "strong": "medium"}.get(tier, "low")}
     if value >= settings.readiness_band_high:
         band = "high"
     elif value >= settings.readiness_band_medium:

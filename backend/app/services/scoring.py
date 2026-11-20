@@ -349,16 +349,16 @@ def location_match(inputs: ComponentInputs) -> float:
     if inputs.job_is_remote:
         return 100.0
 
+    from app.services.location import same_city, same_region  # noqa: PLC0415
+
     seeker = (inputs.seeker_location or "").strip().lower()
     job = (inputs.job_location or "").strip().lower()
 
     if seeker and job:
-        if seeker == job:
+        if seeker == job or same_city(seeker, job):
             return 100.0
-        # same country (last comma segment)
-        seeker_country = seeker.split(",")[-1].strip()
-        job_country = job.split(",")[-1].strip()
-        if seeker_country and seeker_country == job_country:
+        # same state/region (Indian city->state aware; else last comma segment)
+        if same_region(seeker, job):
             return 80.0
 
     if job and job in {p.lower().strip() for p in inputs.seeker_preferred_locations}:

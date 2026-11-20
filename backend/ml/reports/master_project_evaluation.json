@@ -1,158 +1,283 @@
 {
-  "generated_at": "2026-11-15T10:17:55.961754+00:00",
+  "generated_at": "2026-11-20T04:47:04.491420+00:00",
   "environment": {
     "database_url_configured": true,
-    "cwd": "C:\\Users\\aanya\\Documents\\SIH\\projects\\job recommendation system\\backend"
+    "cwd": "E:\\College\\B.Tech\\EDI\\aanya project\\job-recommendation-system\\backend"
   },
   "M0": {
     "status": "ok",
-    "source": "C:\\Users\\aanya\\Documents\\SIH\\projects\\job recommendation system\\backend\\ml\\reports\\m0_embedding_eval.json",
-    "Base Bi-Encoder": {
-      "recall@1": 0.655172,
-      "recall@3": 0.724138,
-      "recall@5": 0.758621,
-      "mrr@10": 0.705172,
-      "ndcg@10": 0.633956,
-      "latency_ms_per_user": 281.137
-    },
-    "Fine-Tuned Bi-Encoder": {
-      "recall@1": 0.689655,
-      "recall@3": 0.827586,
-      "recall@5": 0.827586,
-      "mrr@10": 0.761494,
-      "ndcg@10": 0.705237,
-      "latency_ms_per_user": 205.149
-    },
-    "Bi-Encoder + Cross-Encoder": {
-      "recall@1": 0.724138,
-      "recall@3": 0.931034,
-      "recall@5": 0.965517,
-      "mrr@10": 0.824713,
-      "ndcg@10": 0.805351,
-      "latency_ms_per_user": 2133.835
-    },
-    "improvements": {
-      "b_vs_a": {
-        "recall@1": 0.034483,
-        "recall@3": 0.103448,
-        "recall@5": 0.068965,
-        "mrr@10": 0.056322,
-        "ndcg@10": 0.071281
+    "source": "E:\\College\\B.Tech\\EDI\\aanya project\\job-recommendation-system\\backend\\ml\\artifacts\\cross_encoder_training_report.json",
+    "data": "https://huggingface.co/datasets/cnamuangtoun/resume-job-description-fit",
+    "test_note": "official test split; every test job is unseen in training",
+    "models": {
+      "BGE bi-encoder cosine (zero-shot)": {
+        "n": 1759,
+        "auc_fit_vs_nofit": 0.6192,
+        "auc_good_vs_rest": 0.508,
+        "spearman": 0.1484,
+        "ndcg@5_per_job": 0.7216,
+        "ndcg@10_per_job": 0.7366,
+        "ndcg_jobs_evaluated": 61,
+        "accuracy_3class": 0.4332,
+        "macro_f1_3class": 0.3583
       },
-      "c_vs_a": {
-        "recall@1": 0.068966,
-        "recall@3": 0.206896,
-        "recall@5": 0.206896,
-        "mrr@10": 0.119541,
-        "ndcg@10": 0.171395
+      "Base MS-MARCO cross-encoder (zero-shot)": {
+        "n": 1759,
+        "auc_fit_vs_nofit": 0.5563,
+        "auc_good_vs_rest": 0.5431,
+        "spearman": 0.0954,
+        "ndcg@5_per_job": 0.6663,
+        "ndcg@10_per_job": 0.6785,
+        "ndcg_jobs_evaluated": 61,
+        "accuracy_3class": 0.4218,
+        "macro_f1_3class": 0.3588
       },
-      "c_vs_b": {
-        "recall@1": 0.034483,
-        "recall@3": 0.103448,
-        "recall@5": 0.137931,
-        "mrr@10": 0.063219,
-        "ndcg@10": 0.100114
-      },
-      "b_beats_a_ndcg10": true,
-      "c_beats_b_ndcg10": true,
-      "c_beats_a_ndcg10": true
+      "Fine-tuned cross-encoder (this run)": {
+        "n": 1759,
+        "auc_fit_vs_nofit": 0.6309,
+        "auc_good_vs_rest": 0.5954,
+        "spearman": 0.2186,
+        "ndcg@5_per_job": 0.6705,
+        "ndcg@10_per_job": 0.6939,
+        "ndcg_jobs_evaluated": 61,
+        "accuracy_3class": 0.4082,
+        "macro_f1_3class": 0.3872
+      }
     },
-    "meta": {
-      "corpus_size": 106,
-      "num_queries": 29,
-      "heldout_profiles": 38,
-      "golden_postings": 100,
-      "pairs_total": 516,
-      "split": {
-        "by": "profile_id",
-        "train_ratio": 0.8,
-        "seed": 42,
-        "zero_user_overlap": true
-      },
-      "expanded_with_hard_distractors": true
-    }
+    "improvement_finetuned_vs_base": {
+      "auc_fit_vs_nofit": 0.0746,
+      "auc_good_vs_rest": 0.0523,
+      "spearman": 0.1232,
+      "ndcg@5_per_job": 0.0042,
+      "ndcg@10_per_job": 0.0154,
+      "accuracy_3class": -0.0136,
+      "macro_f1_3class": 0.0284
+    },
+    "note": "bi-encoder (first-stage retrieval) is the off-the-shelf BAAI/bge-base-en-v1.5, not fine-tuned"
   },
   "M1": {
     "status": "ok",
-    "threshold": 0.65,
-    "n_pairs": 228,
-    "rows": {
-      "YAML-only": {
-        "precision": 1.0,
-        "recall": 0.0261,
-        "f1": 0.0508,
-        "auc_roc": 0.5435
+    "source": "E:\\College\\B.Tech\\EDI\\aanya project\\job-recommendation-system\\backend\\ml\\artifacts\\skillgraph_gnn_v7.json",
+    "data": {
+      "source": "O*NET 31.0 software_skills (USDOL/ETA, CC BY 4.0)",
+      "occupations": 920,
+      "technologies": 2622,
+      "edges": 25690,
+      "split": {
+        "train": 20571,
+        "val": 1238,
+        "test": 3881,
+        "rule": "20% of each occupation's technologies hidden"
       },
-      "Pure GraphSAGE": {
-        "precision": 0.88,
-        "recall": 0.9565,
-        "f1": 0.9167,
-        "auc_roc": 0.9591
+      "min_occupations_per_technology": 2
+    },
+    "models": {
+      "Popularity (most-used tools)": {
+        "E1_link_prediction_test": {
+          "recall@10": 0.4221,
+          "recall@50": 0.55,
+          "mrr": 0.6262,
+          "auc": 0.8445,
+          "occupations": 823
+        }
       },
-      "Hybrid (Graph + GraphSAGE)": {
-        "precision": 0.88,
-        "recall": 0.9565,
-        "f1": 0.9167,
-        "auc_roc": 0.938
+      "BGE text similarity (zero-shot)": {
+        "E1_link_prediction_test": {
+          "recall@10": 0.042,
+          "recall@50": 0.0983,
+          "mrr": 0.0726,
+          "auc": 0.6137,
+          "occupations": 823
+        },
+        "E2_skill_adjacency_auc_test": {
+          "easy_negatives": 0.6116,
+          "hard_negatives_same_job_group": 0.5824
+        },
+        "E3_related_occupations": {
+          "recall@10": 0.5789,
+          "recall@20": 0.7196,
+          "occupations": 920
+        }
+      },
+      "PPMI-SVD co-occurrence": {
+        "E1_link_prediction_test": {
+          "recall@10": 0.4791,
+          "recall@50": 0.7098,
+          "mrr": 0.5725,
+          "auc": 0.9576,
+          "occupations": 823
+        },
+        "E2_skill_adjacency_auc_test": {
+          "easy_negatives": 0.8663,
+          "hard_negatives_same_job_group": 0.7309
+        },
+        "E3_related_occupations": {
+          "recall@10": 0.2067,
+          "recall@20": 0.292,
+          "occupations": 920
+        }
+      },
+      "GraphSAGE (this model)": {
+        "E1_link_prediction_test": {
+          "recall@10": 0.4679,
+          "recall@50": 0.7101,
+          "mrr": 0.4994,
+          "auc": 0.9641,
+          "occupations": 823
+        },
+        "E2_skill_adjacency_auc_test": {
+          "easy_negatives": 0.8714,
+          "hard_negatives_same_job_group": 0.7145
+        },
+        "E3_related_occupations": {
+          "recall@10": 0.3092,
+          "recall@20": 0.4347,
+          "occupations": 920
+        }
       }
     },
-    "gate_pass_hybrid_f1": true,
-    "artifact": "relational_graphsage_gnn"
+    "calibration": {
+      "kind": "isotonic",
+      "min_prob": 0.8,
+      "fitted_on": "validation adjacency pairs, hard (same-job-group) negatives",
+      "test_isotonic": {
+        "brier": 0.2138,
+        "ece": 0.0237,
+        "precision_at_p>=0.65": 0.82,
+        "share_of_true_pairs_kept_at_p>=0.65": 0.3087,
+        "precision_at_p>=0.8": 0.9011,
+        "share_of_true_pairs_kept_at_p>=0.8": 0.1855
+      },
+      "test_platt_for_comparison": {
+        "brier": 0.2178,
+        "ece": 0.0505,
+        "precision_at_p>=0.65": 0.7878,
+        "share_of_true_pairs_kept_at_p>=0.65": 0.3414,
+        "precision_at_p>=0.8": null,
+        "share_of_true_pairs_kept_at_p>=0.8": 0.0
+      },
+      "min_cosine_for_evidence": 0.8992
+    },
+    "app_skill_coverage": {
+      "vocab": 98,
+      "mapped_to_onet": 73,
+      "no_vector": 25
+    },
+    "old_handmade_pairs_for_reference": {
+      "new_graphsage": {
+        "auc": 0.781,
+        "pairs_covered": 138,
+        "pairs_total": 228
+      },
+      "old_yaml_gnn_v6": {
+        "auc": 0.9625,
+        "pairs_covered": 217,
+        "pairs_total": 228
+      },
+      "note": "labels come from hand-made clusters in synthesize_corpus.py, which the old model was trained on - not an independent test"
+    }
   },
   "M2": {
     "status": "ok",
-    "source": "C:\\Users\\aanya\\Documents\\SIH\\projects\\job recommendation system\\backend\\ml\\artifacts\\dcn_ranker_v1.metrics.json",
+    "source": "E:\\College\\B.Tech\\EDI\\aanya project\\job-recommendation-system\\backend\\ml\\artifacts\\dcn_ranker_v2.metrics.json",
+    "reported_on": "test",
+    "data_dir": "ml\\datasets\\careerbuilder",
     "Heuristic Weighted Sum": {
-      "ndcg@5": 0.9551695880348845,
-      "ndcg@10": 0.9586724353498873,
-      "mrr@10": 0.9166666666666666,
-      "map@10": 0.9166666666666666,
-      "auc_roc": 0.9845481049562682,
-      "n_eval_queries": 6,
-      "n_total_groups": 43,
+      "ndcg@5": 0.529290066808209,
+      "ndcg@10": 0.6044910368103057,
+      "mrr@10": 0.4843553866528474,
+      "map@10": 0.469199170879333,
+      "auc_roc": 0.6148460753899779,
+      "n_eval_queries": 827,
+      "n_total_groups": 892,
       "positive_label_min": 4
     },
     "LightGBM GBDT": {
-      "ndcg@5": 0.8931120597550493,
-      "ndcg@10": 0.9061168041153126,
-      "mrr@10": 0.8333333333333334,
-      "map@10": 0.8333333333333334,
-      "auc_roc": 0.926530612244898,
-      "n_eval_queries": 6,
-      "n_total_groups": 43,
+      "ndcg@5": 0.7641674309160023,
+      "ndcg@10": 0.8021560780744064,
+      "mrr@10": 0.7554212011285772,
+      "map@10": 0.7289884964353425,
+      "auc_roc": 0.8262788155188653,
+      "n_eval_queries": 827,
+      "n_total_groups": 892,
       "positive_label_min": 4,
-      "model": "LGBMRanker"
+      "model": "LGBMRanker",
+      "top_features_by_gain": {
+        "raw_bi_encoder_cosine": 0.4778,
+        "location_exact_match": 0.15,
+        "job_age_days": 0.1321,
+        "job_skill_count": 0.0575,
+        "cross_encoder_prob": 0.0417,
+        "location_region_match": 0.0317,
+        "missing_required_count": 0.0236,
+        "career_family_graph_distance": 0.0172,
+        "experience_delta_min_years": 0.0146,
+        "cross_encoder_logit": 0.0134
+      },
+      "best_iteration": 19
     },
     "DCN-v2 Neural Ranker": {
-      "ndcg@5": 0.9612444531423665,
-      "ndcg@10": 0.9612444531423665,
-      "mrr@10": 0.9166666666666666,
-      "map@10": 0.9166666666666666,
-      "auc_roc": 0.9743440233236151,
-      "n_eval_queries": 6,
-      "n_total_groups": 43,
+      "ndcg@5": 0.7196973329668044,
+      "ndcg@10": 0.7615963395083026,
+      "mrr@10": 0.6977010997869523,
+      "map@10": 0.6758729187630985,
+      "auc_roc": 0.7671933818206201,
+      "n_eval_queries": 827,
+      "n_total_groups": 892,
       "positive_label_min": 4
     }
   },
   "M3": {
     "status": "ok",
-    "artifact": "C:\\Users\\aanya\\Documents\\SIH\\projects\\job recommendation system\\backend\\ml\\artifacts\\calibrator_v4.joblib",
+    "artifact": "E:\\College\\B.Tech\\EDI\\aanya project\\job-recommendation-system\\backend\\ml\\artifacts\\calibrator_v5.joblib",
     "input_kind": "dcn_logit",
+    "fit_on": "ml\\datasets\\careerbuilder\\val.jsonl",
+    "dcn_artifact": "dcn_ranker_v2.pt",
     "oof_n_splits": 5,
     "Pre-calibration (OOF)": {
-      "ece": 0.02348853920345135,
-      "brier": 0.02212397806640241
+      "ece": 0.03481076173358315,
+      "brier": 0.11566535432281255
     },
     "Post-calibration (OOF, unbiased)": {
-      "ece": 0.016377745465706597,
-      "brier": 0.02604447223274487
+      "ece": 0.010474031491783418,
+      "brier": 0.11359176441739818
     },
-    "n_samples": 252,
-    "positive_rate": 0.027777777777777776,
-    "calibration_curve_png": "C:\\Users\\aanya\\Documents\\SIH\\projects\\job recommendation system\\backend\\ml\\artifacts\\calibration_curve.png"
+    "held_out_test": {
+      "n": 7058,
+      "positive_rate": 0.18900538396146216,
+      "ece_before": 0.046131710210282,
+      "brier_before": 0.1267220185980631,
+      "ece_after": 0.01901987119381279,
+      "brier_after": 0.1248657231442015
+    },
+    "match_tiers": {
+      "base_rate": 0.16024131842260153,
+      "top": 0.32048263684520306,
+      "strong": 0.16024131842260153,
+      "rule": "top >= 2x validation apply rate; strong >= validation apply rate; else possible",
+      "test": {
+        "top": {
+          "share": 0.16378577500708416,
+          "apply_rate": 0.5173010380622838
+        },
+        "strong": {
+          "share": 0.16591102295267782,
+          "apply_rate": 0.23484201537147736
+        },
+        "possible": {
+          "share": 0.6703032020402381,
+          "apply_rate": 0.0974424011836821
+        }
+      }
+    },
+    "n_samples": 6796,
+    "positive_rate": 0.16024131842260153,
+    "calibration_curve_png": "E:\\College\\B.Tech\\EDI\\aanya project\\job-recommendation-system\\backend\\ml\\artifacts\\calibration_curve.png"
   },
   "M4": {
     "status": "ok",
+    "simulation_study": true,
+    "note": "synthetic clicks only; the live policy does not use these weights - it starts fresh and learns online from real interactions (ml/artifacts/bandit_online.joblib)",
     "n_rounds": 300,
     "benchmark": {
       "n_rounds": 1000,
@@ -203,8 +328,8 @@
         "n_rounds": 1000,
         "ips_estimated_reward": 0.527725,
         "snips_estimated_reward": 0.523349,
-        "cumulative_expected_reward": 538.231791,
-        "cumulative_regret": 28.746354,
+        "cumulative_expected_reward": 538.23179,
+        "cumulative_regret": 28.746355,
         "oracle_rounds": 1000,
         "snips_ctr_reward_lift_vs_random": 0.287265
       },
@@ -223,567 +348,20 @@
         "n_rounds": 1000,
         "ips_estimated_reward": 0.529982,
         "snips_estimated_reward": 0.523549,
-        "cumulative_expected_reward": 537.603125,
-        "cumulative_regret": 29.37502,
+        "cumulative_expected_reward": 537.603124,
+        "cumulative_regret": 29.375021,
         "oracle_rounds": 1000,
         "snips_ctr_reward_lift_vs_random": 0.287757
       }
     },
     "artifacts": {
-      "report_json": "C:\\Users\\aanya\\Documents\\SIH\\projects\\job recommendation system\\backend\\ml\\artifacts\\bandit_ope_report.json",
-      "regret_curve_png": "C:\\Users\\aanya\\Documents\\SIH\\projects\\job recommendation system\\backend\\ml\\artifacts\\bandit_regret_curve.png"
+      "report_json": "E:\\College\\B.Tech\\EDI\\aanya project\\job-recommendation-system\\backend\\ml\\artifacts\\simulation\\bandit_ope_report.json",
+      "regret_curve_png": "E:\\College\\B.Tech\\EDI\\aanya project\\job-recommendation-system\\backend\\ml\\artifacts\\simulation\\bandit_regret_curve.png"
     }
   },
   "M5": {
-    "status": "ok",
-    "source": "db",
-    "n_evaluated_pairs": 15,
-    "verification_pass_rate": 1.0,
-    "programmatic_verification_pass_rate": 1.0,
-    "prerequisite_ordering_accuracy": 1.0,
-    "prereq_pairs_checked": 1,
-    "prereq_pairs_ok": 1,
-    "hallucination_rate": 0.0,
-    "end_to_end_trace_test_pass_rate": 1.0,
-    "multi_hop_chains_covered": [
-      "sql->postgresql"
-    ],
-    "target_chains": [
-      "sql->postgresql",
-      "python->machine learning",
-      "machine learning->deep learning",
-      "docker->kubernetes"
-    ],
-    "examples": [
-      {
-        "sample": {
-          "profile_id": "ff3c153c-ac2d-401d-84b9-5d32079224dc",
-          "job_id": "3d565a22-a727-4d7e-b267-71c27aaf62cd",
-          "job_title": "Cloud & DevOps Infrastructure Lead",
-          "chain_hits_in_candidates": 1
-        },
-        "verification_pass": true,
-        "programmatic_verification_pass": true,
-        "trace_pass": true,
-        "trace_checks": {
-          "has_agent_trace": true,
-          "has_3_agents": true,
-          "agent1_gap_analyzer": true,
-          "agent2_curriculum_planner": true,
-          "agent3_critic": true,
-          "grounded_m1": true
-        },
-        "prereq_pairs_checked": 0,
-        "prereq_pairs_ok": 0,
-        "prerequisite_ordering_accuracy": 1.0,
-        "hallucinated_skills": [],
-        "hallucination_rate": 0.0,
-        "chains_covered": [],
-        "n_steps": 6,
-        "n_phases": 4,
-        "summary": "4 skill step(s), 2 project step(s), ~280h total (high effort); readiness low \u2192 medium.",
-        "issues": []
-      },
-      {
-        "sample": {
-          "profile_id": "ff3c153c-ac2d-401d-84b9-5d32079224dc",
-          "job_id": "aca964ad-8bf2-4281-96ef-115ab8a08f25",
-          "job_title": "Senior Data Platform Engineer",
-          "chain_hits_in_candidates": 1
-        },
-        "verification_pass": true,
-        "programmatic_verification_pass": true,
-        "trace_pass": true,
-        "trace_checks": {
-          "has_agent_trace": true,
-          "has_3_agents": true,
-          "agent1_gap_analyzer": true,
-          "agent2_curriculum_planner": true,
-          "agent3_critic": true,
-          "grounded_m1": true
-        },
-        "prereq_pairs_checked": 1,
-        "prereq_pairs_ok": 1,
-        "prerequisite_ordering_accuracy": 1.0,
-        "hallucinated_skills": [],
-        "hallucination_rate": 0.0,
-        "chains_covered": [
-          "sql->postgresql"
-        ],
-        "n_steps": 6,
-        "n_phases": 4,
-        "summary": "4 skill step(s), 2 project step(s), ~200h total (high effort); readiness low \u2192 medium.",
-        "issues": []
-      },
-      {
-        "sample": {
-          "profile_id": "fdb2c6a8-3f50-4a74-8e3d-6bfc411b2982",
-          "job_id": "3d565a22-a727-4d7e-b267-71c27aaf62cd",
-          "job_title": "Cloud & DevOps Infrastructure Lead",
-          "chain_hits_in_candidates": 1
-        },
-        "verification_pass": true,
-        "programmatic_verification_pass": true,
-        "trace_pass": true,
-        "trace_checks": {
-          "has_agent_trace": true,
-          "has_3_agents": true,
-          "agent1_gap_analyzer": true,
-          "agent2_curriculum_planner": true,
-          "agent3_critic": true,
-          "grounded_m1": true
-        },
-        "prereq_pairs_checked": 0,
-        "prereq_pairs_ok": 0,
-        "prerequisite_ordering_accuracy": 1.0,
-        "hallucinated_skills": [],
-        "hallucination_rate": 0.0,
-        "chains_covered": [],
-        "n_steps": 6,
-        "n_phases": 4,
-        "summary": "4 skill step(s), 2 project step(s), ~280h total (high effort); readiness low \u2192 medium.",
-        "issues": []
-      }
-    ],
-    "all_pairs": [
-      {
-        "sample": {
-          "profile_id": "ff3c153c-ac2d-401d-84b9-5d32079224dc",
-          "job_id": "3d565a22-a727-4d7e-b267-71c27aaf62cd",
-          "job_title": "Cloud & DevOps Infrastructure Lead",
-          "chain_hits_in_candidates": 1
-        },
-        "verification_pass": true,
-        "programmatic_verification_pass": true,
-        "trace_pass": true,
-        "trace_checks": {
-          "has_agent_trace": true,
-          "has_3_agents": true,
-          "agent1_gap_analyzer": true,
-          "agent2_curriculum_planner": true,
-          "agent3_critic": true,
-          "grounded_m1": true
-        },
-        "prereq_pairs_checked": 0,
-        "prereq_pairs_ok": 0,
-        "prerequisite_ordering_accuracy": 1.0,
-        "hallucinated_skills": [],
-        "hallucination_rate": 0.0,
-        "chains_covered": [],
-        "n_steps": 6,
-        "n_phases": 4,
-        "summary": "4 skill step(s), 2 project step(s), ~280h total (high effort); readiness low \u2192 medium.",
-        "issues": []
-      },
-      {
-        "sample": {
-          "profile_id": "ff3c153c-ac2d-401d-84b9-5d32079224dc",
-          "job_id": "aca964ad-8bf2-4281-96ef-115ab8a08f25",
-          "job_title": "Senior Data Platform Engineer",
-          "chain_hits_in_candidates": 1
-        },
-        "verification_pass": true,
-        "programmatic_verification_pass": true,
-        "trace_pass": true,
-        "trace_checks": {
-          "has_agent_trace": true,
-          "has_3_agents": true,
-          "agent1_gap_analyzer": true,
-          "agent2_curriculum_planner": true,
-          "agent3_critic": true,
-          "grounded_m1": true
-        },
-        "prereq_pairs_checked": 1,
-        "prereq_pairs_ok": 1,
-        "prerequisite_ordering_accuracy": 1.0,
-        "hallucinated_skills": [],
-        "hallucination_rate": 0.0,
-        "chains_covered": [
-          "sql->postgresql"
-        ],
-        "n_steps": 6,
-        "n_phases": 4,
-        "summary": "4 skill step(s), 2 project step(s), ~200h total (high effort); readiness low \u2192 medium.",
-        "issues": []
-      },
-      {
-        "sample": {
-          "profile_id": "fdb2c6a8-3f50-4a74-8e3d-6bfc411b2982",
-          "job_id": "3d565a22-a727-4d7e-b267-71c27aaf62cd",
-          "job_title": "Cloud & DevOps Infrastructure Lead",
-          "chain_hits_in_candidates": 1
-        },
-        "verification_pass": true,
-        "programmatic_verification_pass": true,
-        "trace_pass": true,
-        "trace_checks": {
-          "has_agent_trace": true,
-          "has_3_agents": true,
-          "agent1_gap_analyzer": true,
-          "agent2_curriculum_planner": true,
-          "agent3_critic": true,
-          "grounded_m1": true
-        },
-        "prereq_pairs_checked": 0,
-        "prereq_pairs_ok": 0,
-        "prerequisite_ordering_accuracy": 1.0,
-        "hallucinated_skills": [],
-        "hallucination_rate": 0.0,
-        "chains_covered": [],
-        "n_steps": 6,
-        "n_phases": 4,
-        "summary": "4 skill step(s), 2 project step(s), ~280h total (high effort); readiness low \u2192 medium.",
-        "issues": []
-      },
-      {
-        "sample": {
-          "profile_id": "fd785662-f16b-474f-b7ae-fdd32f2e8fda",
-          "job_id": "3d565a22-a727-4d7e-b267-71c27aaf62cd",
-          "job_title": "Cloud & DevOps Infrastructure Lead",
-          "chain_hits_in_candidates": 1
-        },
-        "verification_pass": true,
-        "programmatic_verification_pass": true,
-        "trace_pass": true,
-        "trace_checks": {
-          "has_agent_trace": true,
-          "has_3_agents": true,
-          "agent1_gap_analyzer": true,
-          "agent2_curriculum_planner": true,
-          "agent3_critic": true,
-          "grounded_m1": true
-        },
-        "prereq_pairs_checked": 0,
-        "prereq_pairs_ok": 0,
-        "prerequisite_ordering_accuracy": 1.0,
-        "hallucinated_skills": [],
-        "hallucination_rate": 0.0,
-        "chains_covered": [],
-        "n_steps": 6,
-        "n_phases": 4,
-        "summary": "4 skill step(s), 2 project step(s), ~280h total (high effort); readiness low \u2192 low.",
-        "issues": []
-      },
-      {
-        "sample": {
-          "profile_id": "f9a24230-2d65-49ce-bb98-20edaeb48beb",
-          "job_id": "3d565a22-a727-4d7e-b267-71c27aaf62cd",
-          "job_title": "Cloud & DevOps Infrastructure Lead",
-          "chain_hits_in_candidates": 1
-        },
-        "verification_pass": true,
-        "programmatic_verification_pass": true,
-        "trace_pass": true,
-        "trace_checks": {
-          "has_agent_trace": true,
-          "has_3_agents": true,
-          "agent1_gap_analyzer": true,
-          "agent2_curriculum_planner": true,
-          "agent3_critic": true,
-          "grounded_m1": true
-        },
-        "prereq_pairs_checked": 0,
-        "prereq_pairs_ok": 0,
-        "prerequisite_ordering_accuracy": 1.0,
-        "hallucinated_skills": [],
-        "hallucination_rate": 0.0,
-        "chains_covered": [],
-        "n_steps": 6,
-        "n_phases": 4,
-        "summary": "4 skill step(s), 2 project step(s), ~280h total (high effort); readiness low \u2192 low.",
-        "issues": []
-      },
-      {
-        "sample": {
-          "profile_id": "f338c545-19bb-414f-a5a9-36ad4a302a89",
-          "job_id": "3d565a22-a727-4d7e-b267-71c27aaf62cd",
-          "job_title": "Cloud & DevOps Infrastructure Lead",
-          "chain_hits_in_candidates": 1
-        },
-        "verification_pass": true,
-        "programmatic_verification_pass": true,
-        "trace_pass": true,
-        "trace_checks": {
-          "has_agent_trace": true,
-          "has_3_agents": true,
-          "agent1_gap_analyzer": true,
-          "agent2_curriculum_planner": true,
-          "agent3_critic": true,
-          "grounded_m1": true
-        },
-        "prereq_pairs_checked": 0,
-        "prereq_pairs_ok": 0,
-        "prerequisite_ordering_accuracy": 1.0,
-        "hallucinated_skills": [],
-        "hallucination_rate": 0.0,
-        "chains_covered": [],
-        "n_steps": 6,
-        "n_phases": 4,
-        "summary": "4 skill step(s), 2 project step(s), ~280h total (high effort); readiness low \u2192 medium.",
-        "issues": []
-      },
-      {
-        "sample": {
-          "profile_id": "f2f05255-3da2-4eb6-9dc2-1a9104de6626",
-          "job_id": "3d565a22-a727-4d7e-b267-71c27aaf62cd",
-          "job_title": "Cloud & DevOps Infrastructure Lead",
-          "chain_hits_in_candidates": 1
-        },
-        "verification_pass": true,
-        "programmatic_verification_pass": true,
-        "trace_pass": true,
-        "trace_checks": {
-          "has_agent_trace": true,
-          "has_3_agents": true,
-          "agent1_gap_analyzer": true,
-          "agent2_curriculum_planner": true,
-          "agent3_critic": true,
-          "grounded_m1": true
-        },
-        "prereq_pairs_checked": 0,
-        "prereq_pairs_ok": 0,
-        "prerequisite_ordering_accuracy": 1.0,
-        "hallucinated_skills": [],
-        "hallucination_rate": 0.0,
-        "chains_covered": [],
-        "n_steps": 6,
-        "n_phases": 4,
-        "summary": "4 skill step(s), 2 project step(s), ~280h total (high effort); readiness low \u2192 medium.",
-        "issues": []
-      },
-      {
-        "sample": {
-          "profile_id": "ebcd039a-cc50-4f65-851e-3c7b6bd8cf18",
-          "job_id": "3d565a22-a727-4d7e-b267-71c27aaf62cd",
-          "job_title": "Cloud & DevOps Infrastructure Lead",
-          "chain_hits_in_candidates": 1
-        },
-        "verification_pass": true,
-        "programmatic_verification_pass": true,
-        "trace_pass": true,
-        "trace_checks": {
-          "has_agent_trace": true,
-          "has_3_agents": true,
-          "agent1_gap_analyzer": true,
-          "agent2_curriculum_planner": true,
-          "agent3_critic": true,
-          "grounded_m1": true
-        },
-        "prereq_pairs_checked": 0,
-        "prereq_pairs_ok": 0,
-        "prerequisite_ordering_accuracy": 1.0,
-        "hallucinated_skills": [],
-        "hallucination_rate": 0.0,
-        "chains_covered": [],
-        "n_steps": 6,
-        "n_phases": 4,
-        "summary": "4 skill step(s), 2 project step(s), ~280h total (high effort); readiness low \u2192 low.",
-        "issues": []
-      },
-      {
-        "sample": {
-          "profile_id": "eab57ae8-aab7-4d5a-b0e7-cfb50d92ebe3",
-          "job_id": "3d565a22-a727-4d7e-b267-71c27aaf62cd",
-          "job_title": "Cloud & DevOps Infrastructure Lead",
-          "chain_hits_in_candidates": 1
-        },
-        "verification_pass": true,
-        "programmatic_verification_pass": true,
-        "trace_pass": true,
-        "trace_checks": {
-          "has_agent_trace": true,
-          "has_3_agents": true,
-          "agent1_gap_analyzer": true,
-          "agent2_curriculum_planner": true,
-          "agent3_critic": true,
-          "grounded_m1": true
-        },
-        "prereq_pairs_checked": 0,
-        "prereq_pairs_ok": 0,
-        "prerequisite_ordering_accuracy": 1.0,
-        "hallucinated_skills": [],
-        "hallucination_rate": 0.0,
-        "chains_covered": [],
-        "n_steps": 6,
-        "n_phases": 4,
-        "summary": "4 skill step(s), 2 project step(s), ~280h total (high effort); readiness low \u2192 medium.",
-        "issues": []
-      },
-      {
-        "sample": {
-          "profile_id": "e98cb4d7-501a-4884-855d-3b0445d6516b",
-          "job_id": "3d565a22-a727-4d7e-b267-71c27aaf62cd",
-          "job_title": "Cloud & DevOps Infrastructure Lead",
-          "chain_hits_in_candidates": 1
-        },
-        "verification_pass": true,
-        "programmatic_verification_pass": true,
-        "trace_pass": true,
-        "trace_checks": {
-          "has_agent_trace": true,
-          "has_3_agents": true,
-          "agent1_gap_analyzer": true,
-          "agent2_curriculum_planner": true,
-          "agent3_critic": true,
-          "grounded_m1": true
-        },
-        "prereq_pairs_checked": 0,
-        "prereq_pairs_ok": 0,
-        "prerequisite_ordering_accuracy": 1.0,
-        "hallucinated_skills": [],
-        "hallucination_rate": 0.0,
-        "chains_covered": [],
-        "n_steps": 6,
-        "n_phases": 4,
-        "summary": "4 skill step(s), 2 project step(s), ~280h total (high effort); readiness low \u2192 medium.",
-        "issues": []
-      },
-      {
-        "sample": {
-          "profile_id": "df69407a-fe40-4fc3-b6f3-f5e99b7677da",
-          "job_id": "3d565a22-a727-4d7e-b267-71c27aaf62cd",
-          "job_title": "Cloud & DevOps Infrastructure Lead",
-          "chain_hits_in_candidates": 1
-        },
-        "verification_pass": true,
-        "programmatic_verification_pass": true,
-        "trace_pass": true,
-        "trace_checks": {
-          "has_agent_trace": true,
-          "has_3_agents": true,
-          "agent1_gap_analyzer": true,
-          "agent2_curriculum_planner": true,
-          "agent3_critic": true,
-          "grounded_m1": true
-        },
-        "prereq_pairs_checked": 0,
-        "prereq_pairs_ok": 0,
-        "prerequisite_ordering_accuracy": 1.0,
-        "hallucinated_skills": [],
-        "hallucination_rate": 0.0,
-        "chains_covered": [],
-        "n_steps": 6,
-        "n_phases": 4,
-        "summary": "4 skill step(s), 2 project step(s), ~280h total (high effort); readiness low \u2192 medium.",
-        "issues": []
-      },
-      {
-        "sample": {
-          "profile_id": "d6098e48-fc71-4c16-9023-c7e4a12c2438",
-          "job_id": "3d565a22-a727-4d7e-b267-71c27aaf62cd",
-          "job_title": "Cloud & DevOps Infrastructure Lead",
-          "chain_hits_in_candidates": 1
-        },
-        "verification_pass": true,
-        "programmatic_verification_pass": true,
-        "trace_pass": true,
-        "trace_checks": {
-          "has_agent_trace": true,
-          "has_3_agents": true,
-          "agent1_gap_analyzer": true,
-          "agent2_curriculum_planner": true,
-          "agent3_critic": true,
-          "grounded_m1": true
-        },
-        "prereq_pairs_checked": 0,
-        "prereq_pairs_ok": 0,
-        "prerequisite_ordering_accuracy": 1.0,
-        "hallucinated_skills": [],
-        "hallucination_rate": 0.0,
-        "chains_covered": [],
-        "n_steps": 6,
-        "n_phases": 4,
-        "summary": "4 skill step(s), 2 project step(s), ~280h total (high effort); readiness low \u2192 medium.",
-        "issues": []
-      },
-      {
-        "sample": {
-          "profile_id": "cda99aae-0e34-461e-8aff-1b933d147dbb",
-          "job_id": "3d565a22-a727-4d7e-b267-71c27aaf62cd",
-          "job_title": "Cloud & DevOps Infrastructure Lead",
-          "chain_hits_in_candidates": 1
-        },
-        "verification_pass": true,
-        "programmatic_verification_pass": true,
-        "trace_pass": true,
-        "trace_checks": {
-          "has_agent_trace": true,
-          "has_3_agents": true,
-          "agent1_gap_analyzer": true,
-          "agent2_curriculum_planner": true,
-          "agent3_critic": true,
-          "grounded_m1": true
-        },
-        "prereq_pairs_checked": 0,
-        "prereq_pairs_ok": 0,
-        "prerequisite_ordering_accuracy": 1.0,
-        "hallucinated_skills": [],
-        "hallucination_rate": 0.0,
-        "chains_covered": [],
-        "n_steps": 6,
-        "n_phases": 4,
-        "summary": "4 skill step(s), 2 project step(s), ~280h total (high effort); readiness low \u2192 medium.",
-        "issues": []
-      },
-      {
-        "sample": {
-          "profile_id": "ccef2a3b-72cb-40d2-a3fb-71d51b1e3569",
-          "job_id": "3d565a22-a727-4d7e-b267-71c27aaf62cd",
-          "job_title": "Cloud & DevOps Infrastructure Lead",
-          "chain_hits_in_candidates": 1
-        },
-        "verification_pass": true,
-        "programmatic_verification_pass": true,
-        "trace_pass": true,
-        "trace_checks": {
-          "has_agent_trace": true,
-          "has_3_agents": true,
-          "agent1_gap_analyzer": true,
-          "agent2_curriculum_planner": true,
-          "agent3_critic": true,
-          "grounded_m1": true
-        },
-        "prereq_pairs_checked": 0,
-        "prereq_pairs_ok": 0,
-        "prerequisite_ordering_accuracy": 1.0,
-        "hallucinated_skills": [],
-        "hallucination_rate": 0.0,
-        "chains_covered": [],
-        "n_steps": 6,
-        "n_phases": 4,
-        "summary": "4 skill step(s), 2 project step(s), ~280h total (high effort); readiness low \u2192 medium.",
-        "issues": []
-      },
-      {
-        "sample": {
-          "profile_id": "ca073c68-6aa7-470c-a3b5-ae2c250af0f9",
-          "job_id": "3d565a22-a727-4d7e-b267-71c27aaf62cd",
-          "job_title": "Cloud & DevOps Infrastructure Lead",
-          "chain_hits_in_candidates": 1
-        },
-        "verification_pass": true,
-        "programmatic_verification_pass": true,
-        "trace_pass": true,
-        "trace_checks": {
-          "has_agent_trace": true,
-          "has_3_agents": true,
-          "agent1_gap_analyzer": true,
-          "agent2_curriculum_planner": true,
-          "agent3_critic": true,
-          "grounded_m1": true
-        },
-        "prereq_pairs_checked": 0,
-        "prereq_pairs_ok": 0,
-        "prerequisite_ordering_accuracy": 1.0,
-        "hallucinated_skills": [],
-        "hallucination_rate": 0.0,
-        "chains_covered": [],
-        "n_steps": 6,
-        "n_phases": 4,
-        "summary": "4 skill step(s), 2 project step(s), ~280h total (high effort); readiness low \u2192 medium.",
-        "issues": []
-      }
-    ],
-    "selection_errors_sample": []
+    "status": "error",
+    "error": "eval_m5 DB evaluation failed (no silent fallback): (psycopg.errors.ConnectionTimeout) connection timeout expired\n(Background on this error at: https://sqlalche.me/e/20/e3q8). sample_errors=[]",
+    "how": "start the stack (docker compose up) so the DB is at alembic head, then rerun"
   }
 }

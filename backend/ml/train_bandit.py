@@ -5,7 +5,8 @@ This script can:
 1) simulate a realistic bandit dataset (contextual, stochastic logging policy),
 2) train a LinUCB policy offline,
 3) evaluate with replay-style avg reward and IPS/SNIPS off-policy estimates,
-4) save an artifact to ml/artifacts/bandit_v*.joblib.
+4) save an artifact to ml/artifacts/simulation/bandit_v*.joblib (simulation study;
+   the app does NOT load it - the live policy starts fresh and learns online).
 
 It is dependency-light and can run without a database (simulation mode).
 """
@@ -28,7 +29,9 @@ if str(BACKEND_ROOT) not in sys.path:
 
 from app.services.bandit import BANDIT_FEATURE_NAMES, D, LinUCBPolicy  # noqa: E402
 
-ARTIFACTS = BACKEND_ROOT / "ml" / "artifacts"
+# Simulation study only: kept OUT of ml/artifacts/ so the app never serves a
+# policy trained on simulated clicks (the live bandit learns from real interactions).
+ARTIFACTS = BACKEND_ROOT / "ml" / "artifacts" / "simulation"
 DATASETS = BACKEND_ROOT / "ml" / "datasets"
 
 

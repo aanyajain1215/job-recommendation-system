@@ -145,20 +145,27 @@ def _scale_rows(rows: np.ndarray, scaler: dict | None) -> np.ndarray:
     return ((rows - mean) / scale).astype(np.float32)
 
 
-def get_val_logits_and_labels() -> tuple[np.ndarray, np.ndarray, str, Path]:
-    """Load held-out validation DCN-v2 logits directly (no score fallback)."""
-    val_rows = read_jsonl(DATASETS / "test.jsonl")
+def _version_num(path: Path) -> int:
+    digits = "".join(ch for ch in path.stem.rsplit("_v", 1)[-1] if ch.isdigit())
+    return int(digits) if digits else -1
+
+
+def newest_dcn() -> Path:
+    cands = sorted(ARTIFACTS.glob("dcn_ranker_v*.pt"), key=_version_num)
+    if not cands:
+        raise RuntimeError("DCN ranker artifact not found (expected ml/artifacts/dcn_ranker_v*.pt)")
+    return cands[-1]
+
+
+def get_val_logits_and_labels(rows_path: Path | None = None, dcn_path: Path | None = None
+                              ) -> tuple[np.ndarray, np.ndarray, str, Path]:
+    """Load held-out DCN-v2 logits for `rows_path` directly (no score fallback)."""
+    val_rows = read_jsonl(rows_path or (DATASETS / "test.jsonl"))
     if not val_rows:
         raise SystemExit("validation dataset missing: run ml/build_datasets.py")
     y = np.array([1.0 if float(r.get("label", 0)) >= POSITIVE_LABEL_MIN else 0.0 for r in val_rows], dtype=np.float64)
 
-    # prefer explicit v1, else newest
-    path = ARTIFACTS / "dcn_ranker_v1.pt"
-    if not path.exists():
-        cands = sorted(ARTIFACTS.glob("dcn_ranker_v*.pt"))
-        if not cands:
-            raise RuntimeError("DCN ranker artifact not found (expected ml/artifacts/dcn_ranker_v1.pt)")
-        path = cands[-1]
+    path = dcn_path or newest_dcn()
 
     import torch  # noqa: PLC0415
 
@@ -215,7 +222,15 @@ def fit_calibrator(x: np.ndarray, y: np.ndarray, kind_hint: str | None = None):
         model = LogisticRegression(max_iter=1000)
         model.fit(x.reshape(-1, 1), y.astype(int))
         return model, "platt"
-    model = IsotonicRegression(out_of_bounds="clip")
+    # Isotonic overfits the extremes: a handful of top-logit samples that were all
+    # positive becomes P = 1.0, and live jobs beyond that logit then show "100%".
+    # Bound both ends by Laplace-smoothed rates of the top/bottom 2% of samples.
+    order = np.argsort(x)
+    k = max(30, int(0.02 * n))
+    lo, hi = y[order[:k]], y[order[-k:]]
+    y_min = float((lo.sum() + 1) / (len(lo) + 2))
+    y_max = float((hi.sum() + 1) / (len(hi) + 2))
+    model = IsotonicRegression(y_min=min(y_min, y_max), y_max=y_max, out_of_bounds="clip")
     model.fit(x, y)
     return model, "isotonic"
 
@@ -316,11 +331,14 @@ def print_calibration_table(pre_ece, pre_brier, post_ece, post_brier, input_kind
     print("=" * len(header))
 
 
-def run(register: bool = True) -> dict:
+def run(register: bool = True, data_dir: Path = DATASETS, dcn_path: Path | None = None) -> dict:
     import joblib  # noqa: PLC0415
 
     ARTIFACTS.mkdir(parents=True, exist_ok=True)
-    x, y, input_kind, dcn_path = get_val_logits_and_labels()
+    has_val = (data_dir / "val.jsonl").exists()
+    fit_path = data_dir / ("val.jsonl" if has_val else "test.jsonl")
+    dcn_path = dcn_path or newest_dcn()
+    x, y, input_kind, dcn_path = get_val_logits_and_labels(fit_path, dcn_path)
     if input_kind != "dcn_logit":
         raise RuntimeError(f"Expected input_kind=dcn_logit, got {input_kind}")
     print(f"[calibrate] input_kind={input_kind} (verified), dcn_artifact={dcn_path}, n={len(x)}, positives={int(y.sum())}")
@@ -351,6 +369,32 @@ def run(register: bool = True) -> dict:
     insample_ece = expected_calibration_error(insample_post, y)
     insample_brier = brier_score(insample_post, y)
 
+    # Held-out TEST calibration (rows never used to fit the calibrator or pick the DCN epoch)
+    test_report = None
+    if has_val and (data_dir / "test.jsonl").exists():
+        xt, yt, _k, _p = get_val_logits_and_labels(data_dir / "test.jsonl", dcn_path)
+        pt_pre, pt_post = sigmoid(xt), predict_calibrated(final_model, final_kind, xt)
+        test_report = {
+            "n": int(len(xt)), "positive_rate": float(np.mean(yt)),
+            "ece_before": expected_calibration_error(pt_pre, yt), "brier_before": brier_score(pt_pre, yt),
+            "ece_after": expected_calibration_error(pt_post, yt), "brier_after": brier_score(pt_post, yt),
+        }
+        print(f"[calibrate] held-out TEST: {json.dumps(test_report)}")
+
+    # Match tiers shown in the UI instead of a raw percentage. Cut-offs are
+    # relative to the average apply rate on VAL: Top >= 2x average, Strong >= average.
+    base_rate = float(np.mean(y)) if len(y) else 0.0
+    tiers = {"base_rate": base_rate, "top": 2.0 * base_rate, "strong": base_rate,
+             "rule": "top >= 2x validation apply rate; strong >= validation apply rate; else possible"}
+    if has_val and (data_dir / "test.jsonl").exists():
+        pt_post = predict_calibrated(final_model, final_kind, xt)
+        bands = {"top": pt_post >= tiers["top"],
+                 "strong": (pt_post >= tiers["strong"]) & (pt_post < tiers["top"]),
+                 "possible": pt_post < tiers["strong"]}
+        tiers["test"] = {k: {"share": float(m.mean()), "apply_rate": float(yt[m].mean()) if m.any() else None}
+                         for k, m in bands.items()}
+        print(f"[calibrate] tiers on TEST: {json.dumps(tiers['test'])}")
+
     version = next_version()
     metrics = {
         "input_kind": input_kind,
@@ -367,6 +411,9 @@ def run(register: bool = True) -> dict:
         # primary reported post-calibration metrics are OOF/unbiased
         "ece_after": post_ece,
         "brier_after": post_brier,
+        "fit_on": str(fit_path),
+        "dcn_artifact": dcn_path.name,
+        "test": test_report,
     }
     payload = {
         "kind": final_kind,
@@ -374,6 +421,7 @@ def run(register: bool = True) -> dict:
         "model": final_model,
         "input": input_kind,
         "positive_label_min": POSITIVE_LABEL_MIN,
+        "tiers": tiers,
         "metrics": metrics,
         "trained_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -410,8 +458,11 @@ def run(register: bool = True) -> dict:
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--no-register", action="store_true")
+    ap.add_argument("--data-dir", default=str(DATASETS), help="folder with val.jsonl (fit) + test.jsonl (report)")
+    ap.add_argument("--dcn", default=None, help="DCN artifact (default: newest dcn_ranker_v*.pt)")
     args = ap.parse_args(argv)
-    run(register=not args.no_register)
+    run(register=not args.no_register, data_dir=Path(args.data_dir),
+        dcn_path=Path(args.dcn) if args.dcn else None)
     return 0
 
 

@@ -390,11 +390,20 @@ _POLICY_CACHE: NeuralUCBPolicy | None = None
 _POLICY_CACHE_PATH: str | None = None
 
 
+ONLINE_ARTIFACT = "bandit_online.joblib"
+
+
 def latest_artifact_path() -> Path | None:
+    """The live policy: learned ONLINE from real interactions only.
+
+    Policies pre-trained on simulated clicks live in ml/artifacts/simulation/
+    (a separate study) and are deliberately never loaded here, so a fresh
+    install starts uninformed and learns from real users' applies/saves/dismissals.
+    """
     if not ARTIFACT_DIR.exists():
         return None
-    cands = sorted(ARTIFACT_DIR.glob("bandit_v*.joblib"))
-    return cands[-1] if cands else None
+    path = ARTIFACT_DIR / ONLINE_ARTIFACT
+    return path if path.exists() else None
 
 
 def get_policy(alpha: float = 0.8, temperature: float = 0.5) -> NeuralUCBPolicy:
@@ -529,10 +538,8 @@ def apply_online_reward(db, profile_id, job_id, reward: float) -> bool:
         path = latest_artifact_path()
         if path is None:
             ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
-            path = ARTIFACT_DIR / "bandit_v2.joblib"
-            policy.model_version = policy.model_version or "v2"
-        else:
-            policy.model_version = policy.model_version or path.stem.replace("bandit_", "")
+            path = ARTIFACT_DIR / ONLINE_ARTIFACT
+        policy.model_version = "online"
         policy.trained_at = datetime.now(timezone.utc).isoformat()
         policy.save(path)
         reset_cache()

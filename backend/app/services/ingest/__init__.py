@@ -15,6 +15,7 @@ from app.services.ingest.fetch import (
 )
 from app.services.ingest.parse import (
     detect_employment_type,
+    detect_fresher,
     detect_remote,
     map_seniority,
     parse_location,
@@ -41,6 +42,7 @@ __all__ = [
     "assign_family",
     "clean_text",
     "detect_employment_type",
+    "detect_fresher",
     "detect_remote",
     "extract_skills",
     "fetch_all",

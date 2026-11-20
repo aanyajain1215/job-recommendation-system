@@ -47,6 +47,11 @@ class RecommendationItem(BaseModel):
     # ---- additive Phase 1 & 2 fields ----
     explanation: ExplanationSchema | None = None
     readiness: Readiness | None = None
+    match_tier: Literal["top", "strong", "possible"] | None = Field(
+        default=None,
+        description=("Label shown instead of a raw %: top = >=2x the average apply rate, "
+                     "strong = above average, possible = below (M3-calibrated)"),
+    )
     family: str | None = Field(default=None, description="Job family name")
     strategy: str = Field(default="deterministic", description="Ranking strategy that produced this item")
     model_version: str | None = Field(default=None, description="Learned model version when strategy used one")

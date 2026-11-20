@@ -307,7 +307,7 @@ export default function JobsPage() {
             className="rounded-lg border border-zinc-800 bg-zinc-950/70 py-2 px-3 text-xs text-zinc-300 focus:border-teal-500 focus:outline-none"
           >
             <option value="">All Seniority Levels</option>
-            <option value="entry">Entry Level</option>
+            <option value="entry">Fresher / Entry Level (0-1 yrs)</option>
             <option value="mid">Mid Level</option>
             <option value="senior">Senior</option>
             <option value="lead">Lead</option>

@@ -1,6 +1,6 @@
 # JobRec — Project State (Current Snapshot)
 
-> Snapshot date: **2026-04-16** (repository state). This document summarizes the current implementation, workflow, and operational notes. For historical design intent, see [`DESIGN.md`](DESIGN.md).
+> Snapshot date: **2026-04-16** (repository state); ML section 2a updated **2026-11-20**. This document summarizes the current implementation, workflow, and operational notes. For historical design intent, see [`DESIGN.md`](DESIGN.md).
 
 ## 1. Current implementation summary
 
@@ -34,6 +34,57 @@
 - **Command:** `python backend/ml/evaluate_all.py` (run from `backend/` with required env/DB/deps)
 - **Master report:** `backend/ml/reports/master_project_evaluation.json`
 - Prints aggregated M0–M5 summaries and writes JSON output
+
+## 2a. ML on real data (Nov 2026 overhaul) — what changed and why
+
+### Why the previous ML was not credible
+| Problem | Effect |
+|---|---|
+| Ranker labels came from `ml/ground_truth.py`: the hand-written `scoring.py` score + noise | The DCN learned to copy the formula (formula NDCG 0.959 vs DCN 0.961) |
+| Ranker judged on 6 test queries; bi-encoder "fine-tuned" on 37 positive pairs | Numbers too small to mean anything |
+| GNN trained on ~100 hand-written YAML lines and tested on pairs generated from the same clusters | Circular; AUC 0.96 measured memorisation |
+| `build_datasets.py` read cross-encoder output in the wrong format and swallowed the error | Cross-encoder features were always 0 in ranker training |
+| Fine-tuned weights missing, config paths empty | The app silently used the off-the-shelf models |
+| Ranker trainer picked its best epoch on the test set | Inflated reported scores |
+| Displayed score was `max(calibrated, raw)` | Calibration was overridden |
+
+### What replaced it (all evaluated on held-out data, always against baselines)
+| Model | Data | Script | Held-out evaluation |
+|---|---|---|---|
+| Cross-encoder (M0) | Resume–JD Fit (HuggingFace, human labels) | `ml/train_cross_encoder_real.py` | Official test split; all 71 test jobs unseen |
+| Skill graph (M1) | O*NET 31.0 occupation→technology | `ml/onet.py`, `ml/train_skill_graph_onet.py` | 20% of links hidden; hard negatives from the same job group |
+| Ranker (M2) | CareerBuilder 2012 real applications, tech jobs | `ml/build_careerbuilder_dataset.py` → `ml/train_neural_ranker.py --data-dir ml/datasets/careerbuilder` | Time split: weeks 1–5 train, 6 val (epoch/early stopping), 7 test; no user overlap |
+| Calibrator (M3) | CareerBuilder validation week | `ml/calibrate.py --data-dir ml/datasets/careerbuilder` | Fit on val, reported on test |
+
+Every ranker feature is computed with the app's own serving code (skill extractor, embedder, cross-encoder, skill graph, `score_pair`, `build_features`), so train == serve.
+
+### Leaks found and fixed while building the ranker dataset
+A first run scored NDCG 0.97 with 99% of LightGBM's gain on `job_age_days`. Causes, all fixed: (1) negatives' reference date stored in a format the parser rejected, so every negative had age 0; (2) 7.5k negatives were posted after the user's search time; (3) rows were written positives-first, so tied scores were broken in the model's favour (now hashed order + seeded random tie-break in the evaluator). After fixes the strongest single feature has AUC 0.71 (text similarity).
+
+### Other fixes
+- Location matching (`app/services/location.py`): "Pune, India" == "Pune, Maharashtra", Bangalore == Bengaluru, city→state for major Indian cities.
+- Calibrated score shown as-is; ties broken by the DCN logit; readiness no longer calibrated twice.
+- Newest model files chosen by numeric version (v10 > v9) for skill vectors, ranker, calibrator.
+- Bandit: simulation-trained policies moved to `ml/artifacts/simulation/`; the live policy starts fresh and learns online (`ml/artifacts/bandit_online.joblib`, git-ignored).
+
+### Known limitations (state these in reports)
+- CareerBuilder is 2012, US, and mostly non-tech; only its tech subset is used. The ranker learns how much each signal matters (similarity, location, freshness, skill fit), not job-title vocabulary.
+- CareerBuilder users have no skills list (skills come from past job titles); no salary or education signals.
+- The bi-encoder is not fine-tuned (off-the-shelf BGE).
+- 25 app skills (e.g. "machine learning", FastAPI) have no O*NET equivalent and get no skill vector; the app falls back to curated edges.
+- LightGBM beats the served DCN (NDCG 0.802 vs 0.762); the app currently serves only DCN.
+- Roadmap/simulator/gap readiness still pass the formula score through the DCN-logit calibrator (pre-existing; semantically loose).
+- Best future data: the app's own logged interactions (`ml/build_datasets.py`), once real users exist.
+
+### Reproduce (CPU; training env in `backend/.venv`, see `backend/ml/requirements-train.txt`)
+```
+python ml/train_cross_encoder_real.py
+python ml/train_skill_graph_onet.py
+python ml/build_careerbuilder_dataset.py      # needs the Kaggle files in ml/data/external/careerbuilder/
+python ml/train_neural_ranker.py --data-dir ml/datasets/careerbuilder --version v2
+python ml/calibrate.py --data-dir ml/datasets/careerbuilder --no-register
+python ml/evaluate_all.py
+```
 
 ## 3. Frontend/UI state (current)
 

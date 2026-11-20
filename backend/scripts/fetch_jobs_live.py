@@ -161,7 +161,7 @@ def run_pipeline(
 
         location = parse_location(raw.get("location"))
         years = parse_years(description)
-        level = map_seniority(title, years)
+        level = map_seniority(title, years, description)
         remote = bool(raw.get("is_remote")) or detect_remote(title, description, location)
         employment = detect_employment_type(f"{title} {description[:400]}")
         report.parsed += 1

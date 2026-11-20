@@ -1,0 +1,18 @@
+# Training-only environment (GPU). Kept separate from backend/requirements.txt,
+# which pins the CPU torch build for the Docker server image.
+#
+#   py -3.13 -m venv backend/.venv
+#   backend/.venv/Scripts/python -m pip install -r backend/ml/requirements-train.txt
+#   backend/.venv/Scripts/python backend/ml/train_cross_encoder_real.py
+#
+# CUDA 13 build of torch; drop the index line for CPU-only training (much slower).
+--extra-index-url https://download.pytorch.org/whl/cu130
+torch==2.14.0+cu130
+sentence-transformers==6.3.0
+transformers==5.23.0
+accelerate==1.16.0
+datasets==5.2.0
+numpy==2.5.5
+scipy==1.18.1
+scikit-learn==1.9.1
+matplotlib==3.11.2

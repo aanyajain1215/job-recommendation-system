@@ -13,17 +13,17 @@ JobRec is a full-stack job recommendation and career-path platform built with **
 - **Auth/roles:** job seeker, employer, admin flows
 - **Frontend UX (current):** yellow/blue high-visibility theme, no signup questionnaire (register → dashboard), no Tracker/Settings tabs, in-app job detail modal for live listings, local save support for external (Adzuna) jobs, currency-aware salary display (₹ for Indian listings, appropriate symbols by currency/location)
 
-### ML/AI pipeline (M0–M5, current)
-| Stage | Current implementation | Notes / artifacts |
-|---|---|---|
-| **M0 Retrieval** | Domain-tuned **`BAAI/bge-base-en-v1.5` bi-encoder (768-d)** + **cross-encoder reranker** (two-stage retrieval) | M0 eval/report artifacts under `backend/ml/reports/` (e.g. `m0_embedding_eval.json`) and fine-tuned model dirs under `backend/ml/artifacts/` |
-| **M1 Skill/graph reasoning** | **Relational GraphSAGE** over directed Skill–Role–Project graph (inductive, contrastive link prediction) | Trained/evaluated via ML scripts; hybrid graph+embedding transfer logic used in runtime paths |
-| **M2 Ranking** | **PyTorch DCN-v2** neural ranker (31-feature schema, profile-split training/eval) with LightGBM/heuristic baselines for comparison | Primary learned ranking path (AI-strict/learned-primary runtime strategy) |
-| **M3 Calibration** | **Calibrator on DCN-v2 logits** (`input_kind=dcn_logit`) with stratified OOF pre/post metrics; production fit on val logits | Produces calibrated readiness/match probabilities/scores for display and downstream use |
-| **M4 Personalization/bandit** | **NeuralUCB** contextual bandit (with compatibility for prior policy interfaces), evaluated via IPS/SNIPS/regret (OPE) | Artifacts/reports under `backend/ml/artifacts/` and `backend/ml/reports/` |
-| **M5 Planning** | **3-stage Agentic Planner–Critic** roadmap pipeline with `agent_trace` (gap/prereq analysis → curriculum/project planning → feasibility/grounding critic) | Evaluated on real DB `(profile, job)` pairs in unified evaluation |
+### ML/AI pipeline (M0–M5, current — trained on real data, Nov 2026)
+| Stage | What runs in the app | Trained on (real data) | Held-out result vs baseline |
+|---|---|---|---|
+| **M0 Retrieval** | `BAAI/bge-base-en-v1.5` bi-encoder (off-the-shelf) → **cross-encoder** reranker fine-tuned by us | ~6k human-labelled resume–JD pairs ([Resume–JD Fit](https://huggingface.co/datasets/cnamuangtoun/resume-job-description-fit)) | Test jobs never seen: AUC 0.556 → **0.631**, Spearman 0.095 → **0.219** vs the base cross-encoder |
+| **M1 Skill graph** | **GraphSAGE** skill embeddings + curated prerequisite edges; isotonic-calibrated transfer evidence | **O*NET 31.0** (US Dept. of Labor, CC BY 4.0): 920 occupations, 2,622 technologies | Hidden 20% of occupation→tool links: AUC **0.964** (popularity 0.845, PPMI-SVD 0.958) |
+| **M2 Ranking** | **DCN-v2** ranker over 31 serving-time features | **CareerBuilder (Kaggle 2012)**: 9,751 real applications to tech jobs by 6,427 users | Later-week users never seen: NDCG@10 **0.762** vs hand-written formula 0.605 (LightGBM 0.802); #1 job applied to: 58% vs 31% |
+| **M3 Calibration** | Isotonic calibrator on DCN logits → **Top / Strong / Possible match** tiers in the UI | CareerBuilder validation week | Test ECE 0.046 → **0.019**; "Top" jobs applied to 52% vs "Possible" 10% |
+| **M4 Bandit** | NeuralUCB exploration slot that **learns online from real interactions** (starts fresh) | — (offline policy only in a separate simulation study, `ml/artifacts/simulation/`) | Simulation only; not a real-data result |
+| **M5 Planning** | 3-stage Agentic Planner–Critic roadmap pipeline with `agent_trace` | — | Evaluated on DB `(profile, job)` pairs (needs the database) |
 
-**Unified evaluation:** `backend/ml/evaluate_all.py` aggregates M0–M5 into `backend/ml/reports/master_project_evaluation.json` and prints summary tables.
+**Unified evaluation:** `backend/ml/evaluate_all.py` aggregates the reports above into `backend/ml/reports/master_project_evaluation.json` (M0–M4 run without a database). Details, method and limitations: `docs/PROJECT_STATE.md` §2a.
 
 ## Tech stack
 

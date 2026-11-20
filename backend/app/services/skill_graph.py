@@ -166,25 +166,66 @@ def fetch_graph(db) -> SkillGraph:
     return graph
 
 
+def _version_num(path: Path) -> int:
+    digits = "".join(ch for ch in path.stem.rsplit("_v", 1)[-1] if ch.isdigit())
+    return int(digits) if digits else -1
+
+
 @lru_cache
-def load_skill_embeddings() -> dict[str, np.ndarray]:
-    """Load M1 GraphSAGE/GNN skill embeddings (newest artifact)."""
+def _load_embedding_payload() -> dict | None:
+    """Newest skill-embedding artifact by numeric version (v10 > v7)."""
     import os
 
     if str(os.getenv("SKILL_GRAPH_DISABLE_EMBEDDINGS", "")).strip().lower() in {"1", "true", "yes"}:
-        return {}
+        return None
     try:
         import joblib  # noqa: PLC0415
     except Exception:
-        return {}
-    candidates = sorted(ARTIFACT_DIR.glob("skill2vec_v*.joblib"))
+        return None
+    candidates = sorted(ARTIFACT_DIR.glob("skill2vec_v*.joblib"), key=_version_num)
     if not candidates:
-        candidates = sorted(ARTIFACT_DIR.glob("skillgraph_gnn_v*.joblib"))
+        candidates = sorted(ARTIFACT_DIR.glob("skillgraph_gnn_v*.joblib"), key=_version_num)
     if not candidates:
-        return {}
+        return None
     try:
         payload = joblib.load(candidates[-1])
-        vectors = payload.get("vectors") if isinstance(payload, dict) else None
+        return payload if isinstance(payload, dict) else None
+    except Exception:
+        log.exception("Failed to load skill embedding artifact %s", candidates[-1])
+        return None
+
+
+@lru_cache
+def load_embedding_calibration() -> dict | None:
+    """Calibration stored with the O*NET GraphSAGE artifact (v7+), if any.
+
+    Maps raw skill-skill cosine to P(related), fitted (isotonic) on held-out
+    O*NET pairs with same-job-group hard negatives. Below `min_prob` the
+    embedding gives no transfer evidence at all.
+    """
+    payload = _load_embedding_payload()
+    meta = (payload or {}).get("meta") or {}
+    cal = meta.get("calibration")
+    if isinstance(cal, dict) and cal.get("kind") in ("platt", "isotonic"):
+        return cal
+    return None
+
+
+def calibrated_probability(cosine: float, cal: dict) -> float:
+    """Raw skill-skill cosine -> calibrated P(related) using the stored fit."""
+    if cal.get("kind") == "isotonic":
+        return float(np.interp(cosine, cal["x"], cal["y"]))
+    return 1.0 / (1.0 + float(np.exp(-(cal["a"] * cosine + cal["b"]))))
+
+
+@lru_cache
+def load_skill_embeddings() -> dict[str, np.ndarray]:
+    """Load M1 skill embeddings (newest artifact)."""
+    payload = _load_embedding_payload()
+    if payload is None:
+        return {}
+    try:
+        vectors = payload.get("vectors")
         if not isinstance(vectors, dict):
             return {}
         out: dict[str, np.ndarray] = {}
@@ -209,6 +250,8 @@ def _cosine_sim(a: np.ndarray, b: np.ndarray) -> float:
 
 def reset_embedding_cache() -> None:
     load_skill_embeddings.cache_clear()
+    load_embedding_calibration.cache_clear()
+    _load_embedding_payload.cache_clear()
 
 
 def transfer_similarity(
@@ -247,7 +290,13 @@ def transfer_similarity(
                 sim = _cosine_sim(pvec, tvec)
                 if sim > best:
                     best = sim
-            if best >= 0.0:
+            cal = load_embedding_calibration() if embeddings is None else None
+            if cal is not None and best > -1.0:
+                # calibrated probability that the two skills are related; below
+                # min_prob there is no evidence (not a weak "partial transfer")
+                prob = calibrated_probability(best, cal)
+                emb_sim = prob if prob >= float(cal.get("min_prob", 0.5)) else None
+            elif best >= 0.0:
                 emb_sim = float(max(0.0, min(1.0, best)))
 
     for e in graph.of_type(SkillEdgeType.TRANSFER):

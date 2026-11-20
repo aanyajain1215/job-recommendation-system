@@ -1,0 +1,50 @@
+{
+  "baseline_heuristic": {
+    "ndcg@5": 0.529290066808209,
+    "ndcg@10": 0.6044910368103057,
+    "mrr@10": 0.4843553866528474,
+    "map@10": 0.469199170879333,
+    "auc_roc": 0.6148460753899779,
+    "n_eval_queries": 827,
+    "n_total_groups": 892,
+    "positive_label_min": 4
+  },
+  "lightgbm_gbdt": {
+    "ndcg@5": 0.7641674309160023,
+    "ndcg@10": 0.8021560780744064,
+    "mrr@10": 0.7554212011285772,
+    "map@10": 0.7289884964353425,
+    "auc_roc": 0.8262788155188653,
+    "n_eval_queries": 827,
+    "n_total_groups": 892,
+    "positive_label_min": 4,
+    "model": "LGBMRanker",
+    "top_features_by_gain": {
+      "raw_bi_encoder_cosine": 0.4778,
+      "location_exact_match": 0.15,
+      "job_age_days": 0.1321,
+      "job_skill_count": 0.0575,
+      "cross_encoder_prob": 0.0417,
+      "location_region_match": 0.0317,
+      "missing_required_count": 0.0236,
+      "career_family_graph_distance": 0.0172,
+      "experience_delta_min_years": 0.0146,
+      "cross_encoder_logit": 0.0134
+    },
+    "best_iteration": 19
+  },
+  "dcn_v2": {
+    "ndcg@5": 0.7196973329668044,
+    "ndcg@10": 0.7615963395083026,
+    "mrr@10": 0.6977010997869523,
+    "map@10": 0.6758729187630985,
+    "auc_roc": 0.7671933818206201,
+    "n_eval_queries": 827,
+    "n_total_groups": 892,
+    "positive_label_min": 4
+  },
+  "reported_on": "test",
+  "data_dir": "ml\\datasets\\careerbuilder",
+  "artifact": "E:\\College\\B.Tech\\EDI\\aanya project\\job-recommendation-system\\backend\\ml\\artifacts\\dcn_ranker_v2.pt",
+  "loss_curve_png": "E:\\College\\B.Tech\\EDI\\aanya project\\job-recommendation-system\\backend\\ml\\artifacts\\dcn_loss_curve.png"
+}

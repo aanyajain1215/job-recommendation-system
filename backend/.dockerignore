@@ -6,3 +6,8 @@ __pycache__
 *.egg-info
 .dockerignore
 .git
+# local caches / training-only data (GBs) - never part of the image
+.cache
+ml/data/external
+ml/datasets/careerbuilder
+ml/artifacts/simulation

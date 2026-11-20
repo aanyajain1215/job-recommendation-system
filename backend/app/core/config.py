@@ -48,7 +48,9 @@ class Settings(BaseSettings):
     embedding_dim: int = 768
     # Cross-encoder for precise reranking of top-K candidates
     cross_encoder_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
-    cross_encoder_finetuned_path: str = ""  # e.g. ml/artifacts/cross_encoder_finetuned
+    # Fine-tuned on real Resume-JD Fit pairs (ml/train_cross_encoder_real.py); resolved
+    # relative to ml/artifacts/. Falls back to cross_encoder_model if weights are absent.
+    cross_encoder_finetuned_path: str = "cross_encoder_finetuned"
     cross_encoder_top_k: int = 50
     cross_encoder_batch_size: int = 16
 

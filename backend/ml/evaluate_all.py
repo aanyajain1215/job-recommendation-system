@@ -1,13 +1,21 @@
 #!/usr/bin/env python
-"""Unified Master Evaluation & Ablation Report (M0-M5).
+"""Unified Master Evaluation Report (M0-M5) - real-data, held-out evaluations.
 
-Aggregates metrics across:
-- M0: Two-Stage Bi-Encoder + Cross-Encoder Retrieval
-- M1: Relational GraphSAGE Skill Graph
-- M2: DCN-v2 Neural Ranker (vs heuristic and LightGBM baseline)
-- M3: Probability Calibrator (OOF pre/post ECE, Brier)
-- M4: NeuralUCB Contextual Bandit OPE (IPS/SNIPS)
-- M5: Agentic Roadmap Pipeline (verification, prereq ordering, end-to-end trace)
+Aggregates the reports written by each trainer (all evaluated on data the model
+never saw, always against simple baselines):
+- M0: cross-encoder fine-tuned on human-labelled resume/JD pairs
+      (ml/train_cross_encoder_real.py; test jobs unseen in training)
+- M1: GraphSAGE skill graph on O*NET 31.0 (ml/train_skill_graph_onet.py;
+      held-out occupation->technology links)
+- M2: DCN-v2 ranker on real CareerBuilder applications
+      (ml/build_careerbuilder_dataset.py + train_neural_ranker.py; later-week users)
+- M3: isotonic calibrator on DCN logits (fit on val, reported on test) + match tiers
+- M4: NeuralUCB bandit - SIMULATION STUDY ONLY (synthetic clicks). The live
+      policy starts fresh and learns online from real interactions.
+- M5: Agentic roadmap pipeline (needs the database)
+
+The earlier versions of M0-M2 trained/evaluated on synthetic or self-generated
+labels (circular); see docs/PROJECT_STATE.md for what changed and why.
 
 Saves: backend/ml/reports/master_project_evaluation.json
 """
@@ -42,148 +50,84 @@ def _read_json(path: Path):
         return None
 
 
+def _newest(pattern: str) -> Path | None:
+    def num(p: Path) -> int:
+        digits = "".join(ch for ch in p.stem.rsplit("_v", 1)[-1] if ch.isdigit())
+        return int(digits) if digits else -1
+
+    cands = sorted(ARTIFACTS.glob(pattern), key=num)
+    return cands[-1] if cands else None
+
+
 def eval_m0() -> dict:
-    path = BACKEND_ROOT / "ml" / "reports" / "m0_embedding_eval.json"
+    path = ARTIFACTS / "cross_encoder_training_report.json"
     data = _read_json(path)
-    if not data:
-        return {"status": "missing", "path": str(path)}
-
-    stages = data.get("stages") or {}
-
-    def from_stage(stage_obj: dict):
-        m = (stage_obj or {}).get("metrics") or {}
-        timing = (stage_obj or {}).get("timing_ms") or {}
-        lat = timing.get("avg_inference_latency_ms_per_user") or timing.get("avg_query_encode_ms")
-        return {
-            "recall@1": m.get("recall@1"),
-            "recall@3": m.get("recall@3"),
-            "recall@5": m.get("recall@5"),
-            "mrr@10": m.get("mrr@10"),
-            "ndcg@10": m.get("ndcg@10"),
-            "latency_ms_per_user": lat,
-        }
-
-    # fallback to comparison_table if stages missing
-    table = {r.get("stage"): r for r in (data.get("comparison_table") or [])}
-
-    def from_table(prefix: str):
-        for k, r in table.items():
-            if str(k).startswith(prefix):
-                return {
-                    "recall@1": r.get("recall@1"),
-                    "recall@3": r.get("recall@3"),
-                    "recall@5": r.get("recall@5"),
-                    "mrr@10": r.get("mrr@10"),
-                    "ndcg@10": r.get("ndcg@10"),
-                    "latency_ms_per_user": r.get("avg_inference_latency_ms_per_user") or r.get("avg_query_encode_ms"),
-                }
-        return {}
-
-    base = from_stage(stages.get("a_base_biencoder", {})) or from_table("(a)")
-    ft = from_stage(stages.get("b_finetuned_biencoder", {})) or from_table("(b)")
-    bi_ce = from_stage(stages.get("c_two_stage_bi_ce", {})) or from_table("(c)")
-
+    if not data or "evaluation" not in data:
+        return {"status": "missing", "path": str(path), "how": "python ml/train_cross_encoder_real.py"}
     return {
         "status": "ok",
         "source": str(path),
-        "Base Bi-Encoder": base,
-        "Fine-Tuned Bi-Encoder": ft,
-        "Bi-Encoder + Cross-Encoder": bi_ce,
-        "improvements": data.get("improvements") or data.get("deltas"),
-        "meta": data.get("benchmark") or {},
+        "data": data.get("data", {}).get("source"),
+        "test_note": "official test split; every test job is unseen in training",
+        "models": {name: r.get("test") for name, r in data["evaluation"].items()},
+        "improvement_finetuned_vs_base": data.get("improvement_finetuned_vs_base_on_test"),
+        "note": "bi-encoder (first-stage retrieval) is the off-the-shelf BAAI/bge-base-en-v1.5, not fine-tuned",
     }
 
 
 def eval_m1() -> dict:
-    try:
-        from ml.train_skill2vec import load_artifact
-        from ml.evaluate import transfer_metrics
-
-        payload = load_artifact()
-        vectors = payload.get("vectors") if payload else None
-        tm = transfer_metrics(vectors)
-        # structure 3 rows clearly
-        rows = tm.get("rows") or []
-        out = {"status": "ok", "threshold": tm.get("threshold"), "n_pairs": tm.get("n_pairs"), "rows": {}}
-        name_map = {
-            "yaml_only": "YAML-only",
-            "pure_embedding": "Pure GraphSAGE",
-            "hybrid": "Hybrid (Graph + GraphSAGE)",
-        }
-        for r in rows:
-            key = name_map.get(r.get("mode"), r.get("name", r.get("mode")))
-            out["rows"][key] = {
-                "precision": r.get("precision"),
-                "recall": r.get("recall"),
-                "f1": r.get("f1"),
-                "auc_roc": r.get("auc_roc"),
-            }
-        out["gate_pass_hybrid_f1"] = tm.get("gate_pass")
-        out["artifact"] = (payload.get("meta", {}) if payload else {}).get("model")
-        return out
-    except Exception as exc:
-        return {"status": "error", "error": str(exc), "trace": traceback.format_exc()}
+    path = _newest("skillgraph_gnn_v*.json")
+    data = _read_json(path) if path else None
+    if not data or "evaluation" not in data:
+        return {"status": "missing", "how": "python ml/train_skill_graph_onet.py"}
+    return {
+        "status": "ok",
+        "source": str(path),
+        "data": data.get("data"),
+        "models": data["evaluation"],
+        "calibration": {k: v for k, v in (data.get("calibration") or {}).items() if k not in ("x", "y")},
+        "app_skill_coverage": {k: data["app_skill_coverage"][k] for k in ("vocab", "mapped_to_onet", "no_vector")},
+        "old_handmade_pairs_for_reference": data.get("E4_old_handmade_pairs"),
+    }
 
 
 def eval_m2() -> dict:
-    # prefer metrics json from last training; else run quick eval
-    m = _read_json(ARTIFACTS / "dcn_ranker_v1.metrics.json")
-    if m:
-        return {
-            "status": "ok",
-            "source": str(ARTIFACTS / "dcn_ranker_v1.metrics.json"),
-            "Heuristic Weighted Sum": m.get("baseline_heuristic") or m.get("baseline"),
-            "LightGBM GBDT": m.get("lightgbm_gbdt") or m.get("lightgbm_legacy"),
-            "DCN-v2 Neural Ranker": m.get("dcn_v2"),
-        }
-    # fallback: try recompute on saved split if model/artifacts exist
-    try:
-        from ml.train_neural_ranker import load_split, StandardScalerFit, evaluate_baseline_scores, evaluate_split, build_dcn_model, train_lightgbm_baseline
-        import torch
-        train_raw = load_split(DATASETS / "train.jsonl")
-        val_raw = load_split(DATASETS / "test.jsonl")
-        if train_raw.X.shape[0] == 0 or val_raw.X.shape[0] == 0:
-            return {"status": "missing_data"}
-        scaler = StandardScalerFit().fit(train_raw.X)
-        from ml.train_neural_ranker import SplitData
-        train = SplitData(scaler.transform(train_raw.X), train_raw.y, train_raw.y_bin, train_raw.scores_baseline, train_raw.groups)
-        val = SplitData(scaler.transform(val_raw.X), val_raw.y, val_raw.y_bin, val_raw.scores_baseline, val_raw.groups)
-        baseline = evaluate_baseline_scores(val_raw, val_raw.scores_baseline)
-        lgbm, _ = train_lightgbm_baseline(train, val)
-        # load dcn
-        path = ARTIFACTS / "dcn_ranker_v1.pt"
-        dcn = None
-        if path.exists():
-            payload = torch.load(path, map_location="cpu", weights_only=False)
-            model = build_dcn_model(train.X.shape[1])
-            model.load_state_dict(payload.get("state_dict", {}), strict=False)
-            dcn = evaluate_split(model, val)
-        return {
-            "status": "ok",
-            "Heuristic Weighted Sum": baseline,
-            "LightGBM GBDT": lgbm,
-            "DCN-v2 Neural Ranker": dcn,
-        }
-    except Exception as exc:
-        return {"status": "error", "error": str(exc), "trace": traceback.format_exc()}
+    path = _newest("dcn_ranker_v*.metrics.json")
+    m = _read_json(path) if path else None
+    if not m:
+        return {"status": "missing", "how": "python ml/train_neural_ranker.py --data-dir ml/datasets/careerbuilder --version vN"}
+    return {
+        "status": "ok",
+        "source": str(path),
+        "reported_on": m.get("reported_on", "unknown"),
+        "data_dir": m.get("data_dir"),
+        "Heuristic Weighted Sum": m.get("baseline_heuristic") or m.get("baseline"),
+        "LightGBM GBDT": m.get("lightgbm_gbdt") or m.get("lightgbm_legacy"),
+        "DCN-v2 Neural Ranker": m.get("dcn_v2"),
+    }
 
 
 def eval_m3() -> dict:
-    # read newest calibrator artifact metrics
     try:
         import joblib
-        cands = sorted(ARTIFACTS.glob("calibrator_v*.joblib"))
-        if not cands:
+
+        path = _newest("calibrator_v*.joblib")
+        if path is None:
             return {"status": "missing"}
-        payload = joblib.load(cands[-1])
+        payload = joblib.load(path)
         metrics = payload.get("metrics") or {}
         return {
             "status": "ok",
-            "artifact": str(cands[-1]),
+            "artifact": str(path),
             "input_kind": metrics.get("input_kind") or payload.get("input"),
+            "fit_on": metrics.get("fit_on"),
+            "dcn_artifact": metrics.get("dcn_artifact"),
             "oof_n_splits": metrics.get("oof_n_splits"),
             "Pre-calibration (OOF)": {"ece": metrics.get("ece_before"), "brier": metrics.get("brier_before")},
-            "Post-calibration (OOF, unbiased)": {"ece": metrics.get("ece_after_oof", metrics.get("ece_after")), "brier": metrics.get("brier_after_oof", metrics.get("brier_after"))},
+            "Post-calibration (OOF, unbiased)": {"ece": metrics.get("ece_after_oof", metrics.get("ece_after")),
+                                                 "brier": metrics.get("brier_after_oof", metrics.get("brier_after"))},
+            "held_out_test": metrics.get("test"),
+            "match_tiers": payload.get("tiers"),
             "n_samples": metrics.get("n_samples"),
             "positive_rate": metrics.get("positive_rate"),
             "calibration_curve_png": str(ARTIFACTS / "calibration_curve.png"),
@@ -206,7 +150,7 @@ def eval_m4() -> dict:
         lin, lin_extra = train_linear_linucb(rounds, alpha=LIN_ALPHA)
         neu = train_neural_ucb(rounds, alpha=NEURAL_ALPHA, temperature=NEURAL_TEMP)
         try:
-            neu.save(ARTIFACTS / "bandit_v2.joblib")
+            neu.save(ARTIFACTS / "simulation" / "bandit_v2.joblib")
         except Exception:
             pass
         # (b) Pure Greedy = neural greedy (alpha=0, no exploration bonus), same
@@ -217,7 +161,7 @@ def eval_m4() -> dict:
         eval_rounds = rounds[split:]
         results_eval, curves_eval = evaluate_ope(eval_rounds, models)
         results_all, _ = evaluate_ope(rounds, models)
-        regret_png = save_regret_curve(curves_eval, ARTIFACTS / "bandit_regret_curve.png")
+        regret_png = save_regret_curve(curves_eval, ARTIFACTS / "simulation" / "bandit_regret_curve.png")
         report = {
             "created_at": datetime.now(timezone.utc).isoformat(),
             "benchmark": bench_meta,
@@ -229,9 +173,9 @@ def eval_m4() -> dict:
             },
             "heldout_eval": {"n_rounds": len(eval_rounds), "policies": results_eval},
             "all_rounds": {"n_rounds": len(rounds), "policies": results_all},
-            "artifacts": {"report_json": str(ARTIFACTS / "bandit_ope_report.json"), "regret_curve_png": str(regret_png) if regret_png else None},
+            "artifacts": {"report_json": str(ARTIFACTS / "simulation" / "bandit_ope_report.json"), "regret_curve_png": str(regret_png) if regret_png else None},
         }
-        (ARTIFACTS / "bandit_ope_report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
+        (ARTIFACTS / "simulation" / "bandit_ope_report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
 
         summary = {}
         for label, m in results_eval.items():
@@ -243,6 +187,9 @@ def eval_m4() -> dict:
             }
         return {
             "status": "ok",
+            "simulation_study": True,
+            "note": ("synthetic clicks only; the live policy does not use these weights - it starts "
+                     "fresh and learns online from real interactions (ml/artifacts/bandit_online.joblib)"),
             "n_rounds": len(eval_rounds),
             "benchmark": bench_meta,
             "policies": summary,
@@ -496,28 +443,30 @@ def fmt(x, nd=4):
 
 def print_master(report: dict):
     print("\n" + "#" * 100)
-    print("MASTER ABLATION & SYSTEM METRICS SUMMARY (M0-M5)")
+    print("MASTER EVALUATION SUMMARY (M0-M5) - real data, held-out splits")
     print("#" * 100)
 
     m0 = report.get("M0", {})
-    print("\n[M0] Two-Stage Bi-Encoder + Cross-Encoder Retrieval")
+    print("\n[M0] Cross-encoder on real resume/JD pairs (test jobs unseen in training)")
     print("-" * 100)
-    print(f"{'Model':38s} {'R@1':>7s} {'R@3':>7s} {'R@5':>7s} {'MRR@10':>8s} {'NDCG@10':>8s} {'ms/user':>10s}")
-    for name in ["Base Bi-Encoder", "Fine-Tuned Bi-Encoder", "Bi-Encoder + Cross-Encoder"]:
-        r = m0.get(name) or {}
-        print(f"{name:38s} {fmt(r.get('recall@1')):>7s} {fmt(r.get('recall@3')):>7s} {fmt(r.get('recall@5')):>7s} {fmt(r.get('mrr@10')):>8s} {fmt(r.get('ndcg@10')):>8s} {fmt(r.get('latency_ms_per_user'),2):>10s}")
+    print(f"{'Model':42s} {'AUC fit':>8s} {'AUC good':>9s} {'Spearman':>9s} {'NDCG@10':>8s} {'MacroF1':>8s}")
+    for name, r in (m0.get("models") or {}).items():
+        r = r or {}
+        print(f"{name:42s} {fmt(r.get('auc_fit_vs_nofit')):>8s} {fmt(r.get('auc_good_vs_rest')):>9s} "
+              f"{fmt(r.get('spearman')):>9s} {fmt(r.get('ndcg@10_per_job')):>8s} {fmt(r.get('macro_f1_3class')):>8s}")
 
     m1 = report.get("M1", {})
-    print("\n[M1] Relational GraphSAGE Skill Graph (transfer classification)")
+    print("\n[M1] Skill graph on O*NET (held-out occupation->technology links)")
     print("-" * 100)
-    print(f"{'Mode':38s} {'Precision':>10s} {'Recall':>10s} {'F1':>10s} {'AUC-ROC':>10s}")
-    rows = m1.get("rows") or {}
-    for name in ["YAML-only", "Pure GraphSAGE", "Hybrid (Graph + GraphSAGE)"]:
-        r = rows.get(name) or rows.get(name.replace("(Graph + GraphSAGE)", "Graph+GraphSAGE")) or {}
-        print(f"{name:38s} {fmt(r.get('precision')):>10s} {fmt(r.get('recall')):>10s} {fmt(r.get('f1')):>10s} {fmt(r.get('auc_roc')):>10s}")
+    print(f"{'Model':42s} {'Link AUC':>9s} {'R@10':>7s} {'R@50':>7s} {'Adj AUC (hard)':>15s}")
+    for name, r in (m1.get("models") or {}).items():
+        e1 = r.get("E1_link_prediction_test") or {}
+        e2 = r.get("E2_skill_adjacency_auc_test") or {}
+        hard = e2.get("hard_negatives_same_job_group") if isinstance(e2, dict) else e2
+        print(f"{name:42s} {fmt(e1.get('auc')):>9s} {fmt(e1.get('recall@10')):>7s} {fmt(e1.get('recall@50')):>7s} {fmt(hard):>15s}")
 
     m2 = report.get("M2", {})
-    print("\n[M2] DCN-v2 Neural Ranker (validation, profile-split, positive-bearing queries)")
+    print(f"\n[M2] Ranker on real applications (reported on: {m2.get('reported_on')})")
     print("-" * 100)
     print(f"{'Model':38s} {'NDCG@5':>8s} {'NDCG@10':>8s} {'MRR@10':>8s} {'AUC-ROC':>8s} {'n_eval_q':>9s}")
     for name in ["Heuristic Weighted Sum", "LightGBM GBDT", "DCN-v2 Neural Ranker"]:
@@ -525,17 +474,22 @@ def print_master(report: dict):
         print(f"{name:38s} {fmt(r.get('ndcg@5')):>8s} {fmt(r.get('ndcg@10')):>8s} {fmt(r.get('mrr@10')):>8s} {fmt(r.get('auc_roc')):>8s} {str(r.get('n_eval_queries','n/a')):>9s}")
 
     m3 = report.get("M3", {})
-    print("\n[M3] Probability Calibrator (OOF, unbiased)")
+    print("\n[M3] Probability Calibrator (fit on val; OOF + held-out test)")
     print("-" * 100)
     print(f"{'State':38s} {'ECE':>12s} {'Brier':>12s}")
-    pre = m3.get("Pre-calibration (OOF)") or m3.get("Pre-calibration") or {}
-    post = m3.get("Post-calibration (OOF, unbiased)") or m3.get("Post-calibration (OOF)") or m3.get("Post-calibration") or {}
-    print(f"{'Pre-calibration':38s} {fmt(pre.get('ece'),6):>12s} {fmt(pre.get('brier'),6):>12s}")
+    pre = m3.get("Pre-calibration (OOF)") or {}
+    post = m3.get("Post-calibration (OOF, unbiased)") or {}
+    test = m3.get("held_out_test") or {}
+    print(f"{'Pre-calibration (OOF)':38s} {fmt(pre.get('ece'),6):>12s} {fmt(pre.get('brier'),6):>12s}")
     print(f"{'Post-calibration (OOF)':38s} {fmt(post.get('ece'),6):>12s} {fmt(post.get('brier'),6):>12s}")
-    print(f"  input_kind={m3.get('input_kind')} n={m3.get('n_samples')} oof_folds={m3.get('oof_n_splits')}")
+    print(f"{'Post-calibration (held-out TEST)':38s} {fmt(test.get('ece_after'),6):>12s} {fmt(test.get('brier_after'),6):>12s}")
+    tiers = (m3.get("match_tiers") or {}).get("test") or {}
+    for t in ("top", "strong", "possible"):
+        if t in tiers:
+            print(f"  tier {t:9s} share={fmt(tiers[t].get('share'),3)} real apply rate={fmt(tiers[t].get('apply_rate'),3)}")
 
     m4 = report.get("M4", {})
-    print("\n[M4] NeuralUCB Contextual Bandit OPE (IPS / SNIPS)")
+    print("\n[M4] NeuralUCB Contextual Bandit OPE - SIMULATION STUDY (synthetic clicks; not the live policy)")
     print("-" * 100)
     print(f"{'Policy':38s} {'IPS Reward':>12s} {'SNIPS Reward':>13s} {'SNIPS Lift':>12s} {'Cum Regret':>12s}")
     for name, r in (m4.get("policies") or {}).items():
@@ -571,7 +525,12 @@ def main():
     print("[evaluate_all] Running M4 (bandit OPE)...")
     report["M4"] = eval_m4()
     print("[evaluate_all] Running M5 (agentic roadmap)...")
-    report["M5"] = eval_m5()
+    try:
+        report["M5"] = eval_m5()
+    except Exception as exc:  # needs a migrated database; record the failure, keep M0-M4
+        report["M5"] = {"status": "error", "error": str(exc)[:500],
+                        "how": "start the stack (docker compose up) so the DB is at alembic head, then rerun"}
+        print(f"[evaluate_all] M5 skipped: {str(exc)[:160]}")
 
     out_path = REPORTS / "master_project_evaluation.json"
     out_path.write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")

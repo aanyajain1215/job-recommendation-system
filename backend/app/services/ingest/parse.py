@@ -127,9 +127,69 @@ def parse_years(text: str) -> float | None:
     return None
 
 
-def map_seniority(title: str, years: float | None = None) -> ExperienceLevel:
-    """Deterministic title→level mapping (reuses the resume seniority ladder)."""
-    level = _infer_seniority(title or "", years)  # type: ignore[arg-type]
+# Postings that say they want freshers / 0-1 years. Indian listings use "fresher"
+# far more than "entry level", and it usually appears in the description only.
+_FRESHER_RE = re.compile(
+    r"\bfreshers?\b"
+    r"|\b0\s*(?:[-–—]|to)\s*[12]\s*(?:\+\s*)?(?:years?|yrs)\b"
+    r"|\bentry[\s-]+level\b"
+    r"|\bno\s+(?:prior\s+|previous\s+)?(?:work\s+)?experience\s+(?:is\s+)?(?:required|needed|necessary)\b"
+    r"|\bgraduate\s+(?:trainee|engineer\s+trainee|program(?:me)?)\b"
+    r"|\bcampus\s+(?:hire|hiring|recruitment|drive|placement)\b"
+    r"|\b(?:recent|new|fresh)\s+grad(?:uate)?s?\b",
+    re.IGNORECASE,
+)
+_ENTRY_TITLE_RE = re.compile(
+    r"\b(?:intern|internship|trainee|apprentice|junior|jr\.?|graduate|fresher|freshers|entry[\s-]+level)\b",
+    re.IGNORECASE,
+)
+_SENIOR_TITLE_RE = re.compile(
+    r"\b(?:senior|sr\.?|lead|principal|staff|architect|manager|director|head|vp|vice\s+president|chief|cto|ceo|coo)\b",
+    re.IGNORECASE,
+)
+
+
+def detect_fresher(text: str | None) -> bool:
+    """True when a posting/query explicitly targets freshers / 0-1 years / entry level."""
+    return bool(text and _FRESHER_RE.search(text))
+
+
+def map_seniority(
+    title: str, years: float | None = None, description: str | None = None
+) -> ExperienceLevel:
+    """Posting → experience level.
+
+    Order (first match wins):
+      1. entry words in the title (intern, trainee, junior, fresher, ...) unless
+         the title is also senior ("Senior Trainer" stays senior)
+      2. senior/lead/executive words in the title → the resume seniority ladder
+      3. the description explicitly asks for freshers / 0-1 years / entry level
+      4. the required years parsed from the posting (0-1 → entry, 2-4 → mid, ...)
+      5. ladder default for generic titles ("developer", "engineer") → mid
+
+    Previously a generic title word ("developer") decided "mid" before the
+    years or the description were looked at, so "Full Stack Developer (0-1
+    years, freshers welcome)" was labelled mid; and the ladder mapped the word
+    "entry" itself to mid.
+    """
+    t = title or ""
+    senior_title = bool(_SENIOR_TITLE_RE.search(t))
+    if _ENTRY_TITLE_RE.search(t) and not senior_title:
+        return ExperienceLevel.ENTRY
+    if not senior_title:
+        if detect_fresher(description):
+            return ExperienceLevel.ENTRY
+        if years is not None:
+            if years < 2:
+                return ExperienceLevel.ENTRY
+            if years < 5:
+                return ExperienceLevel.MID
+            if years < 8:
+                return ExperienceLevel.SENIOR
+            if years < 12:
+                return ExperienceLevel.LEAD
+            return ExperienceLevel.EXECUTIVE
+    level = _infer_seniority(t, years)  # type: ignore[arg-type]
     if level in {e.value for e in ExperienceLevel}:
         return ExperienceLevel(level)
     if years is not None:

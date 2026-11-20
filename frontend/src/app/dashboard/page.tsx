@@ -18,6 +18,7 @@ import {
   RecommendationItem,
 } from "@/lib/types";
 import JobDetailModal from "@/components/job-detail-modal";
+import { MATCH_TIER_META, matchTierOf } from "@/lib/format";
 import {
   ArrowRight,
   Briefcase,
@@ -331,14 +332,11 @@ export default function DashboardPage() {
                         <div>
                           <div className="flex items-center justify-between mb-2">
                             <span
-                              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${
-                                item.match_score >= 70
-                                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
-                                  : "bg-cyan-500/10 text-cyan-600 border border-cyan-500/30"
-                              }`}
+                              className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-bold ${MATCH_TIER_META[matchTierOf(item)].badge}`}
+                              title={MATCH_TIER_META[matchTierOf(item)].hint}
                             >
                               <Zap className="h-3 w-3 fill-current" />
-                              {item.match_score}% Match
+                              {MATCH_TIER_META[matchTierOf(item)].label}
                             </span>
                             {item.job.is_remote && (
                               <span className="text-[10px] text-zinc-400">Remote</span>

@@ -125,7 +125,7 @@ def _map_posting(raw: dict) -> dict | None:
     raw_location = str(raw.get("location") or "").strip()
     location = parse_location(raw_location) or raw_location or "Not specified"
     years = parse_years(description)
-    level = map_seniority(title, years)
+    level = map_seniority(title, years, description)
     remote = bool(raw.get("is_remote")) or detect_remote(title, description, location)
     employment = detect_employment_type(f"{title} {description[:400]}")
 

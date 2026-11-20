@@ -191,6 +191,8 @@ Schema:
 Rules:
 - ONLY include fields the user's query actually mentions (unknown fields are dropped downstream anyway).
 - Use ONLY the enum values listed. Never invent fields.
+- "fresher", "freshers", "0-1 years", "no experience", "graduate", "entry level" => "experience_level": "entry"
+  (do NOT put these words in "keywords"). "internship"/"intern" => "employment_type": "internship".
 
 USER QUERY:
 {query}"""

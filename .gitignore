@@ -44,8 +44,18 @@ mlruns/
 !backend/ml/reports/master_project_evaluation.json
 # Large fine-tuned weights kept locally (regenerate via training scripts)
 backend/ml/artifacts/**/*.safetensors
+# Live bandit state learned online from real users (runtime data, not a release artifact)
+backend/ml/artifacts/bandit_online.joblib
+
+# Downloaded public datasets + local HF/pip caches and training checkpoints
+backend/ml/data/external/
+backend/.cache/
 
 # Ingestion run snapshots / reports (regenerated per run)
 backend/ml/data/raw/
 backend/ml/reports/*
 !backend/ml/reports/master_project_evaluation.json
+
+# Derived from Kaggle competition data (CareerBuilder 2012): rules forbid redistribution.
+# Rebuild with backend/ml/build_careerbuilder_dataset.py; manifest.json is kept.
+backend/ml/datasets/careerbuilder/*.jsonl

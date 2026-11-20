@@ -1,5 +1,5 @@
 {
-  "created_at": "2026-11-15T10:18:59.987834+00:00",
+  "created_at": "2026-11-20T04:47:42.166069+00:00",
   "benchmark": {
     "n_rounds": 1000,
     "k_arms": 8,
@@ -85,8 +85,8 @@
         "n_rounds": 1000,
         "ips_estimated_reward": 0.527725,
         "snips_estimated_reward": 0.523349,
-        "cumulative_expected_reward": 538.231791,
-        "cumulative_regret": 28.746354,
+        "cumulative_expected_reward": 538.23179,
+        "cumulative_regret": 28.746355,
         "oracle_rounds": 1000,
         "snips_ctr_reward_lift_vs_random": 0.287265
       },
@@ -105,15 +105,15 @@
         "n_rounds": 1000,
         "ips_estimated_reward": 0.529982,
         "snips_estimated_reward": 0.523549,
-        "cumulative_expected_reward": 537.603125,
-        "cumulative_regret": 29.37502,
+        "cumulative_expected_reward": 537.603124,
+        "cumulative_regret": 29.375021,
         "oracle_rounds": 1000,
         "snips_ctr_reward_lift_vs_random": 0.287757
       }
     }
   },
   "artifacts": {
-    "report_json": "C:\\Users\\aanya\\Documents\\SIH\\projects\\job recommendation system\\backend\\ml\\artifacts\\bandit_ope_report.json",
-    "regret_curve_png": "C:\\Users\\aanya\\Documents\\SIH\\projects\\job recommendation system\\backend\\ml\\artifacts\\bandit_regret_curve.png"
+    "report_json": "E:\\College\\B.Tech\\EDI\\aanya project\\job-recommendation-system\\backend\\ml\\artifacts\\simulation\\bandit_ope_report.json",
+    "regret_curve_png": "E:\\College\\B.Tech\\EDI\\aanya project\\job-recommendation-system\\backend\\ml\\artifacts\\simulation\\bandit_regret_curve.png"
   }
 }

@@ -44,14 +44,24 @@ class CrossEncoderReranker:
         self._resolved = self._resolve_model_path()
         log.info("Cross-encoder reranker active: %s", self._resolved)
 
+    @staticmethod
+    def _has_weights(path: Path) -> bool:
+        return path.is_dir() and any(
+            (path / name).exists() for name in ("model.safetensors", "pytorch_model.bin")
+        )
+
     def _resolve_model_path(self) -> str:
-        p = Path(self.finetuned_path) if self.finetuned_path else None
-        if p and p.exists():
-            return str(p)
-        if self.finetuned_path:
-            cand = ARTIFACT_DIR / self.finetuned_path
-            if cand.exists():
+        if not self.finetuned_path:
+            return self.model_name
+        for cand in (Path(self.finetuned_path), ARTIFACT_DIR / self.finetuned_path):
+            if self._has_weights(cand):
                 return str(cand)
+        # Weights are git-ignored (large); a fresh clone has only the config files.
+        log.warning(
+            "Fine-tuned cross-encoder weights not found at %r; using base model %s. "
+            "Run `python ml/train_cross_encoder_real.py` to produce them.",
+            self.finetuned_path, self.model_name,
+        )
         return self.model_name
 
     def _get_model(self):

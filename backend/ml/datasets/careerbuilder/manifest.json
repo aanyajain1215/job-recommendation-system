@@ -1,0 +1,108 @@
+{
+  "created_at": "2026-11-19T20:06:22.067298+00:00",
+  "source": "Kaggle Job Recommendation Challenge (CareerBuilder.com, 2012) - real applications",
+  "scope": "tech jobs only (title matches families.yaml)",
+  "labels": {
+    "applied": 6,
+    "not_applied_sampled": 0
+  },
+  "negatives": {
+    "per_user": 7,
+    "same_state": 4,
+    "rule": "same time window, already posted at the user's search time, not applied"
+  },
+  "split": {
+    "train_windows": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "val_windows": [
+      6
+    ],
+    "test_windows": [
+      7
+    ],
+    "user_overlap": "none (each user is in one window)"
+  },
+  "rows": {
+    "train": 39947,
+    "val": 6796,
+    "test": 7058
+  },
+  "groups": {
+    "train": 4700,
+    "val": 835,
+    "test": 892
+  },
+  "positives": {
+    "train": 7328,
+    "val": 1089,
+    "test": 1334
+  },
+  "family_mix": {
+    "Frontend Engineering": 1125,
+    "Software Engineering": 3842,
+    "Data Analytics": 3709,
+    "Cybersecurity": 580,
+    "Data Science": 391,
+    "Backend Engineering": 54,
+    "DevOps Engineering": 50
+  },
+  "feature_order": [
+    "raw_bi_encoder_cosine",
+    "cross_encoder_logit",
+    "cross_encoder_prob",
+    "required_coverage_ratio",
+    "preferred_coverage_ratio",
+    "transfer_sim_mean",
+    "transfer_sim_max",
+    "missing_required_count",
+    "transfer_credit_count",
+    "experience_delta_min_years",
+    "experience_delta_max_years",
+    "education_rank_delta_signed",
+    "education_field_match",
+    "project_skill_overlap_ratio",
+    "project_overlap_count",
+    "is_remote_job",
+    "location_exact_match",
+    "location_preferred_match",
+    "location_region_match",
+    "seeker_open_to_remote",
+    "salary_iou",
+    "salary_gap_ratio",
+    "salary_disclosed",
+    "career_family_exact_match",
+    "career_family_graph_distance",
+    "job_age_days",
+    "applicant_count",
+    "profile_completeness",
+    "historical_apply_rate",
+    "job_skill_count",
+    "seeker_skill_count"
+  ],
+  "constant_features": [
+    "education_rank_delta_signed",
+    "education_field_match",
+    "project_overlap_count",
+    "location_preferred_match",
+    "seeker_open_to_remote",
+    "salary_iou",
+    "salary_gap_ratio",
+    "salary_disclosed",
+    "applicant_count",
+    "historical_apply_rate"
+  ],
+  "known_gaps": [
+    "education left empty (serving passes no degree bar)",
+    "no salary in data",
+    "applicant_count/historical_apply_rate = 0 (as for live Adzuna jobs)",
+    "seeker skills extracted from past job titles + major only (CB has no skill list)",
+    "2012 US postings; app serves mostly 2020s Indian tech postings"
+  ],
+  "cross_encoder": "fine-tuned cross_encoder_finetuned",
+  "seconds": 806.0
+}

@@ -346,6 +346,18 @@ class _ProfileContext:
         )
 
 
+def _tier_for(outcome: "RankOutcome") -> str | None:
+    """Match tier for a calibrated outcome (None when the score is not calibrated)."""
+    if not outcome.strategy.endswith("+m3_calibrated"):
+        return None
+    try:
+        from app.services.calibration import match_tier  # noqa: PLC0415
+
+        return match_tier(float(outcome.final) / 100.0)
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def _job_age_days(job: Job, now: datetime) -> float:
     """Days since posting — deterministic M2 context feature (plan §6)."""
     try:
@@ -499,17 +511,11 @@ class ContentRecommender:
                 if cal_logit is not None:
                     cal_logit = float(max(-12.0, min(12.0, cal_logit)))
                 calibrated = predict_positive(outcome.final, logit=cal_logit)
-                calibrated_score = float(calibrated) * 100.0
-
-                # outcome.final is the DCN-v2 sigmoid probability * 100 (learned).
-                # Keep calibration primary but guard against OOD collapse by using the
-                # model-derived DCN probability as a floor when calibration under-shoots.
-                dcn_prob_score = float(outcome.final)
-                if calibrated_score <= 0.0 and dcn_prob_score > 1.0:
-                    final_score = dcn_prob_score
-                else:
-                    final_score = max(calibrated_score, dcn_prob_score) if dcn_logit is not None else calibrated_score
-                calibrated_final = round(max(0.0, min(100.0, final_score)), 4)
+                # Shown score = calibrated probability only. (Previously
+                # max(calibrated, raw DCN prob), which overrode calibration.)
+                # Isotonic steps create ties; the sort below breaks them by the
+                # DCN logit, so the order is exactly the learned ranking.
+                calibrated_final = round(max(0.0, min(100.0, float(calibrated) * 100.0)), 4)
 
                 outcome = RankOutcome(
                     final=calibrated_final,
@@ -522,8 +528,15 @@ class ContentRecommender:
                 raise RuntimeError(f"M3 calibration failed (AI-strict): {exc}") from exc
             scored.append((job, result, outcome))
 
-        # 1. relevance order — deterministic tie-break on job id
-        scored.sort(key=lambda t: (-t[2].final, str(t[0].id)))
+        # 1. relevance order — calibrated score, then the DCN logit (isotonic
+        # calibration is monotone, so this equals the learned order), then job id
+        def _dcn_logit(outcome: RankOutcome) -> float:
+            try:
+                return float((outcome.attributions or [{}])[0].get("dcn_logit") or 0.0)
+            except Exception:
+                return 0.0
+
+        scored.sort(key=lambda t: (-t[2].final, -_dcn_logit(t[2]), str(t[0].id)))
 
         # 2. MMR diversity over a bounded pool
         pool_cap = min(len(scored), max(limit * 4, 24))
@@ -664,7 +677,10 @@ class ContentRecommender:
                     missing_skills=list(result.skill_detail.missing_required),
                     match_reasons=reasons,
                     explanation=contract.as_dict(),
-                    readiness=readiness_from_score(outcome.final),
+                    readiness=readiness_from_score(
+                        outcome.final, already_calibrated=outcome.strategy.endswith("+m3_calibrated")
+                    ),
+                    match_tier=_tier_for(outcome),
                     family=family,
                     strategy=outcome.strategy,
                     model_version=outcome.model_version,

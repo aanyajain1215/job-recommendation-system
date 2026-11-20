@@ -262,6 +262,8 @@ export interface RecommendationItem {
   match_reasons: string[];
   explanation?: ExplanationContract | null;
   readiness?: Readiness | null;
+  /** Label shown instead of a raw %: top (2x+ average apply rate) | strong (above average) | possible. */
+  match_tier?: "top" | "strong" | "possible" | null;
   family?: string | null;
   /** Ranking strategy that produced this item (deterministic | ltr_blend | ltr_full). */
   strategy?: string;

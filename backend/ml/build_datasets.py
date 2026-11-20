@@ -229,16 +229,18 @@ def build_feature_rows(db, agg: dict) -> list[dict]:
             try:
                 pairs = [(getattr(profile, "resume_text", "") or "", getattr(job, "description", "") or "") for _, job, *_ in per_job]
                 if hasattr(ce_scorer, "score_pairs_detailed"):
-                    detailed = ce_scorer.score_pairs_detailed(pairs)
-                    for (jid, *_rest), d in zip(per_job, detailed):
-                        ce_logits_map[jid] = float(d.get("logit", 0.0))
-                        ce_probs_map[jid] = float(d.get("prob", 0.0))
+                    # returns (logits, probs) arrays - previously this was read as a
+                    # list of dicts, which raised and silently zeroed both features
+                    logits, probs = ce_scorer.score_pairs_detailed(pairs)
+                    for (jid, *_rest), lg, pr in zip(per_job, logits, probs):
+                        ce_logits_map[jid] = float(lg)
+                        ce_probs_map[jid] = float(pr)
                 else:
                     probs = ce_scorer.score_pairs(pairs)
                     for (jid, *_rest), p in zip(per_job, probs):
                         ce_probs_map[jid] = float(p)
-            except Exception:
-                pass
+            except Exception as exc:  # noqa: BLE001
+                print(f"[datasets] cross-encoder scoring failed for profile {pid}: {exc}", file=sys.stderr)
 
         for jid, _job, label, ts, inputs, result, age, applicants in per_job:
             features = build_features(

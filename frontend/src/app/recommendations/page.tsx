@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { getRecommendations, submitFeedback, recordRecommendationEvent } from "@/lib/api";
-import { formatSalary } from "@/lib/format";
+import { formatSalary, MATCH_TIER_META, matchTierOf, type MatchTier } from "@/lib/format";
 import JobDetailModal from "@/components/job-detail-modal";
 import {
   FeedbackReason,
@@ -53,7 +53,7 @@ export default function RecommendationsPage() {
   const [feed, setFeed] = useState<RecommendationFeedResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [minMatchThreshold, setMinMatchThreshold] = useState<number>(0);
+  const [minTier, setMinTier] = useState<MatchTier | "all">("all");
   const [refreshing, setRefreshing] = useState(false);
   const [feedbackMenu, setFeedbackMenu] = useState<string | null>(null);
   const [sendingFeedbackId, setSendingFeedbackId] = useState<string | null>(null);
@@ -134,33 +134,10 @@ export default function RecommendationsPage() {
   }
 
   const filteredItems = (feed?.items || []).filter(
-    (item) => item.match_score >= minMatchThreshold,
+    (item) =>
+      minTier === "all" ||
+      MATCH_TIER_META[matchTierOf(item)].rank >= MATCH_TIER_META[minTier].rank,
   );
-
-  const getScoreColorClass = (score: number) => {
-    if (score >= 70) {
-      return {
-        badge: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30",
-        ring: "border-emerald-500/20 hover:border-emerald-500/40",
-        bar: "bg-emerald-400",
-        label: "High Alignment",
-      };
-    }
-    if (score >= 40) {
-      return {
-        badge: "bg-cyan-500/10 text-cyan-600 border-cyan-500/30",
-        ring: "border-cyan-500/20 hover:border-cyan-500/40",
-        bar: "bg-cyan-400",
-        label: "Moderate Fit",
-      };
-    }
-    return {
-      badge: "bg-zinc-800 text-zinc-300 border-zinc-700",
-      ring: "border-zinc-800/80 hover:border-zinc-700",
-      bar: "bg-zinc-600",
-      label: "Low Fit",
-    };
-  };
 
   return (
     <div className="min-h-screen bg-zinc-950 pb-20 text-zinc-100">
@@ -266,36 +243,25 @@ export default function RecommendationsPage() {
           <div className="flex items-center gap-2">
             <span className="text-xs text-zinc-400 font-medium">Filter by Fit:</span>
             <div className="inline-flex rounded-lg bg-zinc-900 p-1 border border-zinc-800 text-xs">
-              <button
-                onClick={() => setMinMatchThreshold(0)}
-                className={`px-3 py-1 rounded-md transition-colors ${
-                  minMatchThreshold === 0
-                    ? "bg-zinc-800 text-zinc-100 font-semibold"
-                    : "text-zinc-400 hover:text-zinc-100"
-                }`}
-              >
-                All Jobs
-              </button>
-              <button
-                onClick={() => setMinMatchThreshold(35)}
-                className={`px-3 py-1 rounded-md transition-colors ${
-                  minMatchThreshold === 35
-                    ? "bg-zinc-800 text-zinc-100 font-semibold"
-                    : "text-zinc-400 hover:text-zinc-100"
-                }`}
-              >
-                ≥ 35% Match
-              </button>
-              <button
-                onClick={() => setMinMatchThreshold(60)}
-                className={`px-3 py-1 rounded-md transition-colors ${
-                  minMatchThreshold === 60
-                    ? "bg-zinc-800 text-zinc-100 font-semibold"
-                    : "text-zinc-400 hover:text-zinc-100"
-                }`}
-              >
-                ≥ 60% Top Fits
-              </button>
+              {(
+                [
+                  ["all", "All Jobs"],
+                  ["strong", "Strong & Top"],
+                  ["top", "Top Matches"],
+                ] as const
+              ).map(([value, text]) => (
+                <button
+                  key={value}
+                  onClick={() => setMinTier(value)}
+                  className={`px-3 py-1 rounded-md transition-colors ${
+                    minTier === value
+                      ? "bg-zinc-800 text-zinc-100 font-semibold"
+                      : "text-zinc-400 hover:text-zinc-100"
+                  }`}
+                >
+                  {text}
+                </button>
+              ))}
             </div>
           </div>
         </div>
@@ -304,21 +270,21 @@ export default function RecommendationsPage() {
         {filteredItems.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-zinc-800 bg-zinc-900/30 p-12 text-center">
             <Compass className="h-12 w-12 text-zinc-600 mx-auto mb-3" />
-            <h3 className="text-lg font-semibold text-zinc-200">No jobs match this threshold</h3>
+            <h3 className="text-lg font-semibold text-zinc-200">No jobs in this match tier</h3>
             <p className="mt-1 text-sm text-zinc-400 max-w-md mx-auto">
               Try switching filter to &quot;All Jobs&quot; or add more skills to your profile to expand matching criteria.
             </p>
             <button
-              onClick={() => setMinMatchThreshold(0)}
+              onClick={() => setMinTier("all")}
               className="mt-4 rounded-lg bg-zinc-800 px-4 py-2 text-xs font-semibold text-zinc-200 hover:bg-zinc-700"
             >
-              Reset Threshold Filter
+              Show All Jobs
             </button>
           </div>
         ) : (
           <div className="space-y-4">
             {filteredItems.map((item, index) => {
-              const scoreStyle = getScoreColorClass(item.match_score);
+              const tier = MATCH_TIER_META[matchTierOf(item)];
               // Live listing (fetched from Adzuna, no DB row): external link
               // only — gap / roadmap / feedback are keyed to platform jobs.
               const live =
@@ -326,7 +292,7 @@ export default function RecommendationsPage() {
               return (
                 <div
                   key={item.job.id}
-                  className={`group relative rounded-2xl border bg-zinc-900/50 p-6 transition-all duration-200 ${scoreStyle.ring} hover:bg-zinc-900/80 shadow-md`}
+                  className={`group relative rounded-2xl border bg-zinc-900/50 p-6 transition-all duration-200 ${tier.ring} hover:bg-zinc-900/80 shadow-md`}
                 >
                   <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6">
                     {/* Left Column: Job Info */}
@@ -334,11 +300,11 @@ export default function RecommendationsPage() {
                       <div className="flex flex-wrap items-center gap-2 mb-2">
                         {/* Match Score Badge */}
                         <div
-                          className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold ${scoreStyle.badge}`}
+                          className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold ${tier.badge}`}
+                          title={tier.hint}
                         >
                           <Zap className="h-3.5 w-3.5 fill-current" />
-                          <span>{item.match_score}% Match</span>
-                          <span className="opacity-70 font-normal">({scoreStyle.label})</span>
+                          <span>{tier.label}</span>
                         </div>
 
                         {/* Rank Badge */}

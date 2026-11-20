@@ -9,8 +9,12 @@ Fixes (methodological):
   for a real apples-to-apples comparison:
     (a) Heuristic Weighted Sum  vs (b) LightGBM GBDT  vs (c) DCN-v2 Neural Ranker
 
+Splits: with --data-dir containing train/val/test.jsonl, the epoch (DCN) and
+early stopping (LightGBM) are chosen on VAL and every model is reported once on
+TEST. (Legacy layout train/test only: test doubles as val, as before - biased.)
+
 Artifacts:
-  ml/artifacts/dcn_ranker_v1.pt (state_dict, scaler, feature manifest, meta)
+  ml/artifacts/dcn_ranker_{version}.pt (state_dict, scaler, feature manifest, meta)
   ml/artifacts/dcn_loss_curve.png (+ .json)
 """
 
@@ -213,7 +217,10 @@ def _eval_groups_ranking(split: SplitData, pred_scores: np.ndarray) -> dict:
         if float(np.max(labels)) < POSITIVE_LABEL_MIN:
             continue
         scores = pred_scores[g]
-        order = np.argsort(-scores)
+        # random (seeded) tie-break: file order must never decide ties, or a
+        # model with many tied scores is credited with whatever order the rows have
+        tie = np.random.default_rng(len(g) * 7919 + n_eval_queries).random(len(g))
+        order = np.lexsort((tie, -scores))
         ranked_labels = labels[order].tolist()
         ndcg5s.append(ndcg_at_k(ranked_labels, 5))
         ndcg10s.append(ndcg_at_k(ranked_labels, 10))
@@ -268,8 +275,13 @@ def evaluate_split(model, split: SplitData, device: str = DEVICE, batch: int = 5
 
 # ----------------------------- Baselines -----------------------------------
 
-def train_lightgbm_baseline(train: SplitData, val: SplitData) -> tuple[dict | None, np.ndarray | None]:
-    """Train LightGBM GBDT baseline on same standardized features (apples-to-apples)."""
+def train_lightgbm_baseline(train: SplitData, val: SplitData, test: SplitData | None = None,
+                            feature_order: list[str] | None = None) -> tuple[dict | None, np.ndarray | None]:
+    """Train LightGBM GBDT baseline on same standardized features (apples-to-apples).
+
+    Early stopping on `val`; metrics reported on `test` when given (else `val`).
+    """
+    report_on = test if test is not None else val
     try:
         import lightgbm as lgb  # noqa: PLC0415
 
@@ -295,8 +307,10 @@ def train_lightgbm_baseline(train: SplitData, val: SplitData) -> tuple[dict | No
                     group=train_groups,
                     eval_set=[(val.X, val.y)],
                     eval_group=[val_groups],
+                    eval_at=[10],
+                    callbacks=[lgb.early_stopping(30, verbose=False)],
                 )
-                preds = ranker.predict(val.X)
+                preds = ranker.predict(report_on.X)
                 model = ranker
         except Exception:
             model = None
@@ -317,13 +331,22 @@ def train_lightgbm_baseline(train: SplitData, val: SplitData) -> tuple[dict | No
             clf.fit(train.X, train.y_bin.astype(int))
             # use probability of positive/high-intent as ranking score
             if hasattr(clf, "predict_proba"):
-                preds = clf.predict_proba(val.X)[:, 1]
+                preds = clf.predict_proba(report_on.X)[:, 1]
             else:
-                preds = clf.predict(val.X)
+                preds = clf.predict(report_on.X)
             model = clf
 
-        metrics = evaluate_baseline_scores(val, np.asarray(preds, dtype=np.float64))
+        metrics = evaluate_baseline_scores(report_on, np.asarray(preds, dtype=np.float64))
         metrics["model"] = type(model).__name__
+        try:
+            gains = model.booster_.feature_importance(importance_type="gain")
+            names = feature_order or [f"f{i}" for i in range(len(gains))]
+            total = float(gains.sum()) or 1.0
+            top = sorted(zip(names, gains), key=lambda t: -t[1])[:10]
+            metrics["top_features_by_gain"] = {n: round(float(g) / total, 4) for n, g in top}
+            metrics["best_iteration"] = int(getattr(model, "best_iteration_", 0) or 0)
+        except Exception:
+            pass
         return metrics, np.asarray(preds, dtype=np.float64)
     except Exception as exc:
         print(f"[dcn] LightGBM baseline training/eval failed: {exc}")
@@ -365,10 +388,10 @@ def save_loss_curve(history: list[dict], out_json: Path, out_png: Path):
         return None
 
 
-def print_comparison_table(rows: list[tuple[str, dict]]):
+def print_comparison_table(rows: list[tuple[str, dict]], split_name: str = "validation"):
     header = f"{'Model':38s} {'NDCG@5':>8s} {'NDCG@10':>8s} {'MRR@10':>8s} {'MAP@10':>8s} {'AUC-ROC':>8s} {'n_eval_q':>9s}"
     print("\n" + "=" * len(header))
-    print("M2 Ranker Comparison (validation, profile-split, positive-bearing query groups only)")
+    print(f"M2 Ranker Comparison ({split_name}, profile-split, positive-bearing query groups only)")
     print("=" * len(header))
     print(header)
     print("-" * len(header))
@@ -386,20 +409,23 @@ def print_comparison_table(rows: list[tuple[str, dict]]):
 
 # ----------------------------- Main run ------------------------------------
 
-def run(epochs: int = EPOCHS) -> dict:
+def run(epochs: int = EPOCHS, data_dir: Path = DATASETS, version: str = "v1") -> dict:
     import torch
     import torch.nn as nn
 
     set_seed(SEED)
     ARTIFACTS.mkdir(parents=True, exist_ok=True)
 
-    train_path = DATASETS / "train.jsonl"
-    val_path = DATASETS / "test.jsonl"
+    train_path = data_dir / "train.jsonl"
+    has_val = (data_dir / "val.jsonl").exists()
+    val_path = data_dir / ("val.jsonl" if has_val else "test.jsonl")
+    test_path = data_dir / "test.jsonl" if has_val else None
     if not train_path.exists() or not val_path.exists():
         raise SystemExit("datasets missing: run ml/build_datasets.py first")
 
     train_raw = load_split(train_path)
     val_raw = load_split(val_path)
+    test_raw = load_split(test_path) if test_path else None
     if train_raw.X.shape[0] == 0 or val_raw.X.shape[0] == 0:
         raise SystemExit("empty train/val split")
 
@@ -408,6 +434,12 @@ def run(epochs: int = EPOCHS) -> dict:
     Xva = scaler.transform(val_raw.X)
     train = SplitData(Xtr, train_raw.y, train_raw.y_bin, train_raw.scores_baseline, train_raw.groups)
     val = SplitData(Xva, val_raw.y, val_raw.y_bin, val_raw.scores_baseline, val_raw.groups)
+    test = (SplitData(scaler.transform(test_raw.X), test_raw.y, test_raw.y_bin, test_raw.scores_baseline,
+                      test_raw.groups) if test_raw is not None else None)
+    report_raw = test_raw if test_raw is not None else val_raw
+    report = test if test is not None else val
+    print(f"[dcn] data={data_dir} train_groups={len(train.groups)} val_groups={len(val.groups)} "
+          f"test_groups={len(test.groups) if test else 'n/a (legacy: val==test)'}")
 
     try:
         from app.services.rerank import FEATURE_ORDER  # noqa: PLC0415
@@ -416,11 +448,11 @@ def run(epochs: int = EPOCHS) -> dict:
         feature_order = [f"f{i}" for i in range(train.X.shape[1])]
 
     # (a) Heuristic Weighted Sum Baseline (stored deterministic scores)
-    baseline_metrics = evaluate_baseline_scores(val_raw, val_raw.scores_baseline)
+    baseline_metrics = evaluate_baseline_scores(report_raw, report_raw.scores_baseline)
 
     # (b) LightGBM GBDT baseline on same standardized features (apples-to-apples)
     print("[dcn] training LightGBM GBDT baseline on same standardized features...")
-    lgbm_metrics, _ = train_lightgbm_baseline(train, val)
+    lgbm_metrics, _ = train_lightgbm_baseline(train, val, test, feature_order)
 
     # (c) DCN-v2
     in_dim = train.X.shape[1]
@@ -484,11 +516,10 @@ def run(epochs: int = EPOCHS) -> dict:
     if best_state is not None:
         model.load_state_dict(best_state)
 
-    final_val = evaluate_split(model, val, device=DEVICE)
+    final_val = evaluate_split(model, report, device=DEVICE)
     dcn_metrics = {k: final_val.get(k) for k in ["ndcg@5", "ndcg@10", "mrr@10", "map@10", "auc_roc", "n_eval_queries", "n_total_groups"]}
     dcn_metrics["positive_label_min"] = POSITIVE_LABEL_MIN
 
-    version = "v1"
     artifact_path = ARTIFACTS / f"dcn_ranker_{version}.pt"
     manifest = {
         "feature_order": feature_order,
@@ -502,8 +533,12 @@ def run(epochs: int = EPOCHS) -> dict:
         "positive_label_min": POSITIVE_LABEL_MIN,
         "epochs": epochs,
         "seed": SEED,
-        "split": {"train_groups": len(train.groups), "val_groups": len(val.groups), "zero_user_overlap": True},
-        "evaluation_protocol": "ranking metrics over groups with >=1 positive and >=2 items",
+        "split": {"train_groups": len(train.groups), "val_groups": len(val.groups),
+                  "test_groups": len(test.groups) if test else None, "zero_user_overlap": True},
+        "data_dir": str(data_dir),
+        "evaluation_protocol": ("ranking metrics over groups with >=1 positive and >=2 items; "
+                                + ("epoch chosen on val, reported on test" if test else
+                                   "LEGACY: epoch chosen and reported on the same split")),
         "trained_at": datetime.now(timezone.utc).isoformat(),
     }
     payload = {
@@ -529,17 +564,19 @@ def run(epochs: int = EPOCHS) -> dict:
         ("(b) LightGBM GBDT (same features)", lgbm_metrics),
         ("(c) DCN-v2 Neural Ranker (new M2)", dcn_metrics),
     ]
-    print_comparison_table(comparison)
+    print_comparison_table(comparison, "held-out TEST" if test else "validation (legacy)")
     print(f"\n[dcn] n_eval_queries (positive-bearing, >=2 items): {dcn_metrics.get('n_eval_queries')} / val groups {dcn_metrics.get('n_total_groups')}")
     print(f"[dcn] artifact: {artifact_path}")
     print(f"[dcn] loss curve: {curve_png_path or curve_png}")
     print(f"[dcn] val metrics (DCN-v2): {json.dumps(dcn_metrics, indent=2)}")
 
-    (ARTIFACTS / "dcn_ranker_v1.metrics.json").write_text(
+    (ARTIFACTS / f"dcn_ranker_{version}.metrics.json").write_text(
         json.dumps({
             "baseline_heuristic": baseline_metrics,
             "lightgbm_gbdt": lgbm_metrics,
             "dcn_v2": dcn_metrics,
+            "reported_on": "test" if test else "val (legacy)",
+            "data_dir": str(data_dir),
             "artifact": str(artifact_path),
             "loss_curve_png": str(curve_png_path or curve_png),
         }, indent=2),
@@ -556,8 +593,10 @@ def run(epochs: int = EPOCHS) -> dict:
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--epochs", type=int, default=EPOCHS)
+    ap.add_argument("--data-dir", default=str(DATASETS), help="folder with train/val/test.jsonl")
+    ap.add_argument("--version", default="v1", help="artifact version tag, e.g. v2")
     args = ap.parse_args(argv)
-    run(epochs=args.epochs)
+    run(epochs=args.epochs, data_dir=Path(args.data_dir), version=args.version)
     return 0
 
 

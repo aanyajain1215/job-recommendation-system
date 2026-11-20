@@ -1,0 +1,461 @@
+{
+  "artifact": "ml/artifacts/skill2vec_v7.joblib",
+  "version": "v7",
+  "replaces": "skill2vec_v6 (GraphSAGE on hand-written families.yaml/skill_prereqs.yaml)",
+  "data": {
+    "source": "O*NET 31.0 software_skills (USDOL/ETA, CC BY 4.0)",
+    "occupations": 920,
+    "technologies": 2622,
+    "edges": 25690,
+    "split": {
+      "train": 20571,
+      "val": 1238,
+      "test": 3881,
+      "rule": "20% of each occupation's technologies hidden"
+    },
+    "min_occupations_per_technology": 2
+  },
+  "config": {
+    "epochs": 400,
+    "min_degree": 2,
+    "seed": 42,
+    "holdout": 0.2,
+    "hidden": 128,
+    "out_dim": 64,
+    "dropout": 0.2,
+    "lr": 0.005,
+    "weight_decay": 1e-05,
+    "negatives": 5,
+    "temperature": 10.0,
+    "patience": 60,
+    "min_prob": 0.8,
+    "bge_model": "BAAI/bge-base-en-v1.5"
+  },
+  "best_epoch": 150,
+  "train_seconds": 30.2,
+  "total_seconds": 33.4,
+  "evaluation": {
+    "Popularity (most-used tools)": {
+      "E1_link_prediction_test": {
+        "recall@10": 0.4221,
+        "recall@50": 0.55,
+        "mrr": 0.6262,
+        "auc": 0.8445,
+        "occupations": 823
+      }
+    },
+    "BGE text similarity (zero-shot)": {
+      "E1_link_prediction_test": {
+        "recall@10": 0.042,
+        "recall@50": 0.0983,
+        "mrr": 0.0726,
+        "auc": 0.6137,
+        "occupations": 823
+      },
+      "E2_skill_adjacency_auc_test": {
+        "easy_negatives": 0.6116,
+        "hard_negatives_same_job_group": 0.5824
+      },
+      "E3_related_occupations": {
+        "recall@10": 0.5789,
+        "recall@20": 0.7196,
+        "occupations": 920
+      }
+    },
+    "PPMI-SVD co-occurrence": {
+      "E1_link_prediction_test": {
+        "recall@10": 0.4791,
+        "recall@50": 0.7098,
+        "mrr": 0.5725,
+        "auc": 0.9576,
+        "occupations": 823
+      },
+      "E2_skill_adjacency_auc_test": {
+        "easy_negatives": 0.8663,
+        "hard_negatives_same_job_group": 0.7309
+      },
+      "E3_related_occupations": {
+        "recall@10": 0.2067,
+        "recall@20": 0.292,
+        "occupations": 920
+      }
+    },
+    "GraphSAGE (this model)": {
+      "E1_link_prediction_test": {
+        "recall@10": 0.4679,
+        "recall@50": 0.7101,
+        "mrr": 0.4994,
+        "auc": 0.9641,
+        "occupations": 823
+      },
+      "E2_skill_adjacency_auc_test": {
+        "easy_negatives": 0.8714,
+        "hard_negatives_same_job_group": 0.7145
+      },
+      "E3_related_occupations": {
+        "recall@10": 0.3092,
+        "recall@20": 0.4347,
+        "occupations": 920
+      }
+    }
+  },
+  "calibration": {
+    "kind": "isotonic",
+    "x": [
+      -0.53871,
+      -0.42886,
+      -0.41591,
+      -0.35027,
+      -0.35009,
+      -0.25146,
+      -0.24948,
+      -0.23187,
+      -0.23178,
+      -0.1937,
+      -0.19341,
+      -0.1779,
+      -0.17352,
+      -0.04016,
+      -0.03996,
+      -0.00101,
+      0.00024,
+      0.00911,
+      0.01011,
+      0.20634,
+      0.20666,
+      0.41294,
+      0.41319,
+      0.4984,
+      0.49895,
+      0.53214,
+      0.53225,
+      0.63978,
+      0.63991,
+      0.65479,
+      0.65487,
+      0.70698,
+      0.70777,
+      0.72613,
+      0.7262,
+      0.79764,
+      0.79791,
+      0.81071,
+      0.81087,
+      0.83,
+      0.8302,
+      0.85802,
+      0.8582,
+      0.89872,
+      0.89927,
+      0.95934,
+      0.95968,
+      0.99266,
+      0.99395,
+      0.99831
+    ],
+    "y": [
+      0.0,
+      0.0,
+      0.1,
+      0.1,
+      0.11538,
+      0.11538,
+      0.14286,
+      0.14286,
+      0.26316,
+      0.26316,
+      0.27273,
+      0.27273,
+      0.30435,
+      0.30435,
+      0.30612,
+      0.30612,
+      0.33333,
+      0.33333,
+      0.34448,
+      0.34448,
+      0.35459,
+      0.35459,
+      0.47087,
+      0.47087,
+      0.48529,
+      0.48529,
+      0.50345,
+      0.50345,
+      0.5122,
+      0.5122,
+      0.54167,
+      0.54167,
+      0.55319,
+      0.55319,
+      0.62264,
+      0.62264,
+      0.64706,
+      0.64706,
+      0.67308,
+      0.67308,
+      0.68519,
+      0.68519,
+      0.70213,
+      0.70213,
+      0.8062,
+      0.8062,
+      0.93421,
+      0.93421,
+      1.0,
+      1.0
+    ],
+    "min_prob": 0.8,
+    "fitted_on": "validation adjacency pairs, hard (same-job-group) negatives",
+    "test_isotonic": {
+      "brier": 0.2138,
+      "ece": 0.0237,
+      "precision_at_p>=0.65": 0.82,
+      "share_of_true_pairs_kept_at_p>=0.65": 0.3087,
+      "precision_at_p>=0.8": 0.9011,
+      "share_of_true_pairs_kept_at_p>=0.8": 0.1855
+    },
+    "test_platt_for_comparison": {
+      "brier": 0.2178,
+      "ece": 0.0505,
+      "precision_at_p>=0.65": 0.7878,
+      "share_of_true_pairs_kept_at_p>=0.65": 0.3414,
+      "precision_at_p>=0.8": null,
+      "share_of_true_pairs_kept_at_p>=0.8": 0.0
+    },
+    "min_cosine_for_evidence": 0.8992
+  },
+  "E4_old_handmade_pairs": {
+    "new_graphsage": {
+      "auc": 0.781,
+      "pairs_covered": 138,
+      "pairs_total": 228
+    },
+    "old_yaml_gnn_v6": {
+      "auc": 0.9625,
+      "pairs_covered": 217,
+      "pairs_total": 228
+    },
+    "note": "labels come from hand-made clusters in synthesize_corpus.py, which the old model was trained on - not an independent test"
+  },
+  "app_skill_coverage": {
+    "vocab": 98,
+    "mapped_to_onet": 73,
+    "no_vector": 25,
+    "mapped": {
+      "airflow": "Apache Airflow",
+      "angular": "Google Angular",
+      "ansible": "Ansible software",
+      "aws": "Amazon Web Services AWS software",
+      "azure": "Microsoft Azure software",
+      "bootstrap": "Bootstrap",
+      "c#": "C#",
+      "css": "Cascading style sheets CSS",
+      "data analysis": "Data analysis software",
+      "data visualization": "Data visualization software",
+      "django": "Django",
+      "docker": "Docker",
+      "elasticsearch": "Elasticsearch",
+      "ethical hacking": "Penetration testing software",
+      "excel": "Microsoft Excel",
+      "figma": "Figma",
+      "flask": "Flask",
+      "gcp": "Google Cloud software",
+      "git": "Git",
+      "github actions": "GitHub",
+      "go": "Go",
+      "grafana": "Grafana Labs Grafana Cloud",
+      "graphql": "GraphQL",
+      "hadoop": "Apache Hadoop",
+      "html": "Hypertext markup language HTML",
+      "hugging face": "Hugging Face",
+      "incident response": "Security incident management software",
+      "java": "Oracle Java",
+      "javascript": "JavaScript",
+      "jira": "Atlassian JIRA",
+      "kafka": "Apache Kafka",
+      "keras": "Keras",
+      "kotlin": "Kotlin",
+      "kubernetes": "Kubernetes",
+      "langchain": "LangChain",
+      "linux": "Linux",
+      "microservices": "Microservices Architecture",
+      "mongodb": "MongoDB",
+      "mysql": "MySQL",
+      "network security": "Network security auditing software",
+      "node.js": "Node.js",
+      "numpy": "NumPy",
+      "openai api": "OpenAI ChatGPT",
+      "pandas": "pandas",
+      "php": "PHP",
+      "postgresql": "PostgreSQL",
+      "postman": "Postman",
+      "power bi": "Microsoft Power BI",
+      "prometheus": "Prometheus",
+      "python": "Python",
+      "pytorch": "PyTorch",
+      "rabbitmq": "RabbitMQ",
+      "react": "React",
+      "react native": "React Native",
+      "redis": "Redis",
+      "rest apis": "RESTful API",
+      "ruby": "Ruby",
+      "rust": "Rust programming language",
+      "scikit-learn": "Scikit-learn",
+      "selenium": "Selenium",
+      "siem": "IBM QRadar SIEM",
+      "sklearn": "Scikit-learn",
+      "spark": "Apache Spark",
+      "spring boot": "Spring Boot",
+      "sql": "Structured query language SQL",
+      "statistics": "Statistical software",
+      "swift": "Swift",
+      "tableau": "Tableau",
+      "tensorflow": "TensorFlow",
+      "terraform": "IBM Terraform",
+      "typescript": "TypeScript",
+      "unit testing": "Unit testing software",
+      "vue.js": "Vue.js"
+    },
+    "no_vector_skills": [
+      "a/b testing",
+      "agile",
+      "ci/cd",
+      "circleci",
+      "computer vision",
+      "cypress",
+      "data structures",
+      "dbt",
+      "deep learning",
+      "express",
+      "fastapi",
+      "flutter",
+      "llm",
+      "machine learning",
+      "matplotlib",
+      "mlops",
+      "natural language processing",
+      "next.js",
+      "nginx",
+      "product management",
+      "prompt engineering",
+      "pytest",
+      "seaborn",
+      "system design",
+      "tailwind css"
+    ],
+    "no_vector_note": "no O*NET equivalent; app falls back to curated prereq/transfer edges"
+  },
+  "history": [
+    {
+      "epoch": 1,
+      "loss": 0.6506644487380981,
+      "val_auc": 0.4935278512165904
+    },
+    {
+      "epoch": 10,
+      "loss": 0.4219270944595337,
+      "val_auc": 0.8277411453670911
+    },
+    {
+      "epoch": 20,
+      "loss": 0.15927447378635406,
+      "val_auc": 0.8854815599708737
+    },
+    {
+      "epoch": 30,
+      "loss": 0.11982514709234238,
+      "val_auc": 0.9079734106550511
+    },
+    {
+      "epoch": 40,
+      "loss": 0.10151176154613495,
+      "val_auc": 0.9149858023128659
+    },
+    {
+      "epoch": 50,
+      "loss": 0.08832325041294098,
+      "val_auc": 0.9269761927753608
+    },
+    {
+      "epoch": 60,
+      "loss": 0.07998543232679367,
+      "val_auc": 0.9268156858344143
+    },
+    {
+      "epoch": 70,
+      "loss": 0.07672742009162903,
+      "val_auc": 0.9284523999050007
+    },
+    {
+      "epoch": 80,
+      "loss": 0.07340159267187119,
+      "val_auc": 0.921036457259481
+    },
+    {
+      "epoch": 90,
+      "loss": 0.0721021443605423,
+      "val_auc": 0.9328141434018598
+    },
+    {
+      "epoch": 100,
+      "loss": 0.06773735582828522,
+      "val_auc": 0.9418827855653368
+    },
+    {
+      "epoch": 110,
+      "loss": 0.06491263955831528,
+      "val_auc": 0.938093582071244
+    },
+    {
+      "epoch": 120,
+      "loss": 0.06316401809453964,
+      "val_auc": 0.9393397944989181
+    },
+    {
+      "epoch": 130,
+      "loss": 0.06070100888609886,
+      "val_auc": 0.9463107544870174
+    },
+    {
+      "epoch": 140,
+      "loss": 0.05952215567231178,
+      "val_auc": 0.9357991810231209
+    },
+    {
+      "epoch": 150,
+      "loss": 0.05885159224271774,
+      "val_auc": 0.9474039633470003
+    },
+    {
+      "epoch": 160,
+      "loss": 0.057967886328697205,
+      "val_auc": 0.9444267553326148
+    },
+    {
+      "epoch": 170,
+      "loss": 0.05568179488182068,
+      "val_auc": 0.9419059481523432
+    },
+    {
+      "epoch": 180,
+      "loss": 0.0554143562912941,
+      "val_auc": 0.9413102455625704
+    },
+    {
+      "epoch": 190,
+      "loss": 0.05436049401760101,
+      "val_auc": 0.9414886953526063
+    },
+    {
+      "epoch": 200,
+      "loss": 0.05397005379199982,
+      "val_auc": 0.9451774188917975
+    },
+    {
+      "epoch": 210,
+      "loss": 0.05227217450737953,
+      "val_auc": 0.9458625094933983
+    }
+  ]
+}
